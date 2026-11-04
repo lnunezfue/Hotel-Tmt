@@ -1,0 +1,18 @@
+{
+  "name": "hotel-sunat",
+  "private": true,
+  "description": "Sistema de Gestión Hotelera con Facturación Electrónica SUNAT (DT-001)",
+  "packageManager": "pnpm@10.12.1",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "infra:up": "docker compose up -d mysql redis",
+    "infra:down": "docker compose down",
+    "db:migrate": "pnpm --filter api prisma:deploy",
+    "db:seed": "pnpm --filter api prisma:seed",
+    "setup": "pnpm install && pnpm infra:up && pnpm --filter api wait-db && pnpm db:migrate && pnpm db:seed",
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  }
+}

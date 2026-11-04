@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+/* Tokens del sistema: misma paleta que la maqueta de usuarios y roles */
+@theme {
+  --font-sans: "IBM Plex Sans", system-ui, "Segoe UI", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --color-tinta: #14213d;
+  --color-tinta-suave: #5b6782;
+  --color-fondo: #f4f5f8;
+  --color-borde: #dce1ea;
+  --color-lateral: #14213d;
+  --color-lateral-activo: #24375e;
+  --color-acento: #c26a00;
+  --color-acento-suave: #fbebd6;
+  /* Estados de habitación (estado_habitacion.color_hex) */
+  --color-desocupada: #2e7d32;
+  --color-reservada: #1565c0;
+  --color-confirmada: #3949ab;
+  --color-ocupada: #c62828;
+  --color-limpieza: #b7791f;
+  --color-mantenimiento: #6d4c41;
+}
+
+html, body, #root { height: 100%; }
+body { background: var(--color-fondo); color: var(--color-tinta); font-family: var(--font-sans); }
+:focus-visible { outline: 2px solid var(--color-acento); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

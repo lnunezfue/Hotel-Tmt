@@ -1,0 +1,11 @@
+packages:
+  - api
+  - web
+onlyBuiltDependencies:
+  - argon2
+  - "@prisma/client"
+  - "@prisma/engines"
+  - prisma
+  - esbuild
+  - "@nestjs/core"
+  - "@tailwindcss/oxide"

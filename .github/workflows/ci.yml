@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: hotel_dev
+          MYSQL_USER: hotel
+          MYSQL_PASSWORD: hotel_dev_pass
+        options: >-
+          --health-cmd="mysqladmin ping -uroot -proot" --health-interval=5s --health-retries=20
+        ports: ["3306:3306"]
+    env:
+      DATABASE_URL: mysql://hotel:hotel_dev_pass@127.0.0.1:3306/hotel_dev
+      JWT_SECRET: ci-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Permitir triggers con usuario no root
+        run: mysql -h127.0.0.1 -uroot -proot -e "SET GLOBAL log_bin_trust_function_creators=1"
+      - name: Migraciones (esquema completo con triggers y vistas)
+        run: pnpm --filter api prisma:deploy
+      - name: Datos de ejemplo
+        run: pnpm --filter api prisma:seed
+      - run: pnpm --filter api prisma:generate
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build

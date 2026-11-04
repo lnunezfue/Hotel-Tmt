@@ -1,0 +1,34 @@
+# Infraestructura local (DT-001 §5.2 · entorno Desarrollo).
+# `pnpm setup` la levanta, aplica las migraciones y carga los datos de ejemplo.
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: hotel-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_dev_pass
+      MYSQL_DATABASE: hotel_dev
+      MYSQL_USER: hotel
+      MYSQL_PASSWORD: hotel_dev_pass
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --log-bin-trust-function-creators=1   # necesario para crear triggers y procedimientos con usuario no root
+      - --default-time-zone=+00:00            # se guarda en UTC; la interfaz muestra hora de Lima
+    ports: ["3306:3306"]
+    volumes: [mysql_data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot_dev_pass"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: hotel-redis
+    command: ["redis-server", "--appendonly", "yes"]   # la cola de emisión no puede perderse en un reinicio
+    ports: ["6379:6379"]
+    volumes: [redis_data:/data]
+
+volumes:
+  mysql_data:
+  redis_data:
