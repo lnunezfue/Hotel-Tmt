@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Unauthor
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { PERMISO_KEY, PUBLICO_KEY } from './permisos.decorator';
+import { contextoActual } from '../../common/contexto-peticion';
 import { UsuarioSesion } from '../../common/usuario-actual.decorator';
 
 export const COOKIE_SESION = 'hotel_sesion';
@@ -19,7 +20,13 @@ export class AuthGuard implements CanActivate {
     const token: string | undefined = req.cookies?.[COOKIE_SESION];
     if (!token) throw new UnauthorizedException('Inicia sesión para continuar');
     try {
-      req.usuario = await this.jwt.verifyAsync<UsuarioSesion>(token);
+      const usuario = await this.jwt.verifyAsync<UsuarioSesion>(token);
+      req.usuario = usuario;
+      const ctx = contextoActual();
+      if (ctx) {
+        ctx.usuarioId = usuario.sub;
+        ctx.sucursalId = usuario.sucursalId;
+      }
     } catch {
       throw new UnauthorizedException('Tu sesión expiró. Vuelve a iniciar sesión');
     }

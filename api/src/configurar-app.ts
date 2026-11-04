@@ -1,6 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { middlewareContexto } from './common/contexto-peticion';
 import { leerConfigAuth } from './config';
 
 // Prisma devuelve BIGINT como bigint; JSON no lo soporta.
@@ -14,4 +15,5 @@ export function configurarApp(app: NestExpressApplication): void {
   app.use(helmet());
   app.use(cookieParser());
   app.set('trust proxy', leerConfigAuth().trustProxy);
+  app.use(middlewareContexto);
 }
