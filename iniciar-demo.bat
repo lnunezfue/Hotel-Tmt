@@ -14,9 +14,11 @@ where pnpm >nul 2>nul || (echo Instalando pnpm... & call npm install -g pnpm@10)
 
 if not exist "api\.env" copy "api\.env.example" "api\.env" >nul
 
-if not exist "node_modules" (
+if not exist ".demo-lista" (
   echo [1/2] Primera vez: instalando dependencias y creando la base de datos. Tarda unos minutos...
-  call pnpm preparar || (echo Algo fallo en la preparacion. Revisa el mensaje de arriba. & pause & exit /b 1)
+  call docker compose down -v >nul 2>nul
+  call pnpm preparar || (echo Algo fallo en la preparacion. Revisa el mensaje de arriba y vuelve a ejecutar. & pause & exit /b 1)
+  echo ok> .demo-lista
 ) else (
   echo [1/2] Levantando MySQL y Redis...
   call pnpm infra:up

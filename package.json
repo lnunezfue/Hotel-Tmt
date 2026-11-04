@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "infra:up": "docker compose up -d mysql redis",
+    "infra:up": "docker compose up -d --wait mysql redis",
     "infra:down": "docker compose down",
     "db:migrate": "pnpm --filter api prisma:deploy",
     "db:seed": "pnpm --filter api prisma:seed",
@@ -15,6 +15,6 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "preparar": "pnpm install && pnpm infra:up && pnpm --filter api wait-db && pnpm db:migrate && pnpm db:seed"
+    "preparar": "pnpm install && pnpm infra:up && pnpm db:migrate && pnpm db:seed"
   }
 }
