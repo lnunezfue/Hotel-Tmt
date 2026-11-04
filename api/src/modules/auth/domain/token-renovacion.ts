@@ -3,6 +3,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 const MAX_LONGITUD_TOKEN = 200;
 const PATRON_ID = /^[1-9]\d{0,18}$/;
 const PATRON_SECRETO = /^[A-Za-z0-9_-]+$/;
+const MAX_SESION_ID = 9223372036854775807n; // máximo BIGINT con signo (int64)
 
 export function generarSecreto(): string {
   return randomBytes(32).toString('base64url');
@@ -23,7 +24,9 @@ export function parsearToken(valor: string | undefined): { sesionId: bigint; sec
   const idTexto = valor.slice(0, separador);
   const secreto = valor.slice(separador + 1);
   if (!PATRON_ID.test(idTexto) || !PATRON_SECRETO.test(secreto)) return null;
-  return { sesionId: BigInt(idTexto), secreto };
+  const sesionId = BigInt(idTexto);
+  if (sesionId > MAX_SESION_ID) return null;
+  return { sesionId, secreto };
 }
 
 export function hashesIguales(a: string, b: string): boolean {

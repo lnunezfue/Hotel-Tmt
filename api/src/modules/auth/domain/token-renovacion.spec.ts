@@ -20,6 +20,16 @@ describe('token-renovacion', () => {
       },
     );
 
+    it('rechaza ids por encima del máximo BIGINT con signo', () => {
+      expect(parsearToken(`${'9'.repeat(19)}.abc`)).toBeNull();
+      expect(parsearToken(`9223372036854775808.${generarSecreto()}`)).toBeNull();
+    });
+
+    it('acepta el máximo BIGINT con signo', () => {
+      const s = generarSecreto();
+      expect(parsearToken(`9223372036854775807.${s}`)).toEqual({ sesionId: 9223372036854775807n, secreto: s });
+    });
+
     it('rechaza ids con ceros a la izquierda o más de 19 dígitos', () => {
       const s = generarSecreto();
       expect(parsearToken(`01.${s}`)).toBeNull();
