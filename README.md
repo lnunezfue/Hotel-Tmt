@@ -10,11 +10,13 @@ Repositorio único del proyecto descrito en el documento técnico **DT-001**: AP
 
 ## Levantar el proyecto
 
-Requisitos: Node 22, pnpm 10 y Docker.
+Requisitos: Node 22, pnpm 10 y Docker Desktop abierto.
+
+En Windows basta con hacer doble clic en `iniciar-demo.bat` (hace todo lo de abajo y abre el navegador).
 
 ```bash
 cp api/.env.example api/.env
-pnpm setup      # instala, levanta MySQL y Redis, aplica migraciones y carga datos de ejemplo
+pnpm preparar   # instala, levanta MySQL y Redis, aplica migraciones y carga datos de ejemplo
 pnpm dev        # API en http://localhost:3000/api · web en http://localhost:5173
 ```
 
