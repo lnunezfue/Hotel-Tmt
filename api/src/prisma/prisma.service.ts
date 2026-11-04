@@ -19,6 +19,10 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
         database: url.pathname.replace('/', ''),
         connectionLimit: 10,
         allowPublicKeyRetrieval: true,
+        // El adaptador escribe y lee las fechas como UTC (sin depender de la zona del proceso); fijar la zona de
+        // la sesión a UTC hace que CURRENT_TIMESTAMP, NOW() y las columnas TIMESTAMP usen la misma referencia
+        // aunque el servidor MySQL esté configurado con otra zona.
+        initSql: "SET time_zone = '+00:00'",
       }),
     });
   }
