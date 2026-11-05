@@ -24,7 +24,18 @@ pnpm dev        # API en http://localhost:3000/api · web en http://localhost:51
 - Usuarios de ejemplo (clave `Hotel2026!`): `admin` (todas las sucursales), `recepcion1` (Hotel Centro), `recepcion2` (Hostal Alto Tacna), `caja1`, `limpieza1`.
 - Los datos de empresa, sucursales, habitaciones, huéspedes y tarifas son **de ejemplo**.
 
-Otros comandos: `pnpm test` (pruebas), `pnpm typecheck`, `pnpm build`, `pnpm infra:down`.
+Variables de `api/.env` (ver `api/.env.example`):
+
+| Variable | Por defecto | Nota |
+|---|---|---|
+| `JWT_SECRET` | valor de respaldo en desarrollo | Obligatoria con `NODE_ENV=production`: la API no arranca sin ella |
+| `JWT_ACCESO_MIN` | 15 | Minutos de vida del token de acceso (reemplaza a `JWT_EXPIRES_IN`, eliminada) |
+| `SESION_MAX_HORAS` | 12 | Duración máxima de una sesión |
+| `REFRESH_GRACIA_SEG` | 30 | Tolerancia para reusar un token de renovación recién rotado |
+| `TRUST_PROXY` | `false` | `1` detrás de Nginx o Caddy |
+| `LIMITE_AUTH_POR_MIN` | 10 | Límite por IP en login y renovación |
+
+Otros comandos: `pnpm test` (pruebas), `pnpm --filter api test:e2e` (pruebas de integración de la API; requieren MySQL con migraciones y datos de ejemplo), `pnpm typecheck`, `pnpm build`, `pnpm infra:down`.
 
 ## Estructura
 
@@ -58,25 +69,25 @@ web/
 | Sprint (DT-001) | Alcance | Estado |
 |---|---|---|
 | S-01 Preparación | Repositorio único, Docker, NestJS, React + Vite, Prisma, migración del esquema, catálogos SUNAT, CI | **Completo** |
-| S-02 Seguridad | Login con JWT en cookie httpOnly, Argon2id, bloqueo tras 3 intentos, guard de permisos por rol, rutas protegidas | **Avanzado**: falta token de renovación, cierre por inactividad e interceptor de auditoría |
+| S-02 Seguridad | Login con JWT en cookie httpOnly y Argon2id, bloqueo tras 3 intentos, guard de permisos por rol. Sesiones revocables: token de acceso de 15 min y token de renovación rotativo (sesión máxima de 12 h); un secreto de renovación desconocido se rechaza sin revocar nada, y reusar el token anterior pasados 30 s revoca la sesión. Cierre por inactividad configurable por empresa (15 a 480 min, 30 por defecto) con aviso de 60 s sincronizado entre pestañas. Bitácora de auditoría inmutable (triggers) con códigos `modulo.accion`, que registra sesión y alta de habitaciones. Límite de 10 por minuto por IP en login y renovación | **Completo** |
 | S-03 Organización | Empresa, sucursales, usuarios y roles (lectura), cambio de sucursal activa | **Iniciado**: falta crear/editar usuarios y el certificado digital |
 | S-04 / S-05 Habitaciones y tablero | Tablero por piso con colores, cambio de estado con reglas y historial, alertas de salida, alta de habitaciones (API) | **Adelantado** |
 | S-06 Reservas | Maqueta del calendario y del formulario de reserva para validar con recepción | **Maqueta** |
 | F3 Facturación | Puerto del proveedor y adaptador simulado | **Diseño listo** |
 
-Requerimientos cubiertos o iniciados: RF-SEG-01, 02, 03, 04, 05 (parcial); RF-RES-01 a 05, 08 y 15 (API); RNF-12, 14, 15, 19 (bloqueo de serie ya en BD), 30, 32, 34.
+Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 05, 08 y 15 (API); RNF-12, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
 
 ## Decisiones técnicas de esta semana
 
 - **El esquema SQL es la fuente de verdad.** La migración inicial es el script v1.1 completo (triggers, procedimientos, vistas y CHECK que Prisma no modela). `schema.prisma` se genera desde la base con `python3 api/scripts/gen-prisma-schema.py hotel_dev` (equivalente a `prisma db pull`). Cambios futuros: nueva migración SQL y volver a generar. Sin cliente mysql local (p. ej. Windows con Docker): `MYSQL_CMD="docker exec -i hotel-mysql mysql -uroot -proot_dev_pass" python api/scripts/gen-prisma-schema.py hotel_dev`; `MYSQL_CMD` admite cualquier comando de cliente mysql.
 - **Prisma sin binarios nativos.** Se usa `engineType = "client"` con el adaptador `@prisma/adapter-mariadb` (compatible con MySQL 8). La imagen Docker queda más liviana y no depende de descargar el motor de Prisma.
 - **Fechas en UTC en la base**, mostradas en hora de Lima en la interfaz.
+- **`argon2` fijado en 0.44.** El binario de 0.45.x para Windows falla al cargar; no subir de versión sin probar en Windows.
 - **La sucursal activa sale del token**, nunca de un parámetro del navegador (DT-001 §4.4).
 
 ## Próximos pasos
 
-1. Token de renovación, cierre por inactividad e interceptor de auditoría (S-02).
-2. Alta y edición de usuarios con asignación de sucursales y series (S-03).
-3. Pisos, tipos y tarifas en la interfaz; tablero en vivo con WebSocket (S-04 / S-05).
-4. Reservas y check-in reales sobre la maqueta validada (S-06).
-5. Pendiente de gerencia para F3: elegir proveedor (NubeFacT o FactuSmart) y volumen mensual de comprobantes (A-01, A-03).
+1. Alta y edición de usuarios con asignación de sucursales y series (S-03).
+2. Pisos, tipos y tarifas en la interfaz; tablero en vivo con WebSocket (S-04 / S-05).
+3. Reservas y check-in reales sobre la maqueta validada (S-06).
+4. Pendiente de gerencia para F3: elegir proveedor (NubeFacT o FactuSmart) y volumen mensual de comprobantes (A-01, A-03).
