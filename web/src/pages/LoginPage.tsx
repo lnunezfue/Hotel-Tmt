@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate } from 'react-router';
+import { Navigate, useSearchParams } from 'react-router';
 import { useLogin, useSesion } from '../features/auth/sesion';
+import { mensajeCierre } from '../features/auth/motivos';
 import { Button } from '../components/ui/Button';
 
 export function LoginPage() {
   const { data: sesion } = useSesion();
   const login = useLogin();
+  const [params] = useSearchParams();
+  const aviso = mensajeCierre(params.get('motivo'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   if (sesion) return <Navigate to="/" replace />;
@@ -22,6 +25,7 @@ export function LoginPage() {
           <h1 className="text-2xl font-bold">Hotel SUNAT</h1>
           <p className="text-sm text-tinta-suave">Ingresa con tu usuario del sistema</p>
         </div>
+        {aviso && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{aviso}</p>}
         <label className="flex flex-col gap-1 text-sm">
           Usuario
           <input id="usuario" autoFocus className="h-10 rounded-lg border border-borde px-3" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />

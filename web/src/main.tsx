@@ -9,8 +9,16 @@ import { TableroPage } from './pages/TableroPage';
 import { ReservasPage } from './pages/ReservasPage';
 import { UsuariosPage } from './pages/UsuariosPage';
 import { puede, useSesion } from './features/auth/sesion';
+import { alCerrarSesion } from './lib/api';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true } } });
+
+// Sesión terminada sin posibilidad de renovar: se limpia la caché y se lleva al ingreso con el motivo.
+alCerrarSesion((motivo) => {
+  queryClient.setQueryData(['sesion'], null);
+  queryClient.clear();
+  if (location.pathname !== '/login') location.replace('/login' + (motivo ? '?motivo=' + encodeURIComponent(motivo) : ''));
+});
 
 /** Rutas protegidas según la sesión y el permiso del rol (la API vuelve a verificar cada acción). */
 function Protegida({ children, permiso }: { children: ReactNode; permiso?: string }) {
