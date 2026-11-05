@@ -8,9 +8,18 @@ describe('leerConfigAuth', () => {
     expect(() => leerConfigAuth({ NODE_ENV: 'production' })).toThrow('JWT_SECRET es obligatoria en producción');
     expect(() => leerConfigAuth({ NODE_ENV: 'production', JWT_SECRET: '' })).toThrow('JWT_SECRET es obligatoria en producción');
   });
-  it('lee TRUST_PROXY numérico y booleano', () => {
+  it('lee TRUST_PROXY como false o número de saltos', () => {
     expect(leerConfigAuth({ TRUST_PROXY: '1' }).trustProxy).toBe(1);
-    expect(leerConfigAuth({ TRUST_PROXY: 'true' }).trustProxy).toBe(true);
+    expect(leerConfigAuth({ TRUST_PROXY: '0' }).trustProxy).toBe(0);
+    expect(leerConfigAuth({ TRUST_PROXY: 'false' }).trustProxy).toBe(false);
+    expect(leerConfigAuth({ TRUST_PROXY: ' ' }).trustProxy).toBe(false);
+  });
+  it('rechaza TRUST_PROXY=true (confiaría en cualquier X-Forwarded-For) y valores no numéricos', () => {
+    const mensaje = 'TRUST_PROXY debe ser false o un número de saltos (p. ej. 1)';
+    expect(() => leerConfigAuth({ TRUST_PROXY: 'true' })).toThrow(mensaje);
+    expect(() => leerConfigAuth({ TRUST_PROXY: 'TRUE' })).toThrow(mensaje);
+    expect(() => leerConfigAuth({ TRUST_PROXY: 'abc' })).toThrow(mensaje);
+    expect(() => leerConfigAuth({ TRUST_PROXY: '-1' })).toThrow(mensaje);
   });
   it('rechaza números inválidos', () => {
     expect(() => leerConfigAuth({ JWT_ACCESO_MIN: 'abc' })).toThrow('JWT_ACCESO_MIN debe ser un entero positivo');

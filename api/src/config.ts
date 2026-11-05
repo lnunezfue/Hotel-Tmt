@@ -4,7 +4,7 @@ export interface ConfigAuth {
   sesionMaxHoras: number;
   graciaSeg: number;
   limitePorMin: number;
-  trustProxy: boolean | number;
+  trustProxy: false | number;
 }
 
 function entero(env: NodeJS.ProcessEnv, nombre: string, defecto: number): number {
@@ -14,12 +14,15 @@ function entero(env: NodeJS.ProcessEnv, nombre: string, defecto: number): number
   return Number(crudo);
 }
 
-function trustProxy(env: NodeJS.ProcessEnv): boolean | number {
+/**
+ * Número de proxies de confianza delante de la API. `true` no se admite: Express tomaría como IP del cliente
+ * el primer valor de `X-Forwarded-For`, que el cliente controla (saltaría el limitador y falsearía la auditoría).
+ */
+function trustProxy(env: NodeJS.ProcessEnv): false | number {
   const crudo = (env.TRUST_PROXY ?? '').trim().toLowerCase();
   if (crudo === '' || crudo === 'false') return false;
-  if (crudo === 'true') return true;
   if (/^\d+$/.test(crudo)) return Number(crudo);
-  throw new Error('TRUST_PROXY debe ser true, false o un entero no negativo');
+  throw new Error('TRUST_PROXY debe ser false o un número de saltos (p. ej. 1)');
 }
 
 export function leerConfigAuth(env: NodeJS.ProcessEnv = process.env): ConfigAuth {
