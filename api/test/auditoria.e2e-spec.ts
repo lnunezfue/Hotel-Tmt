@@ -43,20 +43,25 @@ describe('Auditoría (e2e)', () => {
     const tipo = await prisma.tipo_habitacion.findFirstOrThrow({ where: { activo: true } });
     const numero = `E2E-${Math.random().toString(36).slice(2, 8)}`.slice(0, 10);
 
-    const res = await http()
-      .post('/api/hospedaje/habitaciones')
-      .set('Cookie', cookie)
-      .send({ numero, pisoId: piso.id, tipoHabitacionId: tipo.id });
-    expect(res.status).toBe(201);
+    let habId: number | undefined;
+    try {
+      const res = await http()
+        .post('/api/hospedaje/habitaciones')
+        .set('Cookie', cookie)
+        .send({ numero, pisoId: piso.id, tipoHabitacionId: tipo.id });
+      expect(res.status).toBe(201);
+      habId = res.body.id as number;
 
-    const filas = await prisma.auditoria.findMany({
-      where: { accion: 'habitacion.crear', registro_id: BigInt(res.body.id as number), usuario_id: u.id },
-    });
-    expect(filas).toHaveLength(1);
-    expect(filas[0].tabla).toBe('habitacion');
-    expect(filas[0].sucursal_id).toBe(sucursalId);
+      const filas = await prisma.auditoria.findMany({
+        where: { accion: 'habitacion.crear', registro_id: BigInt(res.body.id as number), usuario_id: u.id },
+      });
+      expect(filas).toHaveLength(1);
+      expect(filas[0].tabla).toBe('habitacion');
+      expect(filas[0].sucursal_id).toBe(sucursalId);
 
-    await prisma.habitacion.delete({ where: { id: res.body.id as number } });
+    } finally {
+      if (habId !== undefined) await prisma.habitacion.delete({ where: { id: habId } });
+    }
   });
 
   it('la bitácora no se modifica ni se borra', async () => {
@@ -75,5 +80,6 @@ describe('Auditoría (e2e)', () => {
     const { cookie } = await sesionDe(['usuario.ver']);
     const res = await http().post('/api/prueba-auditoria').set('Cookie', cookie).send({});
     expect(res.status).toBe(500);
+    expect(res.body.message).toContain('Falta registrar la auditoría de habitacion.crear');
   });
 });
