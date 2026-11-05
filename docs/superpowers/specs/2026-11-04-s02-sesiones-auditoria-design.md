@@ -103,10 +103,12 @@ La tabla `auditoria` está vacía en todos los entornos, por lo que el cambio de
 
 | Cookie | Contenido | Ruta | Vida | Atributos |
 |---|---|---|---|---|
-| `hotel_sesion` | JWT de acceso: `sub, sid, username, nombre, empresaId, rol, permisos, sucursales, sucursalId, inactividadMin` | `/` | `JWT_ACCESO_MIN` (15 min) | httpOnly, SameSite=Lax, Secure en producción |
+| `hotel_sesion` | JWT de acceso: `sub, sid, username, nombre, empresaId, rol, permisos, sucursales, sucursalId, inactividadMin` | `/` | hasta `expira_at` de la sesión (el JWT que contiene vence en `JWT_ACCESO_MIN`, 15 min) | httpOnly, SameSite=Lax, Secure en producción |
 | `hotel_renovacion` | `<sesionId>.<secreto>`; secreto = 32 bytes aleatorios en base64url | `/api/auth` | hasta `expira_at` (12 h) | httpOnly, SameSite=Lax, Secure en producción |
 
 `sid` es el id de `sesion_usuario`. El secreto se compara por hash con `crypto.timingSafeEqual`.
+
+La cookie de acceso sobrevive al JWT para que, vencido el acceso, el navegador lo siga enviando y el guard pueda responder `ACCESO_EXPIRADO` (el cliente renueva) en lugar de `SIN_SESION` (el cliente va al login).
 
 ### 5.2 Guard (cada petición)
 
@@ -134,7 +136,10 @@ Validación de credenciales como hoy. Si tiene éxito, en una transacción: rese
 | `ahora − ultima_renovacion_at > inactividadMin + JWT_ACCESO_MIN` | `REVOCAR(INACTIVIDAD)` |
 | hash = `refresh_hash` | `ROTAR` |
 | hash = `refresh_hash_anterior` y `ahora − rotada_at ≤ REFRESH_GRACIA_SEG` | `CARRERA` |
-| cualquier otro caso | `REVOCAR(REUSO)` |
+| hash = `refresh_hash_anterior` fuera de la tolerancia, o sin `rotada_at` | `REVOCAR(REUSO)` |
+| hash desconocido (no coincide con ninguno) | `DESCONOCIDO`: 401 `SIN_SESION` sin modificar la sesión ni auditar |
+
+Solo un token que fue válido y ya se rotó prueba un robo. Los ids de sesión son correlativos: si cualquier secreto desconocido revocara, cualquiera podría cerrar las sesiones de todos enviando `<id>.<lo-que-sea>`.
 
 5. Después, si el usuario está inactivo o ya no tiene ninguna sucursal asignada → `REVOCAR(USUARIO_INACTIVO)`.
 6. Efectos:

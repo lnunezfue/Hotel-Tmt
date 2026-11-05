@@ -21,6 +21,8 @@ export interface ConfigRenovacion {
 export type DecisionRenovacion =
   | { tipo: 'ROTAR' }
   | { tipo: 'CARRERA' }
+  /** El secreto no corresponde ni al vigente ni al anterior: no prueba posesión de la sesión, no se toca. */
+  | { tipo: 'DESCONOCIDO' }
   | { tipo: 'REVOCAR'; motivo: MotivoRevocacion }
   | { tipo: 'RECHAZAR'; motivo: MotivoRevocacion };
 
@@ -54,15 +56,13 @@ export function decidirRenovacion(
     return { tipo: 'ROTAR' };
   }
 
-  const graciaMs = c.graciaSeg * MS_POR_SEGUNDO;
-  if (
-    s.refreshHashAnterior !== null &&
-    s.rotadaAt !== null &&
-    hashesIguales(hashPresentado, s.refreshHashAnterior) &&
-    ahora.getTime() - s.rotadaAt.getTime() <= graciaMs
-  ) {
-    return { tipo: 'CARRERA' };
+  if (s.refreshHashAnterior !== null && hashesIguales(hashPresentado, s.refreshHashAnterior)) {
+    const graciaMs = c.graciaSeg * MS_POR_SEGUNDO;
+    if (s.rotadaAt !== null && ahora.getTime() - s.rotadaAt.getTime() <= graciaMs) return { tipo: 'CARRERA' };
+    // Un token que fue válido y ya se rotó: alguien más lo tiene.
+    return { tipo: 'REVOCAR', motivo: 'REUSO' };
   }
 
-  return { tipo: 'REVOCAR', motivo: 'REUSO' };
+  // Los ids de sesión son correlativos: revocar ante cualquier secreto permitiría cerrar sesiones ajenas.
+  return { tipo: 'DESCONOCIDO' };
 }

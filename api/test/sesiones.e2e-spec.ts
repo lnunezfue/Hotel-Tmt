@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { leerConfigAuth } from '../src/config';
-import { hashSecreto, parsearToken } from '../src/modules/auth/domain/token-renovacion';
+import { generarSecreto, hashSecreto, parsearToken } from '../src/modules/auth/domain/token-renovacion';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { cookiesDe, crearApp, crearUsuarioPrueba, encabezadoCookies } from './utilidades';
 
@@ -291,6 +291,25 @@ describe('Sesiones con renovación (e2e)', () => {
     const sinCookie = await http().post('/api/auth/refresh');
     expect(sinCookie.status).toBe(401);
     expect(sinCookie.body).toMatchObject({ codigo: 'SIN_SESION' });
+  });
+
+  it('un secreto desconocido para una sesión real no la revoca', async () => {
+    const u = await crearUsuarioPrueba(prisma);
+    const { cookies, sid } = await login(u);
+    const falso = `${sid}.${generarSecreto()}`;
+    expect(falso).not.toBe(cookies[RENOVACION]);
+
+    const r = await refrescar({ [RENOVACION]: falso });
+    expect(r.status).toBe(401);
+    expect(r.body).toEqual({ message: 'Inicia sesión para continuar', codigo: 'SIN_SESION' });
+    const s = await sesion(sid);
+    expect(s.revocada_at).toBeNull();
+    expect(s.motivo_revocacion).toBeNull();
+    expect(await auditoriaDe('auth.sesion_revocada', sid)).toHaveLength(0);
+
+    const real = await refrescar(cookies);
+    expect(real.status).toBe(200);
+    expect(cookiesDe(real)[RENOVACION]).toBeTruthy();
   });
 
   it('cambiar de sucursal', async () => {

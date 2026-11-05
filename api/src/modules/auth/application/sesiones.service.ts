@@ -103,6 +103,8 @@ export class SesionesService {
       );
 
       if (decision.tipo === 'RECHAZAR') return { tipo: 'DENEGADO', codigo: 'SESION_CERRADA', motivo: decision.motivo };
+      // Secreto que nunca fue de esta sesión: igual que una cookie mal formada, sin escribir ni auditar.
+      if (decision.tipo === 'DESCONOCIDO') return SIN_SESION;
       if (decision.tipo === 'REVOCAR') return this.revocar(tx, s, decision.motivo, ahora);
       // §5.4 paso 5: usuario inactivo o sin ninguna sucursal asignada.
       if (carga.estado !== 'OK') return this.revocar(tx, s, 'USUARIO_INACTIVO', ahora);

@@ -30,8 +30,10 @@ describe('decidirRenovacion', () => {
     ['token vigente', base, H1, min(10), { tipo: 'ROTAR' }],
     ['carrera dentro de 30 s', base, H0, seg(30), { tipo: 'CARRERA' }],
     ['anterior pasada la gracia', base, H0, seg(31), { tipo: 'REVOCAR', motivo: 'REUSO' }],
-    ['anterior sin rotación', { ...base, refreshHashAnterior: null, rotadaAt: null }, H0, seg(1), { tipo: 'REVOCAR', motivo: 'REUSO' }],
-    ['hash desconocido', base, HX, seg(1), { tipo: 'REVOCAR', motivo: 'REUSO' }],
+    ['anterior sin rotación', { ...base, rotadaAt: null }, H0, seg(1), { tipo: 'REVOCAR', motivo: 'REUSO' }],
+    ['hash desconocido', base, HX, seg(1), { tipo: 'DESCONOCIDO' }],
+    ['hash desconocido sin anterior', { ...base, refreshHashAnterior: null, rotadaAt: null }, H0, seg(1), { tipo: 'DESCONOCIDO' }],
+    ['hash desconocido en sesión expirada', base, HX, horas(12) + seg(1), { tipo: 'REVOCAR', motivo: 'EXPIRADA' }],
   ])('%s', (_n, s, hash, delta, esperado) => {
     expect(decidirRenovacion(s as EstadoSesion, hash, new Date(T0.getTime() + delta), cfg)).toEqual(esperado);
   });
