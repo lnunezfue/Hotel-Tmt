@@ -1,5 +1,6 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { AuthService } from './auth.service';
@@ -31,6 +32,7 @@ export class AuthController {
   ) {}
 
   @Publico()
+  @UseGuards(ThrottlerGuard)
   @Post('login')
   @HttpCode(200)
   @Auditar('auth.login')
@@ -43,6 +45,7 @@ export class AuthController {
 
   /** Spec §5.4. Las revocaciones ya están confirmadas cuando se lanza el 401. */
   @Publico()
+  @UseGuards(ThrottlerGuard)
   @Post('refresh')
   @HttpCode(200)
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {

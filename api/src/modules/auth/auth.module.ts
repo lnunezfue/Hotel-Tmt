@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { leerConfigAuth } from '../../config';
 import { SesionesService } from './application/sesiones.service';
 import { AuthController } from './auth.controller';
@@ -10,6 +11,12 @@ import { UsuarioSesionRepository } from './infrastructure/usuario-sesion.reposit
 
 @Module({
   imports: [
+    ThrottlerModule.forRootAsync({
+      useFactory: () => ({
+        throttlers: [{ ttl: 60_000, limit: leerConfigAuth().limitePorMin }],
+        errorMessage: 'Demasiados intentos. Espera un minuto e inténtalo de nuevo',
+      }),
+    }),
     JwtModule.registerAsync({
       global: true,
       useFactory: () => {
