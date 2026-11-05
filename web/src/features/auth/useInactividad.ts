@@ -37,12 +37,12 @@ export function useInactividad(minutos: number | undefined): { cierreEn: number 
       alAvisar: setCierreEn,
       alReanudar: () => setCierreEn(null),
       alCerrar: () => {
-        void api('/auth/logout', { method: 'POST', body: JSON.stringify({ motivo: 'INACTIVIDAD' }) })
-          .catch(() => undefined)
-          .finally(() => {
-            avisar('cierre');
-            irAlLogin();
-          });
+        const logout = api('/auth/logout', { method: 'POST', body: JSON.stringify({ motivo: 'INACTIVIDAD' }) }).catch(() => undefined);
+        const espera = new Promise<void>((r) => setTimeout(r, 3000));
+        void Promise.race([logout, espera]).finally(() => {
+          avisar('cierre');
+          irAlLogin();
+        });
       },
     });
 
@@ -60,6 +60,10 @@ export function useInactividad(minutos: number | undefined): { cierreEn: number 
       avisar('actividad');
     };
 
+    const alVolver = () => {
+      if (document.visibilityState === 'visible') reloj.revisar();
+    };
+    document.addEventListener('visibilitychange', alVolver);
     for (const e of EVENTOS) window.addEventListener(e, local, { passive: true });
     if (canal) {
       canal.onmessage = (m: MessageEvent<{ tipo?: string }>) => {
@@ -70,6 +74,7 @@ export function useInactividad(minutos: number | undefined): { cierreEn: number 
 
     return () => {
       for (const e of EVENTOS) window.removeEventListener(e, local);
+      document.removeEventListener('visibilitychange', alVolver);
       reloj.detener();
       try {
         canal?.close();

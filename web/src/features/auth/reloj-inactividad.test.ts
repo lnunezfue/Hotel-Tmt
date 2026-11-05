@@ -51,4 +51,39 @@ describe('reloj de inactividad', () => {
     expect(alReanudar).not.toHaveBeenCalled();
     expect(alCerrar).not.toHaveBeenCalled();
   });
+
+  it('tras suspensión (ahora salta más allá del límite) cierra de inmediato y una sola vez', () => {
+    let salto = 0;
+    const alCerrar = vi.fn();
+    const alAvisar = vi.fn();
+    const reloj = crearRelojInactividad({ limiteMs: 30 * MIN, avisoMs: 60_000, alAvisar, alReanudar: vi.fn(), alCerrar, ahora: () => Date.now() + salto });
+    salto = 45 * MIN;
+    reloj.revisar();
+    reloj.revisar();
+    vi.advanceTimersByTime(5_000);
+    expect(alCerrar).toHaveBeenCalledTimes(1);
+    expect(alAvisar).not.toHaveBeenCalled();
+  });
+
+  it('si ahora pasa el punto de aviso, avisa una sola vez', () => {
+    let salto = 0;
+    const alAvisar = vi.fn();
+    const alCerrar = vi.fn();
+    const reloj = crearRelojInactividad({ limiteMs: 30 * MIN, avisoMs: 60_000, alAvisar, alReanudar: vi.fn(), alCerrar, ahora: () => Date.now() + salto });
+    salto = 29 * MIN + 20_000;
+    reloj.revisar();
+    reloj.revisar();
+    expect(alAvisar).toHaveBeenCalledTimes(1);
+    expect(alCerrar).not.toHaveBeenCalled();
+  });
+
+  it('tras cerrar ignora la actividad y no vuelve a cerrar', () => {
+    const { reloj, alCerrar, alReanudar } = montar();
+    vi.advanceTimersByTime(30 * MIN);
+    expect(alCerrar).toHaveBeenCalledTimes(1);
+    reloj.registrarActividad();
+    vi.advanceTimersByTime(60 * MIN);
+    expect(alCerrar).toHaveBeenCalledTimes(1);
+    expect(alReanudar).not.toHaveBeenCalled();
+  });
 });

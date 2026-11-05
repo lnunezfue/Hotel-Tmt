@@ -7,46 +7,50 @@ export interface OpcionesReloj {
   ahora?: () => number;
 }
 
-/** Cuenta la inactividad: avisa `avisoMs` antes del límite y cierra al alcanzarlo. */
-export function crearRelojInactividad(o: OpcionesReloj): { registrarActividad(): void; detener(): void } {
+/**
+ * Cuenta la inactividad contra un plazo absoluto (`ahora()`), no contra temporizadores
+ * relativos: así una pestaña en segundo plano o un equipo dormido cierran al despertar.
+ */
+export function crearRelojInactividad(o: OpcionesReloj): { registrarActividad(): void; revisar(): void; detener(): void } {
   const ahora = o.ahora ?? Date.now;
-  let tAviso: ReturnType<typeof setTimeout> | undefined;
-  let tCierre: ReturnType<typeof setTimeout> | undefined;
+  let ultimaActividad = ahora();
   let avisando = false;
-  let detenido = false;
+  let terminado = false;
 
-  const limpiar = () => {
-    clearTimeout(tAviso);
-    clearTimeout(tCierre);
-  };
-
-  const armar = () => {
-    limpiar();
-    const cierreEn = ahora() + o.limiteMs;
-    tAviso = setTimeout(() => {
-      avisando = true;
-      o.alAvisar(cierreEn);
-    }, Math.max(0, o.limiteMs - o.avisoMs));
-    tCierre = setTimeout(() => {
+  const revisar = () => {
+    if (terminado) return;
+    const transcurrido = ahora() - ultimaActividad;
+    if (transcurrido >= o.limiteMs) {
+      terminado = true;
       avisando = false;
+      clearInterval(tic);
       o.alCerrar();
-    }, o.limiteMs);
+    } else if (!avisando && transcurrido >= o.limiteMs - o.avisoMs) {
+      avisando = true;
+      o.alAvisar(ultimaActividad + o.limiteMs);
+    }
   };
 
-  armar();
+  const tic = setInterval(revisar, 1000);
 
   return {
     registrarActividad() {
-      if (detenido) return;
+      if (terminado) return;
+      // Si el plazo ya venció (p. ej. al despertar), cierra en vez de reanudar.
+      if (ahora() - ultimaActividad >= o.limiteMs) {
+        revisar();
+        return;
+      }
+      ultimaActividad = ahora();
       if (avisando) {
         avisando = false;
         o.alReanudar();
       }
-      armar();
     },
+    revisar,
     detener() {
-      detenido = true;
-      limpiar();
+      terminado = true;
+      clearInterval(tic);
     },
   };
 }
