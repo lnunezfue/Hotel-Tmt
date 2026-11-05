@@ -75,4 +75,30 @@ describe('cliente HTTP', () => {
     vi.stubGlobal('fetch', vi.fn(async () => json(400, { message: ['Uno', 'Dos'] })));
     await expect(api('/x')).rejects.toMatchObject({ status: 400, message: 'Uno. Dos' });
   });
+
+  it('una renovación limitada (429) no cierra la sesión y conserva el mensaje', async () => {
+    const msg = 'Demasiados intentos. Espera un minuto e inténtalo de nuevo';
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      url === '/api/auth/refresh' ? json(429, { message: msg }) : json(401, { message: 'Acceso vencido', codigo: 'ACCESO_EXPIRADO' })));
+
+    await expect(api('/x')).rejects.toMatchObject({ status: 429, message: msg });
+    expect(manejador).not.toHaveBeenCalled();
+  });
+
+  it('un fallo de red en la renovación no cierra la sesión', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/auth/refresh') throw new TypeError('Failed to fetch');
+      return json(401, { message: 'Acceso vencido', codigo: 'ACCESO_EXPIRADO' });
+    }));
+
+    await expect(api('/x')).rejects.toBeInstanceOf(TypeError);
+    expect(manejador).not.toHaveBeenCalled();
+  });
+
+  it('credenciales incorrectas en /auth/login no disparan el manejador', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json(401, { message: 'Credenciales incorrectas' })));
+
+    await expect(api('/auth/login', { method: 'POST' })).rejects.toMatchObject({ status: 401 });
+    expect(manejador).not.toHaveBeenCalled();
+  });
 });

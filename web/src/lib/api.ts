@@ -55,9 +55,10 @@ async function ejecutar<T>(ruta: string, init: RequestInit, reintentada: boolean
       try {
         await renovar();
       } catch (fallo) {
-        const motivo = fallo instanceof ApiError ? fallo.motivo : undefined;
-        alCerrar(motivo);
-        throw new ApiError(401, fallo instanceof Error ? fallo.message : e.message, 'SESION_CERRADA', motivo);
+        // Solo un 401 de la renovación significa sesión terminada; 429, 5xx o red se propagan tal cual.
+        if (!(fallo instanceof ApiError) || fallo.status !== 401) throw fallo;
+        alCerrar(fallo.motivo);
+        throw new ApiError(401, fallo.message, 'SESION_CERRADA', fallo.motivo);
       }
       return ejecutar<T>(ruta, init, true);
     }
