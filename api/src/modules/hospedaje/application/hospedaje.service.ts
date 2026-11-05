@@ -1,11 +1,16 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { AuditoriaService } from '../../auditoria/application/auditoria.service';
 import { HabitacionRepository } from '../infrastructure/habitacion.repository';
 import { alertaSalida, esEstado, EstadoHabitacion, TransicionInvalidaError, transicionesPermitidas, validarTransicion } from '../domain/estado-habitacion';
 
 @Injectable()
 export class HospedajeService {
-  constructor(private readonly repo: HabitacionRepository, private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly repo: HabitacionRepository,
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   async tablero(sucursalId: number) {
     const pisos = await this.repo.tablero(sucursalId);
@@ -84,11 +89,15 @@ export class HospedajeService {
     const existe = await this.prisma.habitacion.findFirst({ where: { sucursal_id: sucursalId, numero: d.numero } });
     if (existe) throw new ConflictException(`Ya existe la habitación ${d.numero} en esta sucursal`);
     const desocupada = await this.prisma.estado_habitacion.findUniqueOrThrow({ where: { codigo: 'DESOCUPADA' } });
-    return this.prisma.habitacion.create({
-      data: {
-        sucursal_id: sucursalId, piso_id: d.pisoId, tipo_habitacion_id: d.tipoHabitacionId,
-        estado_habitacion_id: desocupada.id, numero: d.numero, descripcion: d.descripcion ?? null,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const hab = await tx.habitacion.create({
+        data: {
+          sucursal_id: sucursalId, piso_id: d.pisoId, tipo_habitacion_id: d.tipoHabitacionId,
+          estado_habitacion_id: desocupada.id, numero: d.numero, descripcion: d.descripcion ?? null,
+        },
+      });
+      await this.auditoria.registrar(tx, { accion: 'habitacion.crear', tabla: 'habitacion', registroId: hab.id, despues: hab });
+      return hab;
     });
   }
 }

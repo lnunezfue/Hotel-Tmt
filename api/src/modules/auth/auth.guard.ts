@@ -1,12 +1,33 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, TokenExpiredError } from '@nestjs/jwt';
 import { PERMISO_KEY, PUBLICO_KEY } from './permisos.decorator';
-import { UsuarioSesion } from '../../common/usuario-actual.decorator';
+import { COOKIE_ACCESO } from './cookies';
+import { errorSesion } from './errores';
+import { contextoActual } from '../../common/contexto-peticion';
+import { UsuarioAutenticado } from '../../common/usuario-actual.decorator';
 
-export const COOKIE_SESION = 'hotel_sesion';
+const esEntero = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
 
-/** Guard global: valida la cookie de sesión y el permiso declarado en el endpoint. */
+/** Rechaza tokens con otra forma (p. ej. emitidos antes de S-02, sin `sid`, o sin `exp`). */
+function esUsuarioAutenticado(p: object): p is UsuarioAutenticado {
+  const u = p as Partial<Record<keyof UsuarioAutenticado, unknown>>;
+  return (
+    esEntero(u.sub) &&
+    esEntero(u.exp) &&
+    typeof u.sid === 'string' &&
+    /^[1-9]\d{0,18}$/.test(u.sid) &&
+    esEntero(u.sucursalId) &&
+    esEntero(u.inactividadMin) &&
+    Array.isArray(u.permisos) &&
+    Array.isArray(u.sucursales)
+  );
+}
+
+/**
+ * Guard global: valida la cookie de acceso y el permiso declarado en el endpoint, sin consultar la base
+ * (spec §5.2). Sin cookie o firma inválida → 401 SIN_SESION; JWT vencido → 401 ACCESO_EXPIRADO.
+ */
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(private readonly jwt: JwtService, private readonly reflector: Reflector) {}
@@ -16,16 +37,25 @@ export class AuthGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(PUBLICO_KEY, objetivo)) return true;
 
     const req = ctx.switchToHttp().getRequest();
-    const token: string | undefined = req.cookies?.[COOKIE_SESION];
-    if (!token) throw new UnauthorizedException('Inicia sesión para continuar');
+    const token: unknown = req.cookies?.[COOKIE_ACCESO];
+    if (typeof token !== 'string' || token === '') throw errorSesion('SIN_SESION');
+    let usuario: UsuarioAutenticado;
     try {
-      req.usuario = await this.jwt.verifyAsync<UsuarioSesion>(token);
-    } catch {
-      throw new UnauthorizedException('Tu sesión expiró. Vuelve a iniciar sesión');
+      usuario = await this.jwt.verifyAsync<UsuarioAutenticado>(token);
+    } catch (e) {
+      throw errorSesion(e instanceof TokenExpiredError ? 'ACCESO_EXPIRADO' : 'SIN_SESION');
+    }
+    if (!esUsuarioAutenticado(usuario)) throw errorSesion('SIN_SESION');
+
+    req.usuario = usuario;
+    const contexto = contextoActual();
+    if (contexto) {
+      contexto.usuarioId = usuario.sub;
+      contexto.sucursalId = usuario.sucursalId;
     }
 
     const permiso = this.reflector.getAllAndOverride<string>(PERMISO_KEY, objetivo);
-    if (permiso && !(req.usuario as UsuarioSesion).permisos.includes(permiso)) {
+    if (permiso && !usuario.permisos.includes(permiso)) {
       throw new ForbiddenException(`Tu rol no tiene el permiso «${permiso}»`);
     }
     return true;

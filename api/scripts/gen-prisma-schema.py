@@ -1,11 +1,11 @@
 """Genera prisma/schema.prisma a partir de information_schema (equivalente a `prisma db pull`).
 Uso: python3 scripts/gen-prisma-schema.py <base_de_datos>  (requiere cliente mysql con acceso)."""
-import subprocess, sys, re, collections
+import subprocess, sys, re, collections, os, shlex
 DB = sys.argv[1] if len(sys.argv) > 1 else 'hotel_dev'
 def q(sql):
-    out = subprocess.run(['mysql', '--default-character-set=utf8mb4', '-B', '-N', '-e', sql, DB], capture_output=True, text=True, check=True).stdout
+    out = subprocess.run(shlex.split(os.environ.get('MYSQL_CMD', 'mysql')) + ['--default-character-set=utf8mb4', '-B', '-N', '-e', sql, DB], capture_output=True, text=True, check=True).stdout
     return [l.split('\t') for l in out.splitlines() if l]
-tables = [r[0] for r in q(f"select table_name from information_schema.tables where table_schema='{DB}' and table_type='BASE TABLE' order by table_name")]
+tables = [r[0] for r in q(f"select table_name from information_schema.tables where table_schema='{DB}' and table_type='BASE TABLE' and table_name <> '_prisma_migrations' order by table_name")]
 cols = collections.defaultdict(list)
 for t, c, ct, nul, dflt, extra, key, cmt in q(f"select table_name,column_name,column_type,is_nullable,ifnull(column_default,'<<NULL>>'),extra,column_key,column_comment from information_schema.columns where table_schema='{DB}' order by table_name,ordinal_position"):
     cols[t].append(dict(name=c, type=ct, null=nul == 'YES', default=None if dflt == '<<NULL>>' else dflt, extra=extra, key=key, comment=cmt))

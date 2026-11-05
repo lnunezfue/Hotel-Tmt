@@ -1,19 +1,31 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { leerConfigAuth } from '../../config';
+import { SesionesService } from './application/sesiones.service';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
+import { UsuarioSesionRepository } from './infrastructure/usuario-sesion.repository';
 
 @Module({
   imports: [
-    JwtModule.register({
+    ThrottlerModule.forRootAsync({
+      useFactory: () => ({
+        throttlers: [{ ttl: 60_000, limit: leerConfigAuth().limitePorMin }],
+        errorMessage: 'Demasiados intentos. Espera un minuto e inténtalo de nuevo',
+      }),
+    }),
+    JwtModule.registerAsync({
       global: true,
-      secret: process.env.JWT_SECRET ?? 'solo-desarrollo',
-      signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN ?? '8h') as `${number}h` },
+      useFactory: () => {
+        const cfg = leerConfigAuth();
+        return { secret: cfg.jwtSecret, signOptions: { expiresIn: cfg.accesoMin * 60 } };
+      },
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, { provide: APP_GUARD, useClass: AuthGuard }],
+  providers: [AuthService, SesionesService, UsuarioSesionRepository, { provide: APP_GUARD, useClass: AuthGuard }],
 })
 export class AuthModule {}

@@ -14,20 +14,24 @@ datasource db {
 }
 
 model auditoria {
-  id            BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
-  usuario_id    Int?             @db.UnsignedInt
-  tabla         String           @db.VarChar(64)
-  registro_id   BigInt           @db.UnsignedBigInt
-  accion        auditoria_accion
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  usuario_id    Int?      @db.UnsignedInt
+  sucursal_id   Int?      @db.UnsignedInt
+  tabla         String    @db.VarChar(64)
+  registro_id   BigInt?   @db.UnsignedBigInt
+  accion        String    @db.VarChar(40)
   datos_antes   Json?
   datos_despues Json?
-  ip            String?          @db.VarChar(45)
-  created_at    DateTime         @default(now()) @db.Timestamp(0)
-  usuario       usuario?         @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_aud_usuario")
+  ip            String?   @db.VarChar(45)
+  user_agent    String?   @db.VarChar(255)
+  created_at    DateTime  @default(now()) @db.Timestamp(0)
+  sucursal      sucursal? @relation(fields: [sucursal_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_aud_sucursal")
+  usuario       usuario?  @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_aud_usuario")
 
-  @@index([usuario_id], map: "fk_aud_usuario")
+  @@index([sucursal_id], map: "fk_aud_sucursal")
   @@index([created_at], map: "ix_aud_fecha")
   @@index([tabla, registro_id], map: "ix_aud_tabla_reg")
+  @@index([usuario_id, created_at], map: "ix_aud_usuario_fecha")
 }
 
 model caja {
@@ -385,35 +389,36 @@ model descuento {
 }
 
 model empresa {
-  id                  Int                   @id @default(autoincrement()) @db.UnsignedInt
-  ruc                 String                @unique(map: "uk_empresa_ruc") @db.Char(11)
-  razon_social        String                @db.VarChar(200)
-  nombre_comercial    String?               @db.VarChar(200)
-  direccion_fiscal    String                @db.VarChar(250)
-  ubigeo_codigo       String                @db.Char(6)
-  telefono            String?               @db.VarChar(20)
-  email               String?               @db.VarChar(120)
-  logo_ruta           String?               @db.VarChar(255)
-  sunat_entorno       empresa_sunat_entorno @default(BETA)
-  sunat_usuario_sol   String?               @db.VarChar(30)
-  sunat_clave_sol     Bytes?                @db.VarBinary(255)
-  ose_proveedor       String?               @db.VarChar(80)
-  igv_porcentaje      Decimal               @default(18.00) @db.Decimal(5, 2)
-  activo              Boolean               @default(true) @db.TinyInt
-  created_at          DateTime              @default(now()) @db.Timestamp(0)
-  updated_at          DateTime              @default(now()) @db.Timestamp(0)
-  ubigeo              ubigeo                @relation(fields: [ubigeo_codigo], references: [codigo], onDelete: NoAction, onUpdate: NoAction, map: "fk_empresa_ubigeo")
-  canal_venta         canal_venta[]
-  categoria_producto  categoria_producto[]
-  certificado_digital certificado_digital[]
-  cliente             cliente[]
-  descuento           descuento[]
-  lote_sunat          lote_sunat[]
-  producto            producto[]
-  proveedor           proveedor[]
-  sucursal            sucursal[]
-  tipo_habitacion     tipo_habitacion[]
-  usuario             usuario[]
+  id                     Int                   @id @default(autoincrement()) @db.UnsignedInt
+  ruc                    String                @unique(map: "uk_empresa_ruc") @db.Char(11)
+  razon_social           String                @db.VarChar(200)
+  nombre_comercial       String?               @db.VarChar(200)
+  direccion_fiscal       String                @db.VarChar(250)
+  ubigeo_codigo          String                @db.Char(6)
+  telefono               String?               @db.VarChar(20)
+  email                  String?               @db.VarChar(120)
+  logo_ruta              String?               @db.VarChar(255)
+  sunat_entorno          empresa_sunat_entorno @default(BETA)
+  sunat_usuario_sol      String?               @db.VarChar(30)
+  sunat_clave_sol        Bytes?                @db.VarBinary(255)
+  ose_proveedor          String?               @db.VarChar(80)
+  igv_porcentaje         Decimal               @default(18.00) @db.Decimal(5, 2)
+  sesion_inactividad_min Int                   @default(30) @db.UnsignedSmallInt
+  activo                 Boolean               @default(true) @db.TinyInt
+  created_at             DateTime              @default(now()) @db.Timestamp(0)
+  updated_at             DateTime              @default(now()) @db.Timestamp(0)
+  ubigeo                 ubigeo                @relation(fields: [ubigeo_codigo], references: [codigo], onDelete: NoAction, onUpdate: NoAction, map: "fk_empresa_ubigeo")
+  canal_venta            canal_venta[]
+  categoria_producto     categoria_producto[]
+  certificado_digital    certificado_digital[]
+  cliente                cliente[]
+  descuento              descuento[]
+  lote_sunat             lote_sunat[]
+  producto               producto[]
+  proveedor              proveedor[]
+  sucursal               sucursal[]
+  tipo_habitacion        tipo_habitacion[]
+  usuario                usuario[]
 
   @@index([ubigeo_codigo], map: "fk_empresa_ubigeo")
 }
@@ -823,6 +828,27 @@ model serie {
   @@index([tipo_comprobante_id], map: "ix_serie_tcomp")
 }
 
+model sesion_usuario {
+  id                    BigInt                            @id @default(autoincrement()) @db.UnsignedBigInt
+  usuario_id            Int                               @db.UnsignedInt
+  sucursal_id           Int                               @db.UnsignedInt
+  refresh_hash          String                            @db.Char(64)
+  refresh_hash_anterior String?                           @db.Char(64)
+  rotada_at             DateTime?                         @db.DateTime(0)
+  ip                    String?                           @db.VarChar(45)
+  user_agent            String?                           @db.VarChar(255)
+  creada_at             DateTime                          @default(now()) @db.DateTime(0)
+  ultima_renovacion_at  DateTime                          @default(now()) @db.DateTime(0)
+  expira_at             DateTime                          @db.DateTime(0)
+  revocada_at           DateTime?                         @db.DateTime(0)
+  motivo_revocacion     sesion_usuario_motivo_revocacion?
+  sucursal              sucursal                          @relation(fields: [sucursal_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sesion_sucursal")
+  usuario               usuario                           @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sesion_usuario")
+
+  @@index([sucursal_id], map: "fk_sesion_sucursal")
+  @@index([usuario_id, revocada_at], map: "ix_sesion_usuario")
+}
+
 model sucursal {
   id                     Int                     @id @default(autoincrement()) @db.UnsignedInt
   empresa_id             Int                     @db.UnsignedInt
@@ -839,6 +865,7 @@ model sucursal {
   updated_at             DateTime                @default(now()) @db.Timestamp(0)
   empresa                empresa                 @relation(fields: [empresa_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sucursal_empresa")
   ubigeo                 ubigeo                  @relation(fields: [ubigeo_codigo], references: [codigo], onDelete: NoAction, onUpdate: NoAction, map: "fk_sucursal_ubigeo")
+  auditoria              auditoria[]
   caja                   caja[]
   compra                 compra[]
   comprobante            comprobante[]
@@ -849,6 +876,7 @@ model sucursal {
   producto_stock         producto_stock[]
   reserva                reserva[]
   serie                  serie[]
+  sesion_usuario         sesion_usuario[]
   tarifa                 tarifa[]
   usuario_sucursal       usuario_sucursal[]
 
@@ -1027,6 +1055,7 @@ model usuario {
   lote_sunat                   lote_sunat[]
   movimiento_inventario        movimiento_inventario[]
   reserva                      reserva[]
+  sesion_usuario               sesion_usuario[]
   usuario_serie                usuario_serie[]
   usuario_sucursal             usuario_sucursal[]
 
@@ -1053,14 +1082,6 @@ model usuario_sucursal {
 
   @@id([usuario_id, sucursal_id])
   @@index([sucursal_id], map: "ix_us_sucursal")
-}
-
-enum auditoria_accion {
-  INSERT
-  UPDATE
-  DELETE
-  ANULAR
-  LOGIN
 }
 
 enum caja_sesion_estado {
@@ -1145,6 +1166,15 @@ enum reserva_estado {
 enum reserva_habitacion_estado {
   ACTIVA
   CANCELADA
+}
+
+enum sesion_usuario_motivo_revocacion {
+  LOGOUT
+  INACTIVIDAD
+  REUSO
+  USUARIO_INACTIVO
+  EXPIRADA
+  ADMIN
 }
 
 enum sucursal_tipo {
