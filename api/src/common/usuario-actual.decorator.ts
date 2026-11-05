@@ -16,6 +16,19 @@ export interface UsuarioSesion {
   inactividadMin: number;
 }
 
-export const UsuarioActual = createParamDecorator((_: unknown, ctx: ExecutionContext): UsuarioSesion => {
+/** Usuario de la petición: el JWT de acceso ya verificado, con las marcas de tiempo que pone la firma (segundos). */
+export interface UsuarioAutenticado extends UsuarioSesion {
+  iat?: number;
+  /** Vencimiento del JWT presentado; un JWT reemitido a partir de este no puede vencer después. */
+  exp: number;
+}
+
+/** Quita `iat`/`exp` para volver a firmar (jsonwebtoken rechaza `exp` en el contenido junto con `expiresIn`). */
+export function sinMarcasDeTiempo(u: UsuarioSesion & { iat?: number; exp?: number }): UsuarioSesion {
+  const { iat: _iat, exp: _exp, ...datos } = u;
+  return datos;
+}
+
+export const UsuarioActual = createParamDecorator((_: unknown, ctx: ExecutionContext): UsuarioAutenticado => {
   return ctx.switchToHttp().getRequest().usuario;
 });

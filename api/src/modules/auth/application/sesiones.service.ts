@@ -1,13 +1,12 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma, sesion_usuario } from '@prisma/client';
 import { contextoActual } from '../../../common/contexto-peticion';
-import { UsuarioSesion } from '../../../common/usuario-actual.decorator';
+import { sinMarcasDeTiempo, UsuarioAutenticado, UsuarioSesion } from '../../../common/usuario-actual.decorator';
 import { leerConfigAuth } from '../../../config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/application/auditoria.service';
 import { decidirRenovacion, MotivoRevocacion } from '../domain/renovacion';
 import { formatearToken, generarSecreto, hashesIguales, hashSecreto, parsearToken } from '../domain/token-renovacion';
-import { errorSesion } from '../errores';
 import { UsuarioSesionRepository } from '../infrastructure/usuario-sesion.repository';
 
 export interface Renovacion {
@@ -15,12 +14,29 @@ export interface Renovacion {
   expiraAt: Date;
 }
 
+/**
+ * 401 que el controlador lanza tras confirmar la transacción. `borrarCookies` es falso cuando el secreto es
+ * desconocido: puede venir de una pestaña con un secreto ya superado mientras el navegador guarda el vigente.
+ */
+export interface Denegacion {
+  tipo: 'DENEGADO';
+  codigo: 'SIN_SESION' | 'SESION_CERRADA';
+  motivo?: MotivoRevocacion;
+  borrarCookies: boolean;
+}
+
 export type ResultadoRenovacion =
   /** `expiraAt`: fin de la sesión (para la vida de la cookie de acceso). `renovacion` solo si hubo rotación. */
   | { tipo: 'OK'; usuario: UsuarioSesion; expiraAt: Date; renovacion?: Renovacion }
-  | { tipo: 'DENEGADO'; codigo: 'SIN_SESION' | 'SESION_CERRADA'; motivo?: MotivoRevocacion };
+  | Denegacion;
 
-const SIN_SESION: ResultadoRenovacion = { tipo: 'DENEGADO', codigo: 'SIN_SESION' };
+export type ResultadoCambioSucursal = { tipo: 'OK'; usuario: UsuarioSesion; expiraAt: Date } | Denegacion;
+
+/** Cookie ausente, mal formada o de una sesión inexistente: no hay nada vigente que conservar. */
+const SIN_SESION: Denegacion = { tipo: 'DENEGADO', codigo: 'SIN_SESION', borrarCookies: true };
+/** Secreto que no es ni el vigente ni el anterior: no se escribe, no se audita y no se borran cookies. */
+const DESCONOCIDO: Denegacion = { tipo: 'DENEGADO', codigo: 'SIN_SESION', borrarCookies: false };
+const cerrada = (motivo: MotivoRevocacion): Denegacion => ({ tipo: 'DENEGADO', codigo: 'SESION_CERRADA', motivo, borrarCookies: true });
 
 /** Las columnas son DATETIME(0): se trabaja con segundos enteros para que lo guardado sea exactamente lo decidido. */
 function ahoraSegundos(): Date {
@@ -102,9 +118,8 @@ export class SesionesService {
         { inactividadMin, accesoMin: this.cfg.accesoMin, graciaSeg: this.cfg.graciaSeg },
       );
 
-      if (decision.tipo === 'RECHAZAR') return { tipo: 'DENEGADO', codigo: 'SESION_CERRADA', motivo: decision.motivo };
-      // Secreto que nunca fue de esta sesión: igual que una cookie mal formada, sin escribir ni auditar.
-      if (decision.tipo === 'DESCONOCIDO') return SIN_SESION;
+      if (decision.tipo === 'DESCONOCIDO') return DESCONOCIDO;
+      if (decision.tipo === 'RECHAZAR') return cerrada(decision.motivo);
       if (decision.tipo === 'REVOCAR') return this.revocar(tx, s, decision.motivo, ahora);
       // §5.4 paso 5: usuario inactivo o sin ninguna sucursal asignada.
       if (carga.estado !== 'OK') return this.revocar(tx, s, 'USUARIO_INACTIVO', ahora);
@@ -166,15 +181,20 @@ export class SesionesService {
 
   /**
    * Cambia la sucursal activa de la sesión `sid` (spec §5.6). 403 si la sucursal no está asignada;
-   * 401 `SESION_CERRADA` si la sesión ya se revocó (el acceso aún no venció), sin modificar nada.
+   * 401 `SESION_CERRADA` si la sesión ya se revocó (el acceso aún no venció), sin modificar nada, o si pasó su
+   * `expira_at` (se revoca con EXPIRADA, como en la renovación). No lanza después de escribir: la revocación
+   * se confirma y el controlador responde 401 después.
    */
-  async cambiarSucursal(actual: UsuarioSesion, sucursalId: number): Promise<{ usuario: UsuarioSesion; expiraAt: Date }> {
+  async cambiarSucursal(actual: UsuarioAutenticado, sucursalId: number): Promise<ResultadoCambioSucursal> {
     if (!actual.sucursales.includes(sucursalId)) throw new ForbiddenException('No tienes acceso a esa sucursal');
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx): Promise<ResultadoCambioSucursal> => {
       const s = await this.bloquear(tx, BigInt(actual.sid));
-      if (!s || s.usuario_id !== actual.sub) throw errorSesion('SIN_SESION');
-      if (s.revocada_at !== null) throw errorSesion('SESION_CERRADA', s.motivo_revocacion ?? 'LOGOUT');
+      if (!s || s.usuario_id !== actual.sub) return SIN_SESION;
+      if (s.revocada_at !== null) return cerrada(s.motivo_revocacion ?? 'LOGOUT');
+      const ahora = ahoraSegundos();
+      // El acceso (JWT_ACCESO_MIN) puede sobrevivir a la sesión unos minutos; no sirve para seguir usándola.
+      if (ahora.getTime() > s.expira_at.getTime()) return this.revocar(tx, s, 'EXPIRADA', ahora);
       // El JWT puede tener hasta JWT_ACCESO_MIN de antigüedad: se confirma la asignación contra la base.
       const asignada = await tx.usuario_sucursal.findUnique({
         where: { usuario_id_sucursal_id: { usuario_id: actual.sub, sucursal_id: sucursalId } },
@@ -190,8 +210,7 @@ export class SesionesService {
         despues: { sucursal_id: sucursalId },
       });
 
-      const { iat: _iat, exp: _exp, ...resto } = actual as UsuarioSesion & { iat?: number; exp?: number };
-      return { usuario: { ...resto, sucursalId }, expiraAt: s.expira_at };
+      return { tipo: 'OK', usuario: { ...sinMarcasDeTiempo(actual), sucursalId }, expiraAt: s.expira_at };
     });
   }
 
@@ -206,7 +225,7 @@ export class SesionesService {
     s: sesion_usuario,
     motivo: MotivoRevocacion,
     ahora: Date,
-  ): Promise<ResultadoRenovacion> {
+  ): Promise<Denegacion> {
     await tx.sesion_usuario.update({ where: { id: s.id }, data: { revocada_at: ahora, motivo_revocacion: motivo } });
     await this.auditoria.registrar(tx, {
       accion: 'auth.sesion_revocada',
@@ -215,6 +234,6 @@ export class SesionesService {
       despues: { motivo },
       usuarioId: s.usuario_id,
     });
-    return { tipo: 'DENEGADO', codigo: 'SESION_CERRADA', motivo };
+    return cerrada(motivo);
   }
 }

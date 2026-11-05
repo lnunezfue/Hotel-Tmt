@@ -2,7 +2,7 @@ import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/c
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UsuarioSesion } from '../../common/usuario-actual.decorator';
+import { sinMarcasDeTiempo, UsuarioSesion } from '../../common/usuario-actual.decorator';
 import { AuditoriaService } from '../auditoria/application/auditoria.service';
 import { Renovacion, SesionesService } from './application/sesiones.service';
 import { UsuarioSesionRepository } from './infrastructure/usuario-sesion.repository';
@@ -60,10 +60,16 @@ export class AuthService {
     return { acceso: await this.firmarAcceso(r.usuario), usuario: r.usuario, renovacion: r.renovacion };
   }
 
-  /** Firma el JWT de acceso; descarta `iat`/`exp` de un payload ya firmado (los pone `signAsync`). */
-  firmarAcceso(usuario: UsuarioSesion): Promise<string> {
-    const { iat: _iat, exp: _exp, ...payload } = usuario as UsuarioSesion & { iat?: number; exp?: number };
-    return this.jwt.signAsync(payload);
+  /**
+   * Firma el JWT de acceso; descarta `iat`/`exp` de un payload ya firmado (los pone `signAsync`). Sin `venceEn`
+   * dura JWT_ACCESO_MIN; con `venceEn` (segundos desde epoch) vence entonces: reemitir no prolonga el acceso.
+   */
+  firmarAcceso(usuario: UsuarioSesion & { iat?: number; exp?: number }, venceEn?: number): Promise<string> {
+    const payload = sinMarcasDeTiempo(usuario);
+    if (venceEn === undefined) return this.jwt.signAsync(payload);
+    // `iat` explícito: jsonwebtoken calcula `exp = iat + expiresIn` con él, sin que un cambio de segundo lo desplace.
+    const iat = Math.floor(Date.now() / 1000);
+    return this.jwt.signAsync({ ...payload, iat }, { expiresIn: Math.max(1, venceEn - iat) });
   }
 
   /** `auth.login_fallido` es un evento de seguridad: se escribe fuera de transacción (spec §7.1) y luego se lanza el error. */

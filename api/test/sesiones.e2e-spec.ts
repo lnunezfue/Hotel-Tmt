@@ -38,13 +38,33 @@ describe('Sesiones con renovación (e2e)', () => {
     return http().get('/api/auth/me').set('Cookie', encabezadoCookies(cookies));
   }
 
+  /** Línea `Set-Cookie` completa (con atributos) de la cookie `nombre`, si la respuesta la fija o la borra. */
+  function lineaCookie(res: request.Response, nombre: string): string | undefined {
+    const crudo = res.headers['set-cookie'] as unknown;
+    const lista = Array.isArray(crudo) ? (crudo as string[]) : typeof crudo === 'string' ? [crudo] : [];
+    return lista.find((l) => l.startsWith(`${nombre}=`));
+  }
+
+  /** `exp` (segundos) del JWT de acceso, sin verificar la firma. */
+  function expDe(jwt: string): number {
+    const payload = new JwtService({}).decode<{ exp?: unknown }>(jwt);
+    if (typeof payload?.exp !== 'number') throw new Error('JWT sin exp');
+    return payload.exp;
+  }
+
+  /** Sesión que venció hace un minuto (creada_at se retrasa por el CHECK expira_at > creada_at). */
+  const fechasVencidas = () => ({
+    creada_at: new Date(Date.now() - (leerConfigAuth().sesionMaxHoras + 1) * 3_600_000),
+    expira_at: new Date(Date.now() - 60_000),
+  });
+
   const sesion = (id: bigint) => prisma.sesion_usuario.findUniqueOrThrow({ where: { id } });
   const auditoriaDe = (accion: string, registroId: bigint) =>
     prisma.auditoria.findMany({ where: { accion, registro_id: registroId }, orderBy: { id: 'asc' } });
 
   it('login crea una sesión, fija ambas cookies y registra auth.login', async () => {
     const u = await crearUsuarioPrueba(prisma);
-    const { cookies, sid } = await login(u);
+    const { res, cookies, sid } = await login(u);
 
     expect(cookies[ACCESO]).toBeTruthy();
     expect(cookies[RENOVACION]).toBeTruthy();
@@ -54,6 +74,19 @@ describe('Sesiones con renovación (e2e)', () => {
     expect(s.usuario_id).toBe(u.id);
     expect(s.revocada_at).toBeNull();
     expect(s.refresh_hash).toBe(hashSecreto(parsearToken(cookies[RENOVACION])!.secreto));
+
+    // Atributos de spec §5.1: ambas viven hasta expira_at; la de renovación solo viaja a /api/auth.
+    const renovacion = lineaCookie(res, RENOVACION);
+    const acceso = lineaCookie(res, ACCESO);
+    expect(renovacion).toMatch(/; Path=\/api\/auth(;|$)/);
+    expect(acceso).toMatch(/; Path=\/(;|$)/);
+    for (const linea of [renovacion, acceso]) {
+      expect(linea).toMatch(/; HttpOnly(;|$)/);
+      expect(linea).toMatch(/; SameSite=Lax(;|$)/);
+      const expires = /; Expires=([^;]+)/.exec(linea ?? '')?.[1];
+      expect(expires).toBeDefined();
+      expect(Math.abs(Date.parse(expires!) - s.expira_at.getTime())).toBeLessThanOrEqual(5_000);
+    }
 
     const aud = await auditoriaDe('auth.login', sid);
     expect(aud).toHaveLength(1);
@@ -302,6 +335,9 @@ describe('Sesiones con renovación (e2e)', () => {
     const r = await refrescar({ [RENOVACION]: falso });
     expect(r.status).toBe(401);
     expect(r.body).toEqual({ message: 'Inicia sesión para continuar', codigo: 'SIN_SESION' });
+    // No borra cookies: puede ser una pestaña con un secreto ya superado y el navegador tener uno vigente.
+    expect(lineaCookie(r, RENOVACION)).toBeUndefined();
+    expect(lineaCookie(r, ACCESO)).toBeUndefined();
     const s = await sesion(sid);
     expect(s.revocada_at).toBeNull();
     expect(s.motivo_revocacion).toBeNull();
@@ -310,6 +346,19 @@ describe('Sesiones con renovación (e2e)', () => {
     const real = await refrescar(cookies);
     expect(real.status).toBe(200);
     expect(cookiesDe(real)[RENOVACION]).toBeTruthy();
+
+    // La posesión se comprueba antes que los tiempos: ni revoca una sesión vencida ni revela el motivo de una cerrada.
+    await prisma.sesion_usuario.update({ where: { id: sid }, data: fechasVencidas() });
+    const vencida = await refrescar({ [RENOVACION]: falso });
+    expect(vencida.status).toBe(401);
+    expect(vencida.body).toEqual({ message: 'Inicia sesión para continuar', codigo: 'SIN_SESION' });
+    expect((await sesion(sid)).revocada_at).toBeNull();
+    expect(await auditoriaDe('auth.sesion_revocada', sid)).toHaveLength(0);
+
+    await prisma.sesion_usuario.update({ where: { id: sid }, data: { revocada_at: new Date(), motivo_revocacion: 'ADMIN' } });
+    const cerrada = await refrescar({ [RENOVACION]: falso });
+    expect(cerrada.status).toBe(401);
+    expect(cerrada.body).toEqual({ message: 'Inicia sesión para continuar', codigo: 'SIN_SESION' });
   });
 
   it('cambiar de sucursal', async () => {
@@ -323,6 +372,8 @@ describe('Sesiones con renovación (e2e)', () => {
     expect(r.status).toBe(200);
     expect(r.body.sucursalId).toBe(segunda);
     expect(cookiesDe(r)[ACCESO]).toBeTruthy();
+    // El acceso nuevo vence cuando vencía el presentado: cambiar de sucursal no prolonga la sesión.
+    expect(expDe(cookiesDe(r)[ACCESO])).toBe(expDe(cookies[ACCESO]));
     expect((await sesion(sid)).sucursal_id).toBe(segunda);
     const aud = await auditoriaDe('auth.cambio_sucursal', sid);
     expect(aud).toHaveLength(1);
@@ -339,6 +390,42 @@ describe('Sesiones con renovación (e2e)', () => {
     expect(r2.body).toMatchObject({ codigo: 'SESION_CERRADA', motivo: 'ADMIN' });
     expect((await sesion(sid)).sucursal_id).toBe(segunda);
     expect(await auditoriaDe('auth.cambio_sucursal', sid)).toHaveLength(1);
+  });
+
+  it('cambiar de sucursal conserva la vida restante del acceso', async () => {
+    const u = await crearUsuarioPrueba(prisma);
+    const { res } = await login(u);
+    const segunda = (res.body.sucursales as number[])[1];
+    // Un acceso al que le quedan 2 min (p. ej. emitido hace 13): el nuevo no puede vencer después.
+    const exp = Math.floor(Date.now() / 1000) + 120;
+    const corto = new JwtService({ secret: leerConfigAuth().jwtSecret }).sign({ ...res.body, exp });
+
+    const r = await http().post('/api/auth/sucursal').set('Cookie', encabezadoCookies({ [ACCESO]: corto })).send({ sucursalId: segunda });
+    expect(r.status).toBe(200);
+    expect(expDe(cookiesDe(r)[ACCESO])).toBe(exp);
+  });
+
+  it('cambiar de sucursal en una sesión vencida la revoca con EXPIRADA', async () => {
+    const u = await crearUsuarioPrueba(prisma);
+    const { res, cookies, sid } = await login(u);
+    const [principal, segunda] = res.body.sucursales as number[];
+    // El acceso (15 min) puede seguir vigente unos minutos después de expira_at.
+    await prisma.sesion_usuario.update({ where: { id: sid }, data: fechasVencidas() });
+
+    const r = await http().post('/api/auth/sucursal').set('Cookie', encabezadoCookies(cookies)).send({ sucursalId: segunda });
+    expect(r.status).toBe(401);
+    expect(r.body).toMatchObject({ codigo: 'SESION_CERRADA', motivo: 'EXPIRADA' });
+    expect(cookiesDe(r)[ACCESO]).not.toBeTruthy();
+
+    const s = await sesion(sid);
+    expect(s.revocada_at).not.toBeNull();
+    expect(s.motivo_revocacion).toBe('EXPIRADA');
+    expect(s.sucursal_id).toBe(principal);
+    const aud = await auditoriaDe('auth.sesion_revocada', sid);
+    expect(aud).toHaveLength(1);
+    expect(aud[0].datos_despues).toEqual({ motivo: 'EXPIRADA' });
+    expect(aud[0].usuario_id).toBe(u.id);
+    expect(await auditoriaDe('auth.cambio_sucursal', sid)).toHaveLength(0);
   });
 
   it('si se desasigna la sucursal activa, la renovación pasa a la principal', async () => {

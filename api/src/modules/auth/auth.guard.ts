@@ -5,15 +5,16 @@ import { PERMISO_KEY, PUBLICO_KEY } from './permisos.decorator';
 import { COOKIE_ACCESO } from './cookies';
 import { errorSesion } from './errores';
 import { contextoActual } from '../../common/contexto-peticion';
-import { UsuarioSesion } from '../../common/usuario-actual.decorator';
+import { UsuarioAutenticado } from '../../common/usuario-actual.decorator';
 
 const esEntero = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
 
-/** Rechaza tokens con otra forma (p. ej. emitidos antes de S-02, sin `sid`). */
-function esUsuarioSesion(p: object): p is UsuarioSesion {
-  const u = p as Partial<Record<keyof UsuarioSesion, unknown>>;
+/** Rechaza tokens con otra forma (p. ej. emitidos antes de S-02, sin `sid`, o sin `exp`). */
+function esUsuarioAutenticado(p: object): p is UsuarioAutenticado {
+  const u = p as Partial<Record<keyof UsuarioAutenticado, unknown>>;
   return (
     esEntero(u.sub) &&
+    esEntero(u.exp) &&
     typeof u.sid === 'string' &&
     /^[1-9]\d{0,18}$/.test(u.sid) &&
     esEntero(u.sucursalId) &&
@@ -38,13 +39,13 @@ export class AuthGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest();
     const token: unknown = req.cookies?.[COOKIE_ACCESO];
     if (typeof token !== 'string' || token === '') throw errorSesion('SIN_SESION');
-    let usuario: UsuarioSesion;
+    let usuario: UsuarioAutenticado;
     try {
-      usuario = await this.jwt.verifyAsync<UsuarioSesion>(token);
+      usuario = await this.jwt.verifyAsync<UsuarioAutenticado>(token);
     } catch (e) {
       throw errorSesion(e instanceof TokenExpiredError ? 'ACCESO_EXPIRADO' : 'SIN_SESION');
     }
-    if (!esUsuarioSesion(usuario)) throw errorSesion('SIN_SESION');
+    if (!esUsuarioAutenticado(usuario)) throw errorSesion('SIN_SESION');
 
     req.usuario = usuario;
     const contexto = contextoActual();

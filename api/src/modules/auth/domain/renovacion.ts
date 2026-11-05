@@ -39,6 +39,13 @@ export function decidirRenovacion(
   ahora: Date,
   c: ConfigRenovacion,
 ): DecisionRenovacion {
+  const esVigente = hashesIguales(hashPresentado, s.refreshHash);
+  const esAnterior = s.refreshHashAnterior !== null && hashesIguales(hashPresentado, s.refreshHashAnterior);
+
+  // Primero la posesión: los ids de sesión son correlativos y, si un secreto desconocido llegara a las reglas
+  // de tiempo, cualquiera podría revocar sesiones ajenas vencidas (y leer su motivo) enviando `<id>.<lo-que-sea>`.
+  if (!esVigente && !esAnterior) return { tipo: 'DESCONOCIDO' };
+
   if (s.revocadaAt !== null) {
     return { tipo: 'RECHAZAR', motivo: s.motivoRevocacion ?? 'LOGOUT' };
   }
@@ -52,17 +59,10 @@ export function decidirRenovacion(
     return { tipo: 'REVOCAR', motivo: 'INACTIVIDAD' };
   }
 
-  if (hashesIguales(hashPresentado, s.refreshHash)) {
-    return { tipo: 'ROTAR' };
-  }
+  if (esVigente) return { tipo: 'ROTAR' };
 
-  if (s.refreshHashAnterior !== null && hashesIguales(hashPresentado, s.refreshHashAnterior)) {
-    const graciaMs = c.graciaSeg * MS_POR_SEGUNDO;
-    if (s.rotadaAt !== null && ahora.getTime() - s.rotadaAt.getTime() <= graciaMs) return { tipo: 'CARRERA' };
-    // Un token que fue válido y ya se rotó: alguien más lo tiene.
-    return { tipo: 'REVOCAR', motivo: 'REUSO' };
-  }
-
-  // Los ids de sesión son correlativos: revocar ante cualquier secreto permitiría cerrar sesiones ajenas.
-  return { tipo: 'DESCONOCIDO' };
+  const graciaMs = c.graciaSeg * MS_POR_SEGUNDO;
+  if (s.rotadaAt !== null && ahora.getTime() - s.rotadaAt.getTime() <= graciaMs) return { tipo: 'CARRERA' };
+  // Un token que fue válido y ya se rotó: alguien más lo tiene.
+  return { tipo: 'REVOCAR', motivo: 'REUSO' };
 }

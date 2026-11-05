@@ -1,15 +1,15 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { AuthService } from './auth.service';
-import { SesionesService } from './application/sesiones.service';
+import { Denegacion, SesionesService } from './application/sesiones.service';
 import { borrarCookies, COOKIE_RENOVACION, fijarCookieAcceso, fijarCookieRenovacion } from './cookies';
 import { errorSesion } from './errores';
 import { Publico } from './permisos.decorator';
 import { Auditar } from '../auditoria/auditar.decorator';
-import { UsuarioActual, UsuarioSesion } from '../../common/usuario-actual.decorator';
+import { UsuarioActual, UsuarioAutenticado, UsuarioSesion } from '../../common/usuario-actual.decorator';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 
 const LoginSchema = z.object({ username: z.string().min(3).max(50), password: z.string().min(1).max(200) });
@@ -21,6 +21,12 @@ const LogoutSchema = z.object({ motivo: z.literal('INACTIVIDAD').optional() }).o
 function cookie(req: Request, nombre: string): string | undefined {
   const valor: unknown = req.cookies?.[nombre];
   return typeof valor === 'string' ? valor : undefined;
+}
+
+/** Arma el 401 de una denegación ya confirmada; borra las cookies salvo ante un secreto desconocido. */
+function denegar(res: Response, d: Denegacion): UnauthorizedException {
+  if (d.borrarCookies) borrarCookies(res);
+  return errorSesion(d.codigo, d.motivo);
 }
 
 @ApiTags('auth')
@@ -50,10 +56,7 @@ export class AuthController {
   @HttpCode(200)
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const r = await this.sesiones.renovar(cookie(req, COOKIE_RENOVACION));
-    if (r.tipo === 'DENEGADO') {
-      borrarCookies(res);
-      throw errorSesion(r.codigo, r.motivo);
-    }
+    if (r.tipo === 'DENEGADO') throw denegar(res, r);
     fijarCookieAcceso(res, await this.auth.firmarAcceso(r.usuario), r.expiraAt);
     if (r.renovacion) fijarCookieRenovacion(res, r.renovacion.valor, r.renovacion.expiraAt);
     return r.usuario;
@@ -84,12 +87,14 @@ export class AuthController {
   @HttpCode(200)
   @Auditar('auth.cambio_sucursal')
   async sucursal(
-    @UsuarioActual() actual: UsuarioSesion,
+    @UsuarioActual() actual: UsuarioAutenticado,
     @Body(new ZodValidationPipe(SucursalSchema)) body: z.infer<typeof SucursalSchema>,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { usuario, expiraAt } = await this.sesiones.cambiarSucursal(actual, body.sucursalId);
-    fijarCookieAcceso(res, await this.auth.firmarAcceso(usuario), expiraAt);
-    return usuario;
+    const r = await this.sesiones.cambiarSucursal(actual, body.sucursalId);
+    if (r.tipo === 'DENEGADO') throw denegar(res, r);
+    // Vence cuando vencía el acceso presentado: cambiar de sucursal no puede prolongar la sesión (spec §5.6).
+    fijarCookieAcceso(res, await this.auth.firmarAcceso(r.usuario, actual.exp), r.expiraAt);
+    return r.usuario;
   }
 }
