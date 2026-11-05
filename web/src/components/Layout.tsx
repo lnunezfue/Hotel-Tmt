@@ -2,6 +2,8 @@ import { NavLink, Outlet } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '../lib/api';
+import { useInactividad } from '../features/auth/useInactividad';
+import { AvisoInactividad } from './AvisoInactividad';
 import { useCambiarSucursal, useLogout, useSesion, puede } from '../features/auth/sesion';
 
 const iconos = {
@@ -46,6 +48,7 @@ export function Layout() {
   const { data: sesion } = useSesion();
   const logout = useLogout();
   const cambiar = useCambiarSucursal();
+  const { cierreEn, seguir } = useInactividad(sesion?.inactividadMin);
   const { data: empresa } = useQuery({ queryKey: ['empresa'], queryFn: () => api<{ razon_social: string; ruc: string; sunat_entorno: string }>('/organizacion/empresa') });
   const { data: sucursales } = useQuery({ queryKey: ['sucursales'], queryFn: () => api<Array<{ id: number; nombre: string }>>('/organizacion/sucursales') });
 
@@ -96,6 +99,7 @@ export function Layout() {
       <main className="min-w-0 px-4 py-6 lg:px-8">
         <Outlet />
       </main>
+      {cierreEn !== null && <AvisoInactividad cierreEn={cierreEn} onSeguir={seguir} />}
     </div>
   );
 }
