@@ -5,6 +5,7 @@ import { HospedajeService } from './application/hospedaje.service';
 import { RequierePermiso } from '../auth/permisos.decorator';
 import { UsuarioActual, UsuarioSesion } from '../../common/usuario-actual.decorator';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
+import { Auditar } from '../auditoria/auditar.decorator';
 import { ESTADOS } from './domain/estado-habitacion';
 
 const CambioEstadoSchema = z.object({ estado: z.enum(ESTADOS), motivo: z.string().max(200).optional() });
@@ -42,6 +43,7 @@ export class HospedajeController {
   }
 
   @RequierePermiso('habitacion.gestionar')
+  @Auditar('habitacion.crear')
   @Post('habitaciones')
   crear(@UsuarioActual() u: UsuarioSesion, @Body(new ZodValidationPipe(HabitacionSchema)) body: z.infer<typeof HabitacionSchema>) {
     return this.svc.crearHabitacion(u.sucursalId, body);
