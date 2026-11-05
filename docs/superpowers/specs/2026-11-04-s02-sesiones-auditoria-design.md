@@ -4,7 +4,7 @@
 |---|---|
 | Sprint | S-02 (fase F1 · Núcleo y seguridad) del DT-001 |
 | Fecha | 2026-11-04 |
-| Estado | Diseño aprobado en conversación · pendiente de revisión escrita |
+| Estado | Implementado en la rama `s02-sesiones-auditoria` |
 | Requerimientos | RF-SEG-04, RF-SEG-05, RNF-13, RNF-14, RNF-15, RNF-16, RNF-27, RNF-32 · DT-001 §4.4, §5.1 |
 
 ## 1. Objetivo
@@ -131,15 +131,15 @@ Validación de credenciales como hoy. Si tiene éxito, en una transacción: rese
 
 | Condición | Resultado |
 |---|---|
+| secreto desconocido: el hash no coincide con `refresh_hash` ni con `refresh_hash_anterior` | `DESCONOCIDO`: 401 `SIN_SESION` sin modificar la sesión, sin auditar y sin borrar cookies |
 | `revocada_at` no nulo | `RECHAZAR(motivo guardado)` |
 | `ahora > expira_at` | `REVOCAR(EXPIRADA)` |
 | `ahora − ultima_renovacion_at > inactividadMin + JWT_ACCESO_MIN` | `REVOCAR(INACTIVIDAD)` |
 | hash = `refresh_hash` | `ROTAR` |
 | hash = `refresh_hash_anterior` y `ahora − rotada_at ≤ REFRESH_GRACIA_SEG` | `CARRERA` |
 | hash = `refresh_hash_anterior` fuera de la tolerancia, o sin `rotada_at` | `REVOCAR(REUSO)` |
-| hash desconocido (no coincide con ninguno) | `DESCONOCIDO`: 401 `SIN_SESION` sin modificar la sesión ni auditar |
 
-Solo un token que fue válido y ya se rotó prueba un robo. Los ids de sesión son correlativos: si cualquier secreto desconocido revocara, cualquiera podría cerrar las sesiones de todos enviando `<id>.<lo-que-sea>`.
+La posesión se comprueba antes que los tiempos: si un secreto desconocido llegara a las filas de tiempo, cualquiera podría revocar (y auditar) sesiones ajenas vencidas o inactivas y leer el motivo de las cerradas. Solo un token que fue válido y ya se rotó prueba un robo. Los ids de sesión son correlativos: si cualquier secreto desconocido revocara, cualquiera podría cerrar las sesiones de todos enviando `<id>.<lo-que-sea>`. Las cookies tampoco se borran: el secreto puede venir de una pestaña que quedó atrás tras dos rotaciones, y borrarlas eliminaría la cookie vigente del navegador.
 
 5. Después, si el usuario está inactivo o ya no tiene ninguna sucursal asignada → `REVOCAR(USUARIO_INACTIVO)`.
 6. Efectos:
@@ -158,7 +158,7 @@ Cuerpo opcional `{ motivo?: 'INACTIVIDAD' }`. Si la cookie de renovación corres
 
 ### 5.6 Cambio de sucursal — `POST /auth/sucursal`
 
-Valida la sucursal contra las asignadas (como hoy), y en una transacción actualiza `sesion_usuario.sucursal_id` (por `sid`) y registra `auth.cambio_sucursal` con antes/después. Emite un JWT de acceso nuevo. Si la sesión `sid` ya está revocada (el acceso aún no venció) → 401 `SESION_CERRADA` y no se modifica nada.
+Valida la sucursal contra las asignadas (como hoy), y en una transacción actualiza `sesion_usuario.sucursal_id` (por `sid`) y registra `auth.cambio_sucursal` con antes/después. Emite un JWT de acceso nuevo que vence cuando vencía el presentado (no da `JWT_ACCESO_MIN` nuevos: si no, repetir el cambio mantendría viva la sesión sin pasar por la renovación, más allá de las 12 h, de la inactividad y de una desactivación). Si la sesión `sid` ya está revocada (el acceso aún no venció) → 401 `SESION_CERRADA` y no se modifica nada. Si pasó su `expira_at` → `REVOCAR(EXPIRADA)` con los mismos efectos que en §5.4 (se confirma antes del 401). En ambos casos se borran las cookies.
 
 ### 5.7 `GET /auth/me`
 
@@ -240,7 +240,7 @@ Los 401 llevan cuerpo `{ message, codigo, motivo? }`; los mensajes están en esp
 | `JWT_ACCESO_MIN` | 15 | Reemplaza a `JWT_EXPIRES_IN`, que se elimina |
 | `SESION_MAX_HORAS` | 12 | |
 | `REFRESH_GRACIA_SEG` | 30 | |
-| `TRUST_PROXY` | `false` | `1` detrás de Nginx/Caddy |
+| `TRUST_PROXY` | `false` | Número de proxies de confianza: `1` detrás de Nginx/Caddy. `true` se rechaza al arrancar: Express tomaría la IP del primer valor de `X-Forwarded-For`, que el cliente controla (saltaría el limitador y falsearía la auditoría) |
 | `LIMITE_AUTH_POR_MIN` | 10 | Límite por IP en login y renovación |
 
 Se actualiza `api/.env.example`.
@@ -264,6 +264,8 @@ Se actualiza `api/.env.example`.
 10. `UPDATE`/`DELETE` sobre `auditoria` → error del motor.
 11. Endpoint de prueba con `@Auditar` que no registra → 500 en entorno de pruebas.
 12. Limitador (con `LIMITE_AUTH_POR_MIN=10`): la petición 11 del minuto → 429.
+13. Secreto desconocido (también en una sesión vencida o revocada) → `SIN_SESION`, sin revocar, auditar ni borrar cookies.
+14. Cambio de sucursal → el acceso nuevo conserva el `exp` del presentado; con la sesión vencida → `EXPIRADA`.
 
 **Cliente (Vitest)**
 - Renovación única ante varias peticiones vencidas simultáneas y reintento.

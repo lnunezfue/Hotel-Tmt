@@ -32,7 +32,7 @@ Variables de `api/.env` (ver `api/.env.example`):
 | `JWT_ACCESO_MIN` | 15 | Minutos de vida del token de acceso (reemplaza a `JWT_EXPIRES_IN`, eliminada) |
 | `SESION_MAX_HORAS` | 12 | Duración máxima de una sesión |
 | `REFRESH_GRACIA_SEG` | 30 | Tolerancia para reusar un token de renovación recién rotado |
-| `TRUST_PROXY` | `false` | `1` detrás de Nginx o Caddy |
+| `TRUST_PROXY` | `false` | Número de proxies de confianza: `1` detrás de Nginx o Caddy. `true` no se admite (la IP del cliente saldría de `X-Forwarded-For`, que él controla) |
 | `LIMITE_AUTH_POR_MIN` | 10 | Límite por IP en login y renovación |
 
 Otros comandos: `pnpm test` (pruebas), `pnpm --filter api test:e2e` (pruebas de integración de la API; requieren MySQL con migraciones y datos de ejemplo), `pnpm typecheck`, `pnpm build`, `pnpm infra:down`.
@@ -75,7 +75,7 @@ web/
 | S-06 Reservas | Maqueta del calendario y del formulario de reserva para validar con recepción | **Maqueta** |
 | F3 Facturación | Puerto del proveedor y adaptador simulado | **Diseño listo** |
 
-Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 05, 08 y 15 (API); RNF-12, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
+Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 05, 08 y 15 (API); RNF-12, 13, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
 
 ## Decisiones técnicas de esta semana
 
