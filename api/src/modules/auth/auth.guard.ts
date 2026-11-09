@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService, TokenExpiredError } from '@nestjs/jwt';
-import { PERMISO_KEY, PUBLICO_KEY } from './permisos.decorator';
+import { CLAVE_TEMPORAL_KEY, PERMISO_KEY, PUBLICO_KEY } from './permisos.decorator';
 import { COOKIE_ACCESO } from './cookies';
 import { errorSesion } from './errores';
 import { contextoActual } from '../../common/contexto-peticion';
@@ -52,6 +52,10 @@ export class AuthGuard implements CanActivate {
     if (contexto) {
       contexto.usuarioId = usuario.sub;
       contexto.sucursalId = usuario.sucursalId;
+    }
+
+    if (usuario.debeCambiarClave === true && !this.reflector.getAllAndOverride<boolean>(CLAVE_TEMPORAL_KEY, objetivo)) {
+      throw new ForbiddenException({ message: 'Cambia tu contraseña temporal para continuar', codigo: 'CAMBIO_CLAVE_REQUERIDO' });
     }
 
     const permiso = this.reflector.getAllAndOverride<string>(PERMISO_KEY, objetivo);

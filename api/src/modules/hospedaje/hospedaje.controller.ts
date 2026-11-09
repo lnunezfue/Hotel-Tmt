@@ -46,7 +46,7 @@ export class HospedajeController {
   @Auditar('habitacion.crear')
   @Post('habitaciones')
   crear(@UsuarioActual() u: UsuarioSesion, @Body(new ZodValidationPipe(HabitacionSchema)) body: z.infer<typeof HabitacionSchema>) {
-    return this.svc.crearHabitacion(u.sucursalId, body);
+    return this.svc.crearHabitacion(u.sucursalId, u.empresaId, body);
   }
 
   @Get('estados')

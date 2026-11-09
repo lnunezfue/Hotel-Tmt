@@ -1,2 +1,25 @@
-export const ACCIONES_AUDITORIA = ['auth.login', 'auth.login_fallido', 'auth.logout', 'auth.sesion_revocada', 'auth.cambio_sucursal', 'habitacion.crear'] as const;
+export const ACCIONES_AUDITORIA = [
+  'auth.login',
+  'auth.login_fallido',
+  'auth.logout',
+  'auth.sesion_revocada',
+  'auth.cambio_sucursal',
+  'auth.cambio_clave',
+  'usuario.crear',
+  'usuario.editar',
+  'usuario.activar',
+  'usuario.desactivar',
+  'usuario.desbloquear',
+  'usuario.restablecer_clave',
+  'usuario.cerrar_sesiones',
+  'rol.crear',
+  'rol.editar_permisos',
+  'habitacion.crear',
+  'habitacion.editar',
+  'piso.crear',
+  'piso.editar',
+  'tipo_habitacion.crear',
+  'tipo_habitacion.editar',
+  'tarifa.crear',
+] as const;
 export type AccionAuditoria = (typeof ACCIONES_AUDITORIA)[number];

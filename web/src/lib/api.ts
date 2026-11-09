@@ -78,6 +78,8 @@ export interface Sesion {
   sucursalId: number;
   sid: string;
   inactividadMin: number;
+  /** Contraseña temporal: la API solo atiende /auth/me y /auth/clave hasta cambiarla. */
+  debeCambiarClave?: boolean;
 }
 
 export type Estado = 'DESOCUPADA' | 'RESERVADA' | 'CONFIRMADA' | 'OCUPADA' | 'LIMPIEZA' | 'MANTENIMIENTO';

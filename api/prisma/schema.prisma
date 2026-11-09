@@ -1039,6 +1039,8 @@ model usuario {
   email                        String?                       @db.VarChar(120)
   ultimo_acceso                DateTime?                     @db.DateTime(0)
   intentos_fallidos            Int                           @default(0) @db.UnsignedTinyInt
+  /// 1 = contraseña temporal asignada por un administrador; debe cambiarla al ingresar
+  debe_cambiar_clave           Boolean                       @default(false) @db.TinyInt
   activo                       Boolean                       @default(true) @db.TinyInt
   created_at                   DateTime                      @default(now()) @db.Timestamp(0)
   updated_at                   DateTime                      @default(now()) @db.Timestamp(0)
@@ -1175,6 +1177,7 @@ enum sesion_usuario_motivo_revocacion {
   USUARIO_INACTIVO
   EXPIRADA
   ADMIN
+  CAMBIO_CLAVE
 }
 
 enum sucursal_tipo {

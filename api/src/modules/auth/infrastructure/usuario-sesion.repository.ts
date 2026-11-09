@@ -38,6 +38,7 @@ export class UsuarioSesionRepository {
         sucursales,
         sucursalId,
         inactividadMin: u.empresa.sesion_inactividad_min,
+        debeCambiarClave: u.debe_cambiar_clave,
       },
     };
   }

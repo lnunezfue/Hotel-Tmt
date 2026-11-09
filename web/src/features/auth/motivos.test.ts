@@ -7,6 +7,7 @@ describe('mensajes de cierre de sesión', () => {
     ['EXPIRADA', 'Tu turno de sesión terminó. Vuelve a ingresar.'],
     ['REUSO', 'Cerramos tu sesión por seguridad. Vuelve a ingresar.'],
     ['USUARIO_INACTIVO', 'Tu usuario fue desactivado. Consulta con un administrador.'],
+    ['CAMBIO_CLAVE', 'Tu contraseña cambió. Vuelve a ingresar con la nueva.'],
     ['ADMIN', 'Un administrador cerró tu sesión.'],
   ])('%s devuelve su texto', (motivo, texto) => {
     expect(mensajeCierre(motivo)).toBe(texto);

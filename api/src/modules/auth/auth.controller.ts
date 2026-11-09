@@ -7,12 +7,13 @@ import { AuthService } from './auth.service';
 import { Denegacion, SesionesService } from './application/sesiones.service';
 import { borrarCookies, COOKIE_RENOVACION, fijarCookieAcceso, fijarCookieRenovacion } from './cookies';
 import { errorSesion } from './errores';
-import { Publico } from './permisos.decorator';
+import { PermitidoConClaveTemporal, Publico } from './permisos.decorator';
 import { Auditar } from '../auditoria/auditar.decorator';
 import { UsuarioActual, UsuarioAutenticado, UsuarioSesion } from '../../common/usuario-actual.decorator';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 
 const LoginSchema = z.object({ username: z.string().min(3).max(50), password: z.string().min(1).max(200) });
+const ClaveSchema = z.object({ actual: z.string().min(1).max(200), nueva: z.string().min(1).max(200) });
 const SucursalSchema = z.object({ sucursalId: z.number().int().positive() });
 // El cuerpo es opcional: sin cuerpo, Express deja `req.body` sin definir.
 const LogoutSchema = z.object({ motivo: z.literal('INACTIVIDAD').optional() }).optional();
@@ -79,8 +80,26 @@ export class AuthController {
   }
 
   @Get('me')
+  @PermitidoConClaveTemporal()
   me(@UsuarioActual() usuario: UsuarioSesion) {
     return usuario;
+  }
+
+  /** Cambio de la propia contraseña; obligatorio tras un restablecimiento (S-03 §4.4). Limitado como el login. */
+  @Post('clave')
+  @HttpCode(200)
+  @UseGuards(ThrottlerGuard)
+  @PermitidoConClaveTemporal()
+  @Auditar('auth.cambio_clave')
+  async clave(
+    @UsuarioActual() actual: UsuarioAutenticado,
+    @Body(new ZodValidationPipe(ClaveSchema)) body: z.infer<typeof ClaveSchema>,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const r = await this.auth.cambiarClave(actual, body.actual, body.nueva);
+    // Mismo vencimiento que el acceso presentado: cambiar la clave no prolonga la sesión.
+    fijarCookieAcceso(res, await this.auth.firmarAcceso(r.usuario, actual.exp), r.expiraAt);
+    return r.usuario;
   }
 
   @Post('sucursal')
