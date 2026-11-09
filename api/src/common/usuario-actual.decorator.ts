@@ -14,6 +14,8 @@ export interface UsuarioSesion {
   sucursalId: number;
   /** `empresa.sesion_inactividad_min`: el cliente cierra la sesión tras estos minutos sin actividad. */
   inactividadMin: number;
+  /** Contraseña temporal: hasta cambiarla, el guard solo deja pasar rutas `@PermitidoConClaveTemporal` (S-03 D5). */
+  debeCambiarClave: boolean;
 }
 
 /** Usuario de la petición: el JWT de acceso ya verificado, con las marcas de tiempo que pone la firma (segundos). */

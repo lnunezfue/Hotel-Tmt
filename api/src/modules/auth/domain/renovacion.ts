@@ -1,6 +1,6 @@
 import { hashesIguales } from './token-renovacion';
 
-export type MotivoRevocacion = 'LOGOUT' | 'INACTIVIDAD' | 'REUSO' | 'USUARIO_INACTIVO' | 'EXPIRADA' | 'ADMIN';
+export type MotivoRevocacion = 'LOGOUT' | 'INACTIVIDAD' | 'REUSO' | 'USUARIO_INACTIVO' | 'EXPIRADA' | 'ADMIN' | 'CAMBIO_CLAVE';
 
 export interface EstadoSesion {
   revocadaAt: Date | null;

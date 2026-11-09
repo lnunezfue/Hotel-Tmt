@@ -214,6 +214,30 @@ export class SesionesService {
     });
   }
 
+  /**
+   * Revoca las sesiones vigentes de un usuario (desactivación, cambio de rol o sucursales, restablecimiento o
+   * cambio de contraseña) dentro de la transacción del cambio. Audita cada una como en §5.4. `exceptoSid`
+   * conserva la sesión desde la que el propio usuario cambió su contraseña. Devuelve cuántas cerró.
+   */
+  async revocarDeUsuario(
+    tx: Prisma.TransactionClient,
+    usuarioId: number,
+    motivo: MotivoRevocacion,
+    exceptoSid?: string,
+  ): Promise<number> {
+    const ahora = ahoraSegundos();
+    const vigentes = await tx.sesion_usuario.findMany({
+      where: {
+        usuario_id: usuarioId,
+        revocada_at: null,
+        expira_at: { gt: ahora },
+        ...(exceptoSid ? { NOT: { id: BigInt(exceptoSid) } } : {}),
+      },
+    });
+    for (const s of vigentes) await this.revocar(tx, s, motivo, ahora);
+    return vigentes.length;
+  }
+
   /** Bloquea la fila (serializa renovaciones concurrentes de la misma sesión) y luego la lee. */
   private async bloquear(tx: Prisma.TransactionClient, id: bigint): Promise<sesion_usuario | null> {
     await tx.$queryRaw`SELECT id FROM sesion_usuario WHERE id = ${id} FOR UPDATE`;

@@ -1,8 +1,9 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service';
-import { sinMarcasDeTiempo, UsuarioSesion } from '../../common/usuario-actual.decorator';
+import { sinMarcasDeTiempo, UsuarioAutenticado, UsuarioSesion } from '../../common/usuario-actual.decorator';
+import { politicaClave } from '../organizacion/domain/usuario';
 import { AuditoriaService } from '../auditoria/application/auditoria.service';
 import { Renovacion, SesionesService } from './application/sesiones.service';
 import { UsuarioSesionRepository } from './infrastructure/usuario-sesion.repository';
@@ -70,6 +71,30 @@ export class AuthService {
     // `iat` explícito: jsonwebtoken calcula `exp = iat + expiresIn` con él, sin que un cambio de segundo lo desplace.
     const iat = Math.floor(Date.now() / 1000);
     return this.jwt.signAsync({ ...payload, iat }, { expiresIn: Math.max(1, venceEn - iat) });
+  }
+
+  /**
+   * Cambio de la propia contraseña (S-03 §4.4). Quita la marca de clave temporal, cierra las demás sesiones del
+   * usuario con CAMBIO_CLAVE y devuelve el contenido del JWT para reemitir el acceso de la sesión actual.
+   */
+  async cambiarClave(actual: UsuarioAutenticado, claveActual: string, nueva: string): Promise<{ usuario: UsuarioSesion; expiraAt: Date }> {
+    const u = await this.prisma.usuario.findUniqueOrThrow({ where: { id: actual.sub }, select: { password_hash: true, username: true } });
+    if (!(await argon2.verify(u.password_hash, claveActual))) throw new BadRequestException('La contraseña actual no es correcta');
+    const errores = politicaClave(nueva, u.username);
+    if (errores.length) throw new BadRequestException({ message: 'La nueva contraseña no cumple la política', errores });
+    if (nueva === claveActual) throw new BadRequestException('La nueva contraseña debe ser distinta de la actual');
+    const hash = await AuthService.hash(nueva);
+
+    const r = await this.prisma.$transaction(async (tx) => {
+      await tx.usuario.update({ where: { id: actual.sub }, data: { password_hash: hash, debe_cambiar_clave: false } });
+      const cerradas = await this.sesiones.revocarDeUsuario(tx, actual.sub, 'CAMBIO_CLAVE', actual.sid);
+      await this.auditoria.registrar(tx, { accion: 'auth.cambio_clave', tabla: 'usuario', registroId: actual.sub, despues: { sesionesCerradas: cerradas } });
+      const carga = await this.usuarios.cargar(tx, actual.sub, actual.sucursalId);
+      const sesion = await tx.sesion_usuario.findUniqueOrThrow({ where: { id: BigInt(actual.sid) }, select: { expira_at: true } });
+      return { carga, expiraAt: sesion.expira_at };
+    });
+    if (r.carga.estado !== 'OK') throw new ForbiddenException('Tu usuario ya no puede ingresar. Consulta con un administrador');
+    return { usuario: { ...r.carga.datos, sid: actual.sid }, expiraAt: r.expiraAt };
   }
 
   /** `auth.login_fallido` es un evento de seguridad: se escribe fuera de transacción (spec §7.1) y luego se lanza el error. */

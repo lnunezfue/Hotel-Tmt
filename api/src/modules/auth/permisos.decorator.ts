@@ -6,3 +6,6 @@ export const PUBLICO_KEY = 'publico';
 export const RequierePermiso = (codigo: string) => SetMetadata(PERMISO_KEY, codigo);
 /** Marca un endpoint como accesible sin sesión (login, health). */
 export const Publico = () => SetMetadata(PUBLICO_KEY, true);
+export const CLAVE_TEMPORAL_KEY = 'claveTemporal';
+/** Ruta disponible aunque el usuario tenga una contraseña temporal pendiente de cambio (S-03 §4.4). */
+export const PermitidoConClaveTemporal = () => SetMetadata(CLAVE_TEMPORAL_KEY, true);
