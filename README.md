@@ -59,23 +59,34 @@ api/
         domain/          Puerto ProveedorFacturacion
         infrastructure/pse/  Adaptador simulado (NubeFacT / FactuSmart irán aquí)
 web/
-  src/pages/          Login, tablero de habitaciones, reservas (maqueta), usuarios
+  src/pages/          Login, tablero, reservas (maqueta), usuarios y roles, hotel y tarifas, cambio de contraseña
   src/features/       Sesión y lógica de hospedaje
   src/components/ui/  Componentes base
 ```
 
-## Avance (semana 1)
+## Avance (semana 2 · al 9 de noviembre)
 
 | Sprint (DT-001) | Alcance | Estado |
 |---|---|---|
 | S-01 Preparación | Repositorio único, Docker, NestJS, React + Vite, Prisma, migración del esquema, catálogos SUNAT, CI | **Completo** |
 | S-02 Seguridad | Login con JWT en cookie httpOnly y Argon2id, bloqueo tras 3 intentos, guard de permisos por rol. Sesiones revocables: token de acceso de 15 min y token de renovación rotativo (sesión máxima de 12 h); un secreto de renovación desconocido se rechaza sin revocar nada, y reusar el token anterior pasados 30 s revoca la sesión. Cierre por inactividad configurable por empresa (15 a 480 min, 30 por defecto) con aviso de 60 s sincronizado entre pestañas. Bitácora de auditoría inmutable (triggers) con códigos `modulo.accion`, que registra sesión y alta de habitaciones. Límite de 10 por minuto por IP en login y renovación | **Completo** |
-| S-03 Organización | Empresa, sucursales, usuarios y roles (lectura), cambio de sucursal activa | **Iniciado**: falta crear/editar usuarios y el certificado digital |
-| S-04 / S-05 Habitaciones y tablero | Tablero por piso con colores, cambio de estado con reglas y historial, alertas de salida, alta de habitaciones (API) | **Adelantado** |
+| S-03 Usuarios y roles | Alta con contraseña temporal (obligatorio cambiarla al primer ingreso), edición de datos, rol y sucursales con principal, activar/desactivar, desbloquear, restablecer contraseña y cerrar sesiones. Desactivar o cambiar rol/sucursales cierra las sesiones del usuario. Roles nuevos y matriz de permisos editable (ADMINISTRADOR protegido). Cambio de la propia contraseña. Todo auditado | **Completo** (series por usuario pasan a S-08 y certificado digital a S-09) |
+| S-04 Configuración del hotel | Pantalla *Hotel y tarifas*: habitaciones (alta, edición, desactivar si no está ocupada), pisos, tipos de habitación y tarifas por tipo × canal × turno con vigencia. Un precio nuevo se programa con fecha y cierra el anterior el día previo; historial por celda. API de precio vigente lista para reservas | **Completo** |
+| S-05 Tablero | Tablero por piso con colores, cambio de estado con reglas y historial, alertas de salida | **Adelantado** (falta tiempo real con WebSocket) |
 | S-06 Reservas | Maqueta del calendario y del formulario de reserva para validar con recepción | **Maqueta** |
 | F3 Facturación | Puerto del proveedor y adaptador simulado | **Diseño listo** |
 
 Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 05, 08 y 15 (API); RNF-12, 13, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
+
+Pruebas: 88 unitarias de API, 35 de integración contra MySQL real (`pnpm --filter api test:e2e`) y 29 del cliente.
+
+### Qué mostrar de la semana 2
+
+1. **Usuarios y roles** (como `admin`): *+ Nuevo usuario* → la contraseña temporal se genera sola. Cerrar sesión e ingresar con ese usuario: pide crear su contraseña antes de mostrar el menú.
+2. En otra ventana, iniciar sesión como `recepcion1`; como `admin`, menú **⋯ → Desactivar**. La sesión de `recepcion1` termina con el aviso "Tu usuario fue desactivado" cuando vence su acceso (15 min como máximo; ya no puede renovarlo ni volver a ingresar).
+3. **Roles y permisos**: quitarle un permiso a RECEPCIONISTA y guardar.
+4. **Hotel y tarifas → Tarifas**: clic en una celda, programar un precio con fecha futura. La celda muestra el cambio programado; con *Ver precios al* en esa fecha se ve el precio nuevo.
+5. **Habitaciones**: agregar la 109 al piso 1 y verla en el tablero; intentar desactivar una ocupada (el sistema lo impide).
 
 ## Decisiones técnicas de esta semana
 
@@ -87,7 +98,7 @@ Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 05, 08 y 15 (A
 
 ## Próximos pasos
 
-1. Alta y edición de usuarios con asignación de sucursales y series (S-03).
-2. Pisos, tipos y tarifas en la interfaz; tablero en vivo con WebSocket (S-04 / S-05).
-3. Reservas y check-in reales sobre la maqueta validada (S-06).
+1. Tablero en vivo con WebSocket (S-05).
+2. Reservas y check-in reales sobre la maqueta validada, usando el precio vigente de `GET /hospedaje/tarifas/vigente` (S-06).
+3. Series por usuario cuando existan series operativas (S-08).
 4. Pendiente de gerencia para F3: elegir proveedor (NubeFacT o FactuSmart) y volumen mensual de comprobantes (A-01, A-03).
