@@ -8,6 +8,8 @@ import { LoginPage } from './pages/LoginPage';
 import { TableroPage } from './pages/TableroPage';
 import { ReservasPage } from './pages/ReservasPage';
 import { UsuariosPage } from './pages/UsuariosPage';
+import { ConfiguracionHotelPage } from './pages/ConfiguracionHotelPage';
+import { CambiarClavePage } from './pages/CambiarClavePage';
 import { puede, useSesion } from './features/auth/sesion';
 import { alCerrarSesion } from './lib/api';
 
@@ -25,6 +27,7 @@ function Protegida({ children, permiso }: { children: ReactNode; permiso?: strin
   const { data: sesion, isLoading } = useSesion();
   if (isLoading) return <div className="p-8 text-tinta-suave">Cargando…</div>;
   if (!sesion) return <Navigate to="/login" replace />;
+  if (sesion.debeCambiarClave) return <CambiarClavePage obligatoria />;
   if (permiso && !puede(sesion, permiso)) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
@@ -39,6 +42,8 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<TableroPage />} />
             <Route path="reservas" element={<ReservasPage />} />
             <Route path="usuarios" element={<Protegida permiso="usuario.ver"><UsuariosPage /></Protegida>} />
+            <Route path="configuracion/hotel" element={<Protegida permiso="habitacion.gestionar"><ConfiguracionHotelPage /></Protegida>} />
+            <Route path="mi-clave" element={<CambiarClavePage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
