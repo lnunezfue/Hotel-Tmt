@@ -83,9 +83,11 @@ export class HospedajeService {
     return this.prisma.tipo_habitacion.findMany({ where: { empresa_id: empresaId, activo: true }, orderBy: { id: 'asc' } });
   }
 
-  async crearHabitacion(sucursalId: number, d: { numero: string; pisoId: number; tipoHabitacionId: number; descripcion?: string }) {
-    const piso = await this.prisma.piso.findFirst({ where: { id: d.pisoId, sucursal_id: sucursalId } });
-    if (!piso) throw new BadRequestException('El piso no pertenece a tu sucursal');
+  async crearHabitacion(sucursalId: number, empresaId: number, d: { numero: string; pisoId: number; tipoHabitacionId: number; descripcion?: string }) {
+    const piso = await this.prisma.piso.findFirst({ where: { id: d.pisoId, sucursal_id: sucursalId, activo: true } });
+    if (!piso) throw new BadRequestException('El piso no pertenece a tu sucursal o está inactivo');
+    const tipo = await this.prisma.tipo_habitacion.findFirst({ where: { id: d.tipoHabitacionId, empresa_id: empresaId, activo: true } });
+    if (!tipo) throw new BadRequestException('El tipo de habitación no existe o está inactivo');
     const existe = await this.prisma.habitacion.findFirst({ where: { sucursal_id: sucursalId, numero: d.numero } });
     if (existe) throw new ConflictException(`Ya existe la habitación ${d.numero} en esta sucursal`);
     const desocupada = await this.prisma.estado_habitacion.findUniqueOrThrow({ where: { codigo: 'DESOCUPADA' } });
