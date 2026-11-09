@@ -27,5 +27,6 @@ import { UsuarioSesionRepository } from './infrastructure/usuario-sesion.reposit
   ],
   controllers: [AuthController],
   providers: [AuthService, SesionesService, UsuarioSesionRepository, { provide: APP_GUARD, useClass: AuthGuard }],
+  exports: [SesionesService],
 })
 export class AuthModule {}
