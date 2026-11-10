@@ -78,8 +78,10 @@ Siguen las capas del módulo `hospedaje` (DT-001 §4.2):
 |---|---|---|
 | `domain/aviso-tablero.ts` | Dominio | Tipo `AvisoTablero { sucursalId, motivo }`, nombre del canal (`tablero:sucursal:{id}`), validación del mensaje recibido. Lógica pura |
 | `domain/notificador-tablero.port.ts` | Dominio | Puerto `NotificadorTablero`: `publicar(aviso)` y `escuchar(sucursalId): Observable<AvisoTablero>`, con su token de inyección |
+| `application/flujo-tablero.ts` | Aplicación | Une los avisos con el latido y corta al llegar `exp`. Función pura sobre RxJS |
+| `application/avisos-tablero.service.ts` | Aplicación | Lo que usan los servicios para avisar: publica sin propagar errores (D4) y reparte a todas las sucursales de una empresa |
 | `infrastructure/notificador-tablero.redis.ts` | Infraestructura | Adaptador con `ioredis`: una conexión para publicar y otra para suscribirse |
-| `tablero-eventos.controller.ts` | Presentación | `@Sse('tablero/eventos')`: une `escuchar(sucursalId)` con el latido y corta al llegar `exp` |
+| `tablero-eventos.controller.ts` | Presentación | `@Sse('tablero/eventos')`: conecta `escuchar(sucursalId)` con `flujo-tablero` |
 
 Detalles del adaptador:
 
@@ -141,18 +143,20 @@ Los módulos `auditoria/` y `catalogos/`, que el DT-001 no lista, se mantienen: 
 
 **Unitarias (API)**
 - `aviso-tablero`: nombre del canal y rechazo de mensajes mal formados.
-- Controlador de eventos con un notificador falso: entrega solo los avisos de la sucursal del token, emite latido y termina al llegar `exp` (con temporizadores simulados).
-- Servicios: cada operación de §4.2 publica el aviso esperado; un fallo del notificador no hace fallar la operación; no se publica si la transacción falla.
+- `flujo-tablero` con temporizadores simulados: convierte avisos en eventos, emite latido y termina al llegar `exp`.
+- `avisos-tablero.service` con un notificador falso: publica, no propaga fallos y reparte a todas las sucursales de la empresa.
 
 **Integración (`test:e2e`, MySQL y Redis reales)**
-- Dos instancias de la aplicación: un cambio de estado hecho en una llega como evento `tablero` al flujo abierto en la otra.
+- Dos instancias de la aplicación: un aviso publicado en una llega como evento `tablero` al flujo abierto en la otra.
 - Un flujo de la sucursal A no recibe el aviso de un cambio en la sucursal B.
 - Sin cookie: 401 y ningún flujo.
-- Editar un tipo de habitación avisa a todas las sucursales de la empresa.
+- Cada operación de §4.2 publica el aviso esperado; las que no deben publicar no lo hacen, y una operación rechazada tampoco. Los servicios no tienen pruebas unitarias en este repo: se prueban aquí, contra la base real.
+- Un fallo del notificador no hace fallar el cambio de estado, y la API arranca y atiende con Redis apagado.
+- Mensajes no válidos en el canal se descartan; al cerrar el navegador se libera la suscripción.
 
 **Cliente**
-- Función de reconexión: secuencia de esperas y reinicio tras una apertura correcta.
-- `useTableroEnVivo` con un `EventSource` simulado: invalida al abrir y al recibir `tablero`; cierra con la pestaña oculta; no reabre si la sesión terminó; reabre al cambiar de sucursal.
+- La lógica de conexión vive en un módulo puro (`conexion-tablero.ts`) con el flujo, el temporizador y la revalidación inyectados, porque el proyecto no tiene DOM de pruebas. Se prueba ahí: secuencia de esperas, reinicio tras una apertura correcta, no reabrir si la sesión terminó, y detener con una reconexión pendiente.
+- `useTableroEnVivo` solo conecta ese módulo con `EventSource`, React Query y la visibilidad de la pestaña; se cubre con la verificación manual.
 
 **Integración continua:** el flujo de CI debe levantar Redis para `test:e2e`; se verifica y se añade si falta.
 
