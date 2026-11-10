@@ -1,0 +1,38 @@
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { MotivoAviso } from '../domain/aviso-tablero';
+import { NOTIFICADOR_TABLERO, NotificadorTablero } from '../domain/notificador-tablero.port';
+
+/**
+ * Avisa a los tableros abiertos de que algo cambió. Se llama después de confirmar el cambio y nunca rechaza
+ * (S-05 D4): si el aviso se pierde, el navegador lo recupera con su consulta de respaldo.
+ */
+@Injectable()
+export class AvisosTablero {
+  private readonly logger = new Logger(AvisosTablero.name);
+
+  constructor(
+    @Inject(NOTIFICADOR_TABLERO) private readonly notificador: NotificadorTablero,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  async avisar(sucursalId: number, motivo: MotivoAviso): Promise<void> {
+    try {
+      await this.notificador.publicar({ sucursalId, motivo });
+    } catch (e) {
+      this.logger.warn(`No se pudo avisar al tablero de la sucursal ${sucursalId} (${motivo}): ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  /** Para cambios de datos de empresa que se ven en el tablero de todas sus sucursales (p. ej. el tipo de habitación). */
+  async avisarEmpresa(empresaId: number, motivo: MotivoAviso): Promise<void> {
+    let sucursales: Array<{ id: number }>;
+    try {
+      sucursales = await this.prisma.sucursal.findMany({ where: { empresa_id: empresaId }, select: { id: true } });
+    } catch (e) {
+      this.logger.warn(`No se pudo avisar a los tableros de la empresa ${empresaId} (${motivo}): ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
+    for (const s of sucursales) await this.avisar(s.id, motivo);
+  }
+}
