@@ -29,19 +29,28 @@ describe('flujoTablero', () => {
     jest.useRealTimers();
   });
 
+  it('emite un latido al abrir, para que las cabeceras salgan de inmediato', () => {
+    abrir(900_000);
+    expect(recibidos).toEqual([{ type: 'latido', data: '' }]);
+  });
+
   it('convierte cada aviso en un evento tablero con su motivo', () => {
     abrir(900_000);
     avisos.next({ sucursalId: 1, motivo: 'estado' });
-    expect(recibidos).toEqual([{ type: 'tablero', data: { motivo: 'estado' } }]);
+    expect(recibidos).toEqual([{ type: 'latido', data: '' }, { type: 'tablero', data: { motivo: 'estado' } }]);
   });
 
   it('emite un latido cada 25 s', () => {
     abrir(900_000);
     jest.advanceTimersByTime(50_000);
-    expect(recibidos).toEqual([
-      { type: 'latido', data: '' },
-      { type: 'latido', data: '' },
-    ]);
+    expect(recibidos).toEqual([{ type: 'latido', data: '' }, { type: 'latido', data: '' }, { type: 'latido', data: '' }]);
+  });
+
+  it('termina cuando el notificador deja de emitir (cierre de la API)', () => {
+    abrir(900_000);
+    avisos.complete();
+    expect(terminado).toBe(true);
+    expect(jest.getTimerCount()).toBe(0);
   });
 
   it('termina al vencer el token y deja de escuchar los avisos', () => {
