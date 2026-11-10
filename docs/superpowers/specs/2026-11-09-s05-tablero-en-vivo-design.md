@@ -4,7 +4,7 @@
 |---|---|
 | Sprint | S-05 (F2 · tablero en vivo) del DT-001 |
 | Fecha | 2026-11-09 |
-| Estado | Diseño aprobado; pendiente de plan e implementación en la rama `s05-tablero-en-vivo` (parte de `s03-s04-organizacion-hotel`) |
+| Estado | Implementado en la rama `s05-tablero-en-vivo` (parte de `s03-s04-organizacion-hotel`); pendiente la verificación manual con dos navegadores |
 | Requerimientos | RF-RES-05 (tablero con actualización sin recargar) · RNF-02 (carga del tablero ≤ 1,5 s con 120 habitaciones) |
 | Depende de | S-02 (sesiones revocables, guard global), S-04 (configuración de habitaciones, pisos y tipos) |
 
@@ -52,7 +52,7 @@ En concreto: con dos navegadores en la misma sucursal, un cambio hecho en uno ap
 - Cabeceras: `Cache-Control: no-cache, no-transform` y `X-Accel-Buffering: no` (evita que Nginx retenga los eventos).
 - Eventos:
   - `tablero` con datos `{ "motivo": "estado" | "habitacion" | "piso" | "tipo" }`. El motivo es informativo; el cliente reacciona igual a todos.
-  - `latido` cada 25 s, sin datos, para que el proxy no cierre la conexión por inactividad.
+  - `latido`, sin datos: uno al abrir y luego cada 25 s, para que el proxy no cierre la conexión por inactividad. El inicial es necesario porque Nest 11 retiene las cabeceras SSE hasta el primer mensaje; sin él, el navegador no vería el flujo abierto hasta 25 s después.
 - El servidor termina el flujo cuando llega el `exp` del token (D5).
 - El flujo no renueva la sesión ni cuenta como actividad del usuario: es una petición GET con el token de acceso, y la inactividad se mide en el cliente (S-02).
 

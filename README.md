@@ -42,26 +42,37 @@ Otros comandos: `pnpm test` (pruebas), `pnpm --filter api test:e2e` (pruebas de 
 ```
 api/
   prisma/
-    migrations/20261104000000_esquema_inicial/   Esquema v1.1 completo: 54 tablas, CHECK, triggers, procedimientos, vistas, catálogos SUNAT
+    migrations/
+      20261104000000_esquema_inicial/            Esquema v1.1 completo: 54 tablas, CHECK, triggers, procedimientos, vistas, catálogos SUNAT
+      20261105000000_sesiones_y_auditoria/       Sesiones revocables, inactividad por empresa, bitácora inmutable (S-02)
+      20261109000000_usuarios_y_configuracion/   Contraseña temporal y permisos de usuarios y configuración (S-03/S-04)
     schema.prisma                                Generado desde la BD (scripts/gen-prisma-schema.py)
     seed.ts                                      Datos de ejemplo
   src/
     main.ts · worker.ts                          Arranque en modo API y en modo trabajador
+    app.module.ts                                Composición de módulos
+    config.ts                                    Configuración validada (JWT, proxy, Redis)
+    common/                                      Contexto de petición, decorador del usuario, validación con Zod
+    prisma/                                      Servicio de Prisma
     modules/
-      auth/            Login, cookie de sesión, guard global de permisos (@RequierePermiso)
+      auth/            Login, sesiones revocables, guard global de permisos (@RequierePermiso)
+      auditoria/       Bitácora inmutable y verificación de @Auditar
       organizacion/    Empresa, sucursales, usuarios y roles
       catalogos/       Catálogos SUNAT y tipos de movimiento
       hospedaje/
-        domain/          Máquina de estados de la habitación, turnos, alertas (lógica pura + pruebas)
-        application/     Casos de uso
-        infrastructure/  Repositorio Prisma (filtra por sucursal del token)
+        domain/          Estados de la habitación, tarifas, aviso del tablero y su puerto (lógica pura + pruebas)
+        application/     Casos de uso, flujo de eventos y avisos del tablero
+        infrastructure/  Repositorio Prisma (filtra por sucursal del token) y notificador Redis
+        tablero-eventos.controller.ts   Flujo SSE del tablero en vivo
       facturacion/
         domain/          Puerto ProveedorFacturacion
         infrastructure/pse/  Adaptador simulado (NubeFacT / FactuSmart irán aquí)
+  test/                Pruebas de integración contra MySQL y Redis reales
 web/
   src/pages/          Login, tablero, reservas (maqueta), usuarios y roles, hotel y tarifas, cambio de contraseña
-  src/features/       Sesión y lógica de hospedaje
+  src/features/       Lógica por dominio: sesión e inactividad, hospedaje (incluida la conexión en vivo), organización
   src/components/ui/  Componentes base
+  src/lib/api/        Cliente HTTP tipado y tipos compartidos
 ```
 
 ## Avance (semana 2 · al 9 de noviembre)
@@ -72,13 +83,13 @@ web/
 | S-02 Seguridad | Login con JWT en cookie httpOnly y Argon2id, bloqueo tras 3 intentos, guard de permisos por rol. Sesiones revocables: token de acceso de 15 min y token de renovación rotativo (sesión máxima de 12 h); un secreto de renovación desconocido se rechaza sin revocar nada, y reusar el token anterior pasados 30 s revoca la sesión. Cierre por inactividad configurable por empresa (15 a 480 min, 30 por defecto) con aviso de 60 s sincronizado entre pestañas. Bitácora de auditoría inmutable (triggers) con códigos `modulo.accion`, que registra sesión y alta de habitaciones. Límite de 10 por minuto por IP en login y renovación | **Completo** |
 | S-03 Usuarios y roles | Alta con contraseña temporal (obligatorio cambiarla al primer ingreso), edición de datos, rol y sucursales con principal, activar/desactivar, desbloquear, restablecer contraseña y cerrar sesiones. Desactivar o cambiar rol/sucursales cierra las sesiones del usuario. Roles nuevos y matriz de permisos editable (ADMINISTRADOR protegido). Cambio de la propia contraseña. Todo auditado | **Completo** (series por usuario pasan a S-08 y certificado digital a S-09) |
 | S-04 Configuración del hotel | Pantalla *Hotel y tarifas*: habitaciones (alta, edición, desactivar si no está ocupada), pisos, tipos de habitación y tarifas por tipo × canal × turno con vigencia. Un precio nuevo se programa con fecha y cierra el anterior el día previo; historial por celda. API de precio vigente lista para reservas | **Completo** |
-| S-05 Tablero | Tablero por piso con colores, cambio de estado con reglas y historial, alertas de salida | **Adelantado** (falta tiempo real con WebSocket) |
+| S-05 Tablero en vivo | Tablero por piso con colores, cambio de estado con reglas y historial, alertas de salida. Los cambios de estado, habitaciones, pisos y tipos llegan a los demás tableros de la sucursal sin recargar (Server-Sent Events, repartidos entre réplicas con Redis), con indicador *En vivo* y consulta de respaldo cada 60 s | **Implementado** (falta la prueba manual con dos navegadores; la administración de canales y turnos queda pendiente) |
 | S-06 Reservas | Maqueta del calendario y del formulario de reserva para validar con recepción | **Maqueta** |
 | F3 Facturación | Puerto del proveedor y adaptador simulado | **Diseño listo** |
 
 Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 05, 08 y 15 (API); RNF-12, 13, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
 
-Pruebas: 88 unitarias de API, 35 de integración contra MySQL real (`pnpm --filter api test:e2e`) y 29 del cliente.
+Pruebas: 115 unitarias de API, 51 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 43 del cliente.
 
 ### Qué mostrar de la semana 2
 
@@ -95,10 +106,12 @@ Pruebas: 88 unitarias de API, 35 de integración contra MySQL real (`pnpm --filt
 - **Fechas en UTC en la base**, mostradas en hora de Lima en la interfaz.
 - **`argon2` fijado en 0.44.** El binario de 0.45.x para Windows falla al cargar; no subir de versión sin probar en Windows.
 - **La sucursal activa sale del token**, nunca de un parámetro del navegador (DT-001 §4.4).
+- **Tablero en vivo con Server-Sent Events, no WebSocket.** El tablero solo necesita avisos del servidor al navegador; SSE reutiliza la cookie y el guard existentes, mientras que WebSocket exigiría otra ruta de autenticación sobre las sesiones revocables. El aviso no lleva datos: el navegador vuelve a pedir el tablero. Redis reparte los avisos entre réplicas (`REDIS_URL`, obligatoria en producción). Detalle en `docs/superpowers/specs/2026-11-09-s05-tablero-en-vivo-design.md`.
 
 ## Próximos pasos
 
-1. Tablero en vivo con WebSocket (S-05).
-2. Reservas y check-in reales sobre la maqueta validada, usando el precio vigente de `GET /hospedaje/tarifas/vigente` (S-06).
-3. Series por usuario cuando existan series operativas (S-08).
-4. Pendiente de gerencia para F3: elegir proveedor (NubeFacT o FactuSmart) y volumen mensual de comprobantes (A-01, A-03).
+1. Probar el tablero en vivo con dos navegadores (S-05).
+2. Administración de canales de venta (con comisión) y turnos, hoy de solo lectura (S-05, antes de reservas).
+3. Reservas y check-in reales sobre la maqueta validada, usando el precio vigente de `GET /hospedaje/tarifas/vigente` (S-06).
+4. Series por usuario cuando existan series operativas (S-08).
+5. Pendiente de gerencia para F3: elegir proveedor (NubeFacT o FactuSmart) y volumen mensual de comprobantes (A-01, A-03).
