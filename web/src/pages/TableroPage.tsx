@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api, type Estado, type HabitacionTablero, type Tablero } from '../lib/api';
 import { accionHacia, ESTADOS, ESTILO_ESTADO, tiempoRestante } from '../features/hospedaje/estados';
+import { useTableroEnVivo } from '../features/hospedaje/useTableroEnVivo';
 import { puede, useSesion } from '../features/auth/sesion';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -136,8 +137,10 @@ export function TableroPage() {
   const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: ['tablero'],
     queryFn: () => api<Tablero>('/hospedaje/tablero'),
-    refetchInterval: 15_000, // RF-RES-05: el tablero se actualiza solo, sin recargar la página
+    refetchInterval: 60_000, // respaldo: los cambios llegan por el flujo en vivo (S-05 D6)
   });
+  const conexion = useTableroEnVivo(); // RF-RES-05: el tablero se actualiza solo, sin recargar la página
+  const enVivo = conexion === 'en-vivo';
   const todas = data?.pisos.flatMap((p) => p.habitaciones) ?? [];
   const sel = todas.find((h) => h.id === selId) ?? null;
   const total = todas.length;
@@ -151,8 +154,12 @@ export function TableroPage() {
           <div className="text-xs text-tinta-suave">Hotel / Tablero</div>
           <h1 className="text-2xl font-bold">Tablero de habitaciones</h1>
         </div>
-        <div className="text-xs text-tinta-suave">
-          Se actualiza cada 15 s · última lectura {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('es-PE') : '—'}
+        <div className="flex items-center gap-1.5 text-xs text-tinta-suave" role="status">
+          <span className={clsx('h-2 w-2 flex-none rounded-full', enVivo ? 'bg-desocupada' : 'bg-limpieza')} />
+          <span className={clsx('font-semibold', enVivo ? 'text-desocupada' : 'text-limpieza')}>
+            {enVivo ? 'En vivo' : conexion === 'reconectando' ? 'Reconectando…' : 'Conectando…'}
+          </span>
+          <span>· última lectura {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('es-PE') : '—'}</span>
         </div>
       </header>
 
