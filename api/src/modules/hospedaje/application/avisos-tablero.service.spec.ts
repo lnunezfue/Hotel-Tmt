@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { NotificadorTablero } from '../domain/notificador-tablero.port';
-import { AvisosTablero } from './avisos-tablero.service';
+import { AvisosTablero, ESPERA_PUBLICAR_MS } from './avisos-tablero.service';
 
 describe('AvisosTablero', () => {
   let notificador: { publicar: jest.Mock; escuchar: jest.Mock };
@@ -52,5 +52,37 @@ describe('AvisosTablero', () => {
     prisma.sucursal.findMany.mockRejectedValue(new Error('bd'));
     await expect(svc.avisarEmpresa(9, 'tipo')).resolves.toBeUndefined();
     expect(notificador.publicar).not.toHaveBeenCalled();
+  });
+
+  describe('con un notificador que no responde (Redis conectado pero colgado)', () => {
+    let resuelto: boolean;
+    const marcar = () => {
+      resuelto = true;
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      resuelto = false;
+      notificador.publicar.mockImplementation(() => new Promise(() => undefined));
+    });
+
+    afterEach(() => jest.useRealTimers());
+
+    it(`avisar se da por vencido a los ${ESPERA_PUBLICAR_MS} ms y no deja temporizadores`, async () => {
+      void svc.avisar(3, 'estado').then(marcar);
+      await jest.advanceTimersByTimeAsync(ESPERA_PUBLICAR_MS - 1);
+      expect(resuelto).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(resuelto).toBe(true);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('avisarEmpresa no acumula esperas: todas las sucursales vencen a la vez', async () => {
+      prisma.sucursal.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }, { id: 3 }]);
+      void svc.avisarEmpresa(9, 'tipo').then(marcar);
+      await jest.advanceTimersByTimeAsync(ESPERA_PUBLICAR_MS);
+      expect(resuelto).toBe(true);
+      expect(notificador.publicar).toHaveBeenCalledTimes(3);
+    });
   });
 });

@@ -1,9 +1,18 @@
 {
-  "moduleFileExtensions": ["js", "json", "ts"],
+  "moduleFileExtensions": [
+    "js",
+    "json",
+    "ts"
+  ],
   "rootDir": "..",
   "testRegex": "test/.*\\.e2e-spec\\.ts$",
-  "transform": { "^.+\\.ts$": "ts-jest" },
+  "transform": {
+    "^.+\\.ts$": "ts-jest"
+  },
   "testEnvironment": "node",
   "globalSetup": "<rootDir>/test/zona-horaria.global-setup.ts",
-  "setupFiles": ["<rootDir>/test/setup-e2e.ts"]
+  "setupFiles": [
+    "<rootDir>/test/setup-e2e.ts"
+  ],
+  "testTimeout": 30000
 }
