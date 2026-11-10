@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/application/auditoria.service';
 import { HabitacionRepository } from '../infrastructure/habitacion.repository';
+import { AvisosTablero } from './avisos-tablero.service';
 import { alertaSalida, esEstado, EstadoHabitacion, TransicionInvalidaError, transicionesPermitidas, validarTransicion } from '../domain/estado-habitacion';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class HospedajeService {
     private readonly repo: HabitacionRepository,
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    private readonly avisos: AvisosTablero,
   ) {}
 
   async tablero(sucursalId: number) {
@@ -60,6 +62,7 @@ export class HospedajeService {
     }
     const estado = await this.prisma.estado_habitacion.findUniqueOrThrow({ where: { codigo: nuevo } });
     await this.repo.cambiarEstado(habitacionId, estado.id, usuarioId, motivo);
+    await this.avisos.avisar(sucursalId, 'estado');
     return { id: habitacionId, estado: nuevo };
   }
 
@@ -91,7 +94,7 @@ export class HospedajeService {
     const existe = await this.prisma.habitacion.findFirst({ where: { sucursal_id: sucursalId, numero: d.numero } });
     if (existe) throw new ConflictException(`Ya existe la habitación ${d.numero} en esta sucursal`);
     const desocupada = await this.prisma.estado_habitacion.findUniqueOrThrow({ where: { codigo: 'DESOCUPADA' } });
-    return this.prisma.$transaction(async (tx) => {
+    const creada = await this.prisma.$transaction(async (tx) => {
       const hab = await tx.habitacion.create({
         data: {
           sucursal_id: sucursalId, piso_id: d.pisoId, tipo_habitacion_id: d.tipoHabitacionId,
@@ -101,5 +104,7 @@ export class HospedajeService {
       await this.auditoria.registrar(tx, { accion: 'habitacion.crear', tabla: 'habitacion', registroId: hab.id, despues: hab });
       return hab;
     });
+    await this.avisos.avisar(sucursalId, 'habitacion');
+    return creada;
   }
 }

@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/application/auditoria.service';
+import { AvisosTablero } from './avisos-tablero.service';
 import {
   esFecha,
   fechaADb,
@@ -49,6 +50,7 @@ export class ConfiguracionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    private readonly avisos: AvisosTablero,
   ) {}
 
   // ── Pisos ───────────────────────────────────────────────────────
@@ -64,11 +66,13 @@ export class ConfiguracionService {
 
   async crearPiso(c: ContextoSucursal, d: { numero: number; nombre: string }) {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const creado = await this.prisma.$transaction(async (tx) => {
         const piso = await tx.piso.create({ data: { sucursal_id: c.sucursalId, numero: d.numero, nombre: d.nombre.trim() } });
         await this.auditoria.registrar(tx, { accion: 'piso.crear', tabla: 'piso', registroId: piso.id, despues: piso });
         return piso;
       });
+      await this.avisos.avisar(c.sucursalId, 'piso'); // no rechaza: no lo alcanza el catch
+      return creado;
     } catch (e) {
       traducir(e, `Ya existe el piso ${d.numero} en esta sucursal`);
     }
@@ -81,11 +85,13 @@ export class ConfiguracionService {
       const activas = await this.prisma.habitacion.count({ where: { piso_id: id, activo: true } });
       if (activas > 0) throw new ConflictException(`El piso tiene ${activas} habitaciones activas; muévelas o desactívalas primero`);
     }
-    return this.prisma.$transaction(async (tx) => {
+    const editado = await this.prisma.$transaction(async (tx) => {
       const despues = await tx.piso.update({ where: { id }, data: { ...(d.nombre !== undefined && { nombre: d.nombre.trim() }), ...(d.activo !== undefined && { activo: d.activo }) } });
       await this.auditoria.registrar(tx, { accion: 'piso.editar', tabla: 'piso', registroId: id, antes, despues });
       return despues;
     });
+    await this.avisos.avisar(c.sucursalId, 'piso');
+    return editado;
   }
 
   // ── Tipos de habitación (por empresa) ──────────────────────────
@@ -139,7 +145,7 @@ export class ConfiguracionService {
       if (enUso > 0) throw new ConflictException(`Hay ${enUso} habitaciones activas de este tipo; cámbialas de tipo primero`);
     }
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const editado = await this.prisma.$transaction(async (tx) => {
         const despues = await tx.tipo_habitacion.update({
           where: { id },
           data: {
@@ -153,6 +159,8 @@ export class ConfiguracionService {
         await this.auditoria.registrar(tx, { accion: 'tipo_habitacion.editar', tabla: 'tipo_habitacion', registroId: id, antes, despues });
         return despues;
       });
+      await this.avisos.avisarEmpresa(c.empresaId, 'tipo'); // el tipo es de empresa: se ve en todas sus sucursales
+      return editado;
     } catch (e) {
       traducir(e, `Ya existe el tipo «${d.nombre?.trim()}»`);
     }
@@ -202,7 +210,7 @@ export class ConfiguracionService {
     }
     const { estado_habitacion: _e, ...datosAntes } = antes;
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const editada = await this.prisma.$transaction(async (tx) => {
         const despues = await tx.habitacion.update({
           where: { id },
           data: {
@@ -216,6 +224,8 @@ export class ConfiguracionService {
         await this.auditoria.registrar(tx, { accion: 'habitacion.editar', tabla: 'habitacion', registroId: id, antes: datosAntes, despues });
         return despues;
       });
+      await this.avisos.avisar(c.sucursalId, 'habitacion');
+      return editada;
     } catch (e) {
       traducir(e, `Ya existe la habitación ${d.numero?.trim()} en esta sucursal`);
     }
