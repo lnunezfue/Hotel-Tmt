@@ -89,7 +89,7 @@ web/
 
 Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 05, 08 y 15 (API); RNF-12, 13, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
 
-Pruebas: 115 unitarias de API, 51 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 43 del cliente.
+Pruebas: 117 unitarias de API, 51 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 43 del cliente.
 
 ### Qué mostrar de la semana 2
 
