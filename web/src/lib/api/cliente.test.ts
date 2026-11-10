@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { alCerrarSesion, api, ApiError } from './api';
+import { alCerrarSesion, api, ApiError } from './cliente';
 
 const json = (status: number, cuerpo: unknown) =>
   new Response(status === 204 ? null : JSON.stringify(cuerpo), { status, headers: { 'Content-Type': 'application/json' } });
