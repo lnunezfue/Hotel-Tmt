@@ -3,11 +3,12 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { leerConfigAuth } from './config';
+import { leerConfigAuth, leerConfigRedis } from './config';
 import { configurarApp } from './configurar-app';
 
 async function bootstrap() {
   leerConfigAuth(); // falla pronto si falta configuración obligatoria
+  leerConfigRedis();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   configurarApp(app);
   const doc = new DocumentBuilder().setTitle('Hotel SUNAT API').setDescription('DT-001 · Sistema de Gestión Hotelera').setVersion('0.1.0').build();
