@@ -129,11 +129,12 @@ describe('Tablero en vivo (e2e)', () => {
 
     it('al cerrar el navegador se libera la suscripción del flujo', async () => {
       const n = a.get(NotificadorTableroRedis);
-      const antes = n.flujosAbiertos;
+      // El servidor se entera del cierre de los flujos de pruebas anteriores de forma asíncrona: se parte de cero.
+      await esperarHasta(() => n.flujosAbiertos === 0);
       const f = await abrir(a, cookie);
-      await esperarHasta(() => n.flujosAbiertos === antes + 1);
+      await esperarHasta(() => n.flujosAbiertos === 1);
       f.cerrar();
-      await esperarHasta(() => n.flujosAbiertos === antes);
+      await esperarHasta(() => n.flujosAbiertos === 0);
     });
   });
 
