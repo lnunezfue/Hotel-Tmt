@@ -83,13 +83,13 @@ web/
 | S-02 Seguridad | Login con JWT en cookie httpOnly y Argon2id, bloqueo tras 3 intentos, guard de permisos por rol. Sesiones revocables: token de acceso de 15 min y token de renovación rotativo (sesión máxima de 12 h); un secreto de renovación desconocido se rechaza sin revocar nada, y reusar el token anterior pasados 30 s revoca la sesión. Cierre por inactividad configurable por empresa (15 a 480 min, 30 por defecto) con aviso de 60 s sincronizado entre pestañas. Bitácora de auditoría inmutable (triggers) con códigos `modulo.accion`, que registra sesión y alta de habitaciones. Límite de 10 por minuto por IP en login y renovación | **Completo** |
 | S-03 Usuarios y roles | Alta con contraseña temporal (obligatorio cambiarla al primer ingreso), edición de datos, rol y sucursales con principal, activar/desactivar, desbloquear, restablecer contraseña y cerrar sesiones. Desactivar o cambiar rol/sucursales cierra las sesiones del usuario. Roles nuevos y matriz de permisos editable (ADMINISTRADOR protegido). Cambio de la propia contraseña. Todo auditado | **Completo** (series por usuario pasan a S-08 y certificado digital a S-09) |
 | S-04 Configuración del hotel | Pantalla *Hotel y tarifas*: habitaciones (alta, edición, desactivar si no está ocupada), pisos, tipos de habitación y tarifas por tipo × canal × turno con vigencia. Un precio nuevo se programa con fecha y cierra el anterior el día previo; historial por celda. API de precio vigente lista para reservas | **Completo** |
-| S-05 Tablero en vivo | Tablero por piso con colores, cambio de estado con reglas y historial, alertas de salida. Los cambios de estado, habitaciones, pisos y tipos llegan a los demás tableros de la sucursal sin recargar (Server-Sent Events, repartidos entre réplicas con Redis), con indicador *En vivo* y consulta de respaldo cada 60 s | **Implementado** (falta la prueba manual con dos navegadores; la administración de canales y turnos queda pendiente) |
+| S-05 Tablero en vivo y canales | Tablero por piso con colores, cambio de estado con reglas y historial, alertas de salida. Los cambios de estado, habitaciones, pisos y tipos llegan a los demás tableros de la sucursal sin recargar (Server-Sent Events, repartidos entre réplicas con Redis), con indicador *En vivo* y consulta de respaldo cada 60 s. Pestaña *Canales*: alta, edición y desactivación de canales de venta con su comisión (permiso `tarifa.editar`; no se desactiva el último activo) | **Implementado** (falta la prueba manual con dos navegadores; la administración de turnos queda pendiente) |
 | S-06 Reservas | Maqueta del calendario y del formulario de reserva para validar con recepción | **Maqueta** |
 | F3 Facturación | Puerto del proveedor y adaptador simulado | **Diseño listo** |
 
 Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 05, 08 y 15 (API); RNF-12, 13, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
 
-Pruebas: 117 unitarias de API, 51 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 43 del cliente.
+Pruebas: 130 unitarias de API, 66 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 43 del cliente.
 
 ### Qué mostrar de la semana 2
 
@@ -111,7 +111,7 @@ Pruebas: 117 unitarias de API, 51 de integración contra MySQL y Redis reales (`
 ## Próximos pasos
 
 1. Probar el tablero en vivo con dos navegadores (S-05).
-2. Administración de canales de venta (con comisión) y turnos, hoy de solo lectura (S-05, antes de reservas).
+2. Administración de turnos, hoy de solo lectura (S-05). Al hacer reservas (S-06), guardar en cada una la comisión vigente del canal, para que cambiarla después no altere los reportes.
 3. Reservas y check-in reales sobre la maqueta validada, usando el precio vigente de `GET /hospedaje/tarifas/vigente` (S-06).
 4. Series por usuario cuando existan series operativas (S-08).
 5. Pendiente de gerencia para F3: elegir proveedor (NubeFacT o FactuSmart) y volumen mensual de comprobantes (A-01, A-03).

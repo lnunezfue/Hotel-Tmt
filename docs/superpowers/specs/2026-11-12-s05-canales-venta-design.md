@@ -4,7 +4,7 @@
 |---|---|
 | Sprint | S-05 (F2) del DT-001, parte pendiente tras el tablero en vivo |
 | Fecha | 2026-11-12 |
-| Estado | Diseño aprobado |
+| Estado | Implementado en la rama `s05-tablero-en-vivo`; pruebas de integración pendientes del CI |
 | Requerimiento | RF-RES-07: administrar canales de venta (mostrador, Booking, Expedia, teléfono, convenio corporativo) y registrar la comisión aplicable |
 | Rama | `s05-tablero-en-vivo` (mismo PR #3, que pasa a cubrir todo el S-05) |
 
