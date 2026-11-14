@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/application/auditoria.service';
+import { AvisosTablero } from './avisos-tablero.service';
 import {
   esFecha,
   fechaADb,
@@ -14,6 +15,7 @@ import {
   validarPrecio,
   Vigencia,
 } from '../domain/tarifa';
+import { normalizarNombreCanal, ReglaCanalError, validarComision } from '../domain/canal-venta';
 
 export interface ContextoSucursal {
   empresaId: number;
@@ -27,8 +29,13 @@ export interface ClaveTarifa {
 }
 
 /** Errores de dominio y claves únicas → 400 / 409. */
+/** Forma pública del canal: la comisión viaja como texto con dos decimales, como los precios. */
+function comoCanal(f: { id: number; nombre: string; comision_porcentaje: Prisma.Decimal; es_ota: boolean; activo: boolean }) {
+  return { id: f.id, nombre: f.nombre, comisionPorcentaje: f.comision_porcentaje.toFixed(2), esOta: f.es_ota, activo: f.activo };
+}
+
 function traducir(e: unknown, duplicado: string): never {
-  if (e instanceof ReglaTarifaError) throw new BadRequestException(e.message);
+  if (e instanceof ReglaTarifaError || e instanceof ReglaCanalError) throw new BadRequestException(e.message);
   if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw new ConflictException(duplicado);
   throw e;
 }
@@ -49,6 +56,7 @@ export class ConfiguracionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    private readonly avisos: AvisosTablero,
   ) {}
 
   // ── Pisos ───────────────────────────────────────────────────────
@@ -64,11 +72,13 @@ export class ConfiguracionService {
 
   async crearPiso(c: ContextoSucursal, d: { numero: number; nombre: string }) {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const creado = await this.prisma.$transaction(async (tx) => {
         const piso = await tx.piso.create({ data: { sucursal_id: c.sucursalId, numero: d.numero, nombre: d.nombre.trim() } });
         await this.auditoria.registrar(tx, { accion: 'piso.crear', tabla: 'piso', registroId: piso.id, despues: piso });
         return piso;
       });
+      await this.avisos.avisar(c.sucursalId, 'piso'); // no rechaza: no lo alcanza el catch
+      return creado;
     } catch (e) {
       traducir(e, `Ya existe el piso ${d.numero} en esta sucursal`);
     }
@@ -81,11 +91,13 @@ export class ConfiguracionService {
       const activas = await this.prisma.habitacion.count({ where: { piso_id: id, activo: true } });
       if (activas > 0) throw new ConflictException(`El piso tiene ${activas} habitaciones activas; muévelas o desactívalas primero`);
     }
-    return this.prisma.$transaction(async (tx) => {
+    const editado = await this.prisma.$transaction(async (tx) => {
       const despues = await tx.piso.update({ where: { id }, data: { ...(d.nombre !== undefined && { nombre: d.nombre.trim() }), ...(d.activo !== undefined && { activo: d.activo }) } });
       await this.auditoria.registrar(tx, { accion: 'piso.editar', tabla: 'piso', registroId: id, antes, despues });
       return despues;
     });
+    await this.avisos.avisar(c.sucursalId, 'piso');
+    return editado;
   }
 
   // ── Tipos de habitación (por empresa) ──────────────────────────
@@ -139,7 +151,7 @@ export class ConfiguracionService {
       if (enUso > 0) throw new ConflictException(`Hay ${enUso} habitaciones activas de este tipo; cámbialas de tipo primero`);
     }
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const editado = await this.prisma.$transaction(async (tx) => {
         const despues = await tx.tipo_habitacion.update({
           where: { id },
           data: {
@@ -153,6 +165,8 @@ export class ConfiguracionService {
         await this.auditoria.registrar(tx, { accion: 'tipo_habitacion.editar', tabla: 'tipo_habitacion', registroId: id, antes, despues });
         return despues;
       });
+      await this.avisos.avisarEmpresa(c.empresaId, 'tipo'); // el tipo es de empresa: se ve en todas sus sucursales
+      return editado;
     } catch (e) {
       traducir(e, `Ya existe el tipo «${d.nombre?.trim()}»`);
     }
@@ -202,7 +216,7 @@ export class ConfiguracionService {
     }
     const { estado_habitacion: _e, ...datosAntes } = antes;
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const editada = await this.prisma.$transaction(async (tx) => {
         const despues = await tx.habitacion.update({
           where: { id },
           data: {
@@ -216,12 +230,76 @@ export class ConfiguracionService {
         await this.auditoria.registrar(tx, { accion: 'habitacion.editar', tabla: 'habitacion', registroId: id, antes: datosAntes, despues });
         return despues;
       });
+      await this.avisos.avisar(c.sucursalId, 'habitacion');
+      return editada;
     } catch (e) {
       traducir(e, `Ya existe la habitación ${d.numero?.trim()} en esta sucursal`);
     }
   }
 
   // ── Canales, turnos y tarifas ──────────────────────────────────
+
+  /** Todos los canales de la empresa, con las tarifas vigentes o programadas de la sucursal activa. */
+  async canalesConfig(c: ContextoSucursal) {
+    const hoy = fechaADb(hoyLima());
+    const filas = await this.prisma.canal_venta.findMany({
+      where: { empresa_id: c.empresaId },
+      include: {
+        _count: {
+          select: { tarifa: { where: { sucursal_id: c.sucursalId, activo: true, OR: [{ vigente_hasta: null }, { vigente_hasta: { gte: hoy } }] } } },
+        },
+      },
+      orderBy: { id: 'asc' },
+    });
+    return filas.map((f) => ({ ...comoCanal(f), tarifas: f._count.tarifa }));
+  }
+
+  async crearCanal(c: ContextoSucursal, d: { nombre: string; comisionPorcentaje: number; esOta: boolean }) {
+    let nombre = d.nombre;
+    try {
+      nombre = normalizarNombreCanal(d.nombre);
+      validarComision(d.comisionPorcentaje);
+      return await this.prisma.$transaction(async (tx) => {
+        const canal = await tx.canal_venta.create({
+          data: { empresa_id: c.empresaId, nombre, comision_porcentaje: new Prisma.Decimal(d.comisionPorcentaje.toFixed(2)), es_ota: d.esOta },
+        });
+        await this.auditoria.registrar(tx, { accion: 'canal_venta.crear', tabla: 'canal_venta', registroId: canal.id, despues: canal });
+        return comoCanal(canal);
+      });
+    } catch (e) {
+      traducir(e, `Ya existe el canal «${nombre.trim()}»`);
+    }
+  }
+
+  async editarCanal(c: ContextoSucursal, id: number, d: { nombre?: string; comisionPorcentaje?: number; esOta?: boolean; activo?: boolean }) {
+    const antes = await this.prisma.canal_venta.findFirst({ where: { id, empresa_id: c.empresaId } });
+    if (!antes) throw new NotFoundException('El canal no existe');
+    let nombre = d.nombre;
+    try {
+      if (d.nombre !== undefined) nombre = normalizarNombreCanal(d.nombre);
+      if (d.comisionPorcentaje !== undefined) validarComision(d.comisionPorcentaje);
+      return await this.prisma.$transaction(async (tx) => {
+        if (d.activo === false && antes.activo) {
+          // Bloquea los canales activos de la empresa: dos desactivaciones simultáneas no pueden dejarla sin ninguno.
+          const activos = await tx.$queryRaw<Array<{ id: number }>>`SELECT id FROM canal_venta WHERE empresa_id = ${c.empresaId} AND activo = 1 FOR UPDATE`;
+          if (activos.length <= 1) throw new ConflictException('Es el único canal activo; activa otro antes de desactivarlo');
+        }
+        const despues = await tx.canal_venta.update({
+          where: { id },
+          data: {
+            ...(nombre !== undefined && { nombre }),
+            ...(d.comisionPorcentaje !== undefined && { comision_porcentaje: new Prisma.Decimal(d.comisionPorcentaje.toFixed(2)) }),
+            ...(d.esOta !== undefined && { es_ota: d.esOta }),
+            ...(d.activo !== undefined && { activo: d.activo }),
+          },
+        });
+        await this.auditoria.registrar(tx, { accion: 'canal_venta.editar', tabla: 'canal_venta', registroId: id, antes, despues });
+        return comoCanal(despues);
+      });
+    } catch (e) {
+      traducir(e, `Ya existe el canal «${nombre?.trim()}»`);
+    }
+  }
 
   canales(c: ContextoSucursal) {
     return this.prisma.canal_venta.findMany({

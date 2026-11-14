@@ -13,6 +13,7 @@ interface Piso { id: number; numero: number; nombre: string; activo: boolean; ha
 interface Tipo { id: number; nombre: string; descripcion: string | null; capacidadAdultos: number; capacidadNinos: number; activo: boolean; habitaciones: number }
 interface Habitacion { id: number; numero: string; descripcion: string | null; activo: boolean; estado: Estado; piso: { id: number; nombre: string; numero: number }; tipo: { id: number; nombre: string } }
 interface Canal { id: number; nombre: string; es_ota: boolean }
+interface CanalConfig { id: number; nombre: string; comisionPorcentaje: string; esOta: boolean; activo: boolean; tarifas: number }
 interface Turno { id: number; nombre: string; duracion_horas: number }
 interface PrecioCelda { id: number; precio: string; moneda: string; desde: string; hasta: string | null }
 interface Celda { tipoId: number; canalId: number; turnoId: number; vigente: PrecioCelda | null; programada: PrecioCelda | null }
@@ -259,6 +260,85 @@ function PestanaTipos() {
   );
 }
 
+// ── Canales de venta ────────────────────────────────────────────
+
+function EditorCanal({ c, ultimoActivo, onListo }: { c: CanalConfig | null; ultimoActivo: boolean; onListo: () => void }) {
+  const refrescar = useRefrescar();
+  const [nombre, setNombre] = useState(c?.nombre ?? '');
+  const [comision, setComision] = useState(c?.comisionPorcentaje ?? '0');
+  const [esOta, setEsOta] = useState(c?.esOta ?? false);
+  const guardar = useMutation({
+    mutationFn: (extra: Record<string, unknown> = {}) => {
+      const datos = { nombre, comisionPorcentaje: Number(comision), esOta, ...extra };
+      return c ? api(`/hospedaje/canales/${c.id}`, json('PATCH', datos)) : api('/hospedaje/canales', json('POST', datos));
+    },
+    onSuccess: () => { refrescar(); onListo(); },
+  });
+  const comisionValida = comision.trim() !== '' && Number(comision) >= 0 && Number(comision) <= 100;
+  return (
+    <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); guardar.mutate({}); }}>
+      <Campo etiqueta="Nombre"><Entrada value={nombre} maxLength={60} onChange={(e) => setNombre(e.target.value)} placeholder="Expedia" required /></Campo>
+      <Campo etiqueta="Comisión (%)" ayuda="Lo que el canal cobra sobre cada venta. Usa 0 si no cobra.">
+        <Entrada type="number" min={0} max={100} step={0.01} value={comision} onChange={(e) => setComision(e.target.value)} />
+      </Campo>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={esOta} onChange={(e) => setEsOta(e.target.checked)} /> Agencia de viajes en línea (OTA), como Booking o Expedia</label>
+      {guardar.error && <Aviso>{guardar.error.message}</Aviso>}
+      <Button variante="primario" type="submit" disabled={nombre.trim().length < 2 || !comisionValida || guardar.isPending}>{c ? 'Guardar' : 'Crear canal'}</Button>
+      {c && (
+        <Button type="button" disabled={guardar.isPending || (c.activo && ultimoActivo)} onClick={() => guardar.mutate({ activo: !c.activo })}>
+          {c.activo ? 'Desactivar canal' : 'Activar canal'}
+        </Button>
+      )}
+      {c?.activo && ultimoActivo && <p className="text-xs text-tinta-suave">Es el único canal activo: activa otro antes de desactivarlo.</p>}
+      {c?.activo && !ultimoActivo && <p className="text-xs text-tinta-suave">Desactivado, deja de aparecer en las tarifas y no se puede vender por él. Sus precios se conservan.</p>}
+    </form>
+  );
+}
+
+function PestanaCanales() {
+  const { data: sesion } = useSesion();
+  const puedeEditar = puede(sesion, 'tarifa.editar');
+  const canales = useQuery({ queryKey: ['config', 'canales-todos'], queryFn: () => api<CanalConfig[]>('/hospedaje/config/canales') });
+  const [editando, setEditando] = useState<CanalConfig | 'nuevo' | null>(null);
+  const activos = canales.data?.filter((c) => c.activo).length ?? 0;
+  return (
+    <div className="flex max-w-3xl flex-col gap-4">
+      {puedeEditar ? (
+        <div><Button variante="primario" onClick={() => setEditando('nuevo')}>+ Nuevo canal</Button></div>
+      ) : (
+        <Aviso tipo="info">Tu rol puede ver los canales pero no cambiarlos (permiso «tarifa.editar»).</Aviso>
+      )}
+      <Card className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-fondo text-left text-xs tracking-wide text-tinta-suave uppercase"><tr><th className="px-4 py-3">Canal</th><th className="px-4 py-3">Comisión</th><th className="px-4 py-3">Tarifas en esta sucursal</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3" /></tr></thead>
+          <tbody>
+            {canales.data?.map((c) => (
+              <tr key={c.id} className={clsx('border-t border-borde', !c.activo && 'text-tinta-suave')}>
+                <td className="px-4 py-2.5 font-medium">{c.nombre}{c.esOta && <Pildora className="ml-2 bg-fondo text-tinta-suave">OTA</Pildora>}</td>
+                <td className="px-4 py-2.5 tabular-nums">{Number(c.comisionPorcentaje).toLocaleString('es-PE', { maximumFractionDigits: 2 })} %</td>
+                <td className="px-4 py-2.5 tabular-nums">{c.tarifas}</td>
+                <td className="px-4 py-2.5"><Pildora className={c.activo ? 'bg-desocupada/10 text-desocupada' : 'bg-fondo text-tinta-suave'}>{c.activo ? 'activo' : 'inactivo'}</Pildora></td>
+                <td className="px-4 py-2.5 text-right">{puedeEditar && <Button variante="fantasma" className="h-8 px-2" onClick={() => setEditando(c)}>Editar</Button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+      <p className="text-xs text-tinta-suave">Los canales son de la empresa: se comparten entre sucursales. Los precios por canal se fijan en Tarifas.</p>
+      <PanelLateral titulo={editando === 'nuevo' ? 'Nuevo canal de venta' : `Canal ${editando?.nombre ?? ''}`} abierto={editando !== null} onCerrar={() => setEditando(null)}>
+        {editando !== null && (
+          <EditorCanal
+            key={editando === 'nuevo' ? 'n' : editando.id}
+            c={editando === 'nuevo' ? null : editando}
+            ultimoActivo={activos <= 1}
+            onListo={() => setEditando(null)}
+          />
+        )}
+      </PanelLateral>
+    </div>
+  );
+}
+
 // ── Tarifas ─────────────────────────────────────────────────────
 
 function EditorTarifa({ tipo, canal, turno, celda, hoy, puedeEditar, onListo }: { tipo: Tipo; canal: Canal; turno: Turno; celda?: Celda; hoy: string; puedeEditar: boolean; onListo: (m: string) => void }) {
@@ -384,7 +464,7 @@ function PestanaTarifas() {
   );
 }
 
-type Pestana = 'habitaciones' | 'pisos' | 'tipos' | 'tarifas';
+type Pestana = 'habitaciones' | 'pisos' | 'tipos' | 'canales' | 'tarifas';
 
 export function ConfiguracionHotelPage() {
   const [pestana, setPestana] = useState<Pestana>('habitaciones');
@@ -396,13 +476,14 @@ export function ConfiguracionHotelPage() {
         <p className="text-sm text-tinta-suave">Configuración de la sucursal activa. Cada cambio queda en la bitácora de auditoría.</p>
       </header>
       <Pestanas<Pestana>
-        opciones={[{ id: 'habitaciones', texto: 'Habitaciones' }, { id: 'pisos', texto: 'Pisos' }, { id: 'tipos', texto: 'Tipos' }, { id: 'tarifas', texto: 'Tarifas' }]}
+        opciones={[{ id: 'habitaciones', texto: 'Habitaciones' }, { id: 'pisos', texto: 'Pisos' }, { id: 'tipos', texto: 'Tipos' }, { id: 'canales', texto: 'Canales' }, { id: 'tarifas', texto: 'Tarifas' }]}
         valor={pestana}
         onCambio={setPestana}
       />
       {pestana === 'habitaciones' && <PestanaHabitaciones />}
       {pestana === 'pisos' && <PestanaPisos />}
       {pestana === 'tipos' && <PestanaTipos />}
+      {pestana === 'canales' && <PestanaCanales />}
       {pestana === 'tarifas' && <PestanaTarifas />}
     </div>
   );

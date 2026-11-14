@@ -1,4 +1,4 @@
-import { leerConfigAuth } from './config';
+import { leerConfigAuth, leerConfigRedis } from './config';
 
 describe('leerConfigAuth', () => {
   it('usa los valores por defecto en desarrollo', () => {
@@ -24,5 +24,19 @@ describe('leerConfigAuth', () => {
   it('rechaza números inválidos', () => {
     expect(() => leerConfigAuth({ JWT_ACCESO_MIN: 'abc' })).toThrow('JWT_ACCESO_MIN debe ser un entero positivo');
     expect(() => leerConfigAuth({ SESION_MAX_HORAS: '0' })).toThrow('SESION_MAX_HORAS debe ser un entero positivo');
+  });
+});
+
+describe('leerConfigRedis', () => {
+  it('usa redis://localhost:6379 en desarrollo', () => {
+    expect(leerConfigRedis({})).toEqual({ url: 'redis://localhost:6379' });
+  });
+  it('exige REDIS_URL en producción (vacía cuenta como ausente)', () => {
+    expect(() => leerConfigRedis({ NODE_ENV: 'production' })).toThrow('REDIS_URL es obligatoria en producción');
+    expect(() => leerConfigRedis({ NODE_ENV: 'production', REDIS_URL: ' ' })).toThrow('REDIS_URL es obligatoria en producción');
+  });
+  it('solo admite redis:// o rediss://', () => {
+    expect(leerConfigRedis({ REDIS_URL: 'rediss://h:6380' }).url).toBe('rediss://h:6380');
+    expect(() => leerConfigRedis({ REDIS_URL: 'http://h' })).toThrow('REDIS_URL debe empezar por redis:// o rediss://');
   });
 });
