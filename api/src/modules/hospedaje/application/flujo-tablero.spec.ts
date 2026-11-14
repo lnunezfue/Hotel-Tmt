@@ -1,4 +1,4 @@
-import { Subject, Subscription } from 'rxjs';
+import { BehaviorSubject, Subject, Subscription } from 'rxjs';
 import { AvisoTablero } from '../domain/aviso-tablero';
 import { EventoFlujo, flujoTablero } from './flujo-tablero';
 
@@ -7,9 +7,11 @@ describe('flujoTablero', () => {
   let recibidos: EventoFlujo[];
   let terminado: boolean;
   let suscripcion: Subscription;
+  /** Estado de Redis; un Subject sin valor inicial para que las pruebas que no lo usan no reciban eventos `servicio`. */
+  let disponible: Subject<boolean>;
 
   const abrir = (msHastaVencer: number) => {
-    suscripcion = flujoTablero(avisos, msHastaVencer).subscribe({
+    suscripcion = flujoTablero(avisos, msHastaVencer, disponible).subscribe({
       next: (e) => recibidos.push(e),
       complete: () => {
         terminado = true;
@@ -20,6 +22,7 @@ describe('flujoTablero', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     avisos = new Subject();
+    disponible = new Subject();
     recibidos = [];
     terminado = false;
   });
@@ -27,6 +30,20 @@ describe('flujoTablero', () => {
   afterEach(() => {
     suscripcion?.unsubscribe();
     jest.useRealTimers();
+  });
+
+  it('informa si los avisos funcionan: al abrir con el valor actual y en cada cambio, sin repetir', () => {
+    const actual = new BehaviorSubject(true);
+    suscripcion = flujoTablero(avisos, 900_000, actual).subscribe((e) => recibidos.push(e));
+    actual.next(true);
+    actual.next(false);
+    actual.next(true);
+    expect(recibidos).toEqual([
+      { type: 'latido', data: '' },
+      { type: 'servicio', data: { avisos: true } },
+      { type: 'servicio', data: { avisos: false } },
+      { type: 'servicio', data: { avisos: true } },
+    ]);
   });
 
   it('emite un latido al abrir, para que las cabeceras salgan de inmediato', () => {

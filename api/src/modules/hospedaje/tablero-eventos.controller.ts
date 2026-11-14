@@ -16,6 +16,6 @@ export class TableroEventosController {
    */
   @Sse('tablero/eventos')
   eventos(@UsuarioActual() u: UsuarioAutenticado): Observable<EventoFlujo> {
-    return flujoTablero(this.notificador.escuchar(u.sucursalId), u.exp * 1000 - Date.now());
+    return flujoTablero(this.notificador.escuchar(u.sucursalId), u.exp * 1000 - Date.now(), this.notificador.disponible());
   }
 }

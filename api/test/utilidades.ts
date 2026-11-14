@@ -115,8 +115,8 @@ function leerBloque(bloque: string): EventoRecibido | null {
 }
 
 /**
- * Abre el flujo de eventos del tablero como lo haría un navegador. Resuelve al recibir las cabeceras: Nest las
- * envía con el primer evento, que es el latido inicial.
+ * Abre el flujo de eventos del tablero como lo haría un navegador. Resuelve al recibir las cabeceras, que Nest
+ * envía al suscribirse.
  */
 export async function abrirFlujo(app: INestApplication, cookie?: string): Promise<Flujo> {
   const servidor = app.getHttpServer() as http.Server;

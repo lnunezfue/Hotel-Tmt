@@ -9,4 +9,6 @@ export interface NotificadorTablero {
   publicar(aviso: AvisoTablero): Promise<void>;
   /** Avisos de una sucursal, publicados desde cualquier réplica. */
   escuchar(sucursalId: number): Observable<AvisoTablero>;
+  /** Si este proceso está recibiendo avisos. Emite el valor actual al suscribirse y luego cada cambio. */
+  disponible(): Observable<boolean>;
 }

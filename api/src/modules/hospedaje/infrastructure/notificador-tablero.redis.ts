@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
-import { filter, Observable, Subject } from 'rxjs';
+import { BehaviorSubject, distinctUntilChanged, filter, Observable, Subject } from 'rxjs';
+import { describirError } from '../../../common/describir-error';
 import { leerConfigRedis } from '../../../config';
 import { AvisoTablero, canalDe, leerAviso, mensajeDe, PATRON_CANALES } from '../domain/aviso-tablero';
 import { NotificadorTablero } from '../domain/notificador-tablero.port';
@@ -19,6 +20,8 @@ export class NotificadorTableroRedis implements NotificadorTablero, OnModuleDest
   private readonly avisos = new Subject<AvisoTablero>();
   private readonly pub: Redis;
   private readonly sub: Redis;
+  /** La suscripción está activa en Redis: sin ella este proceso no recibe avisos. */
+  private readonly suscripcionActiva = new BehaviorSubject(false);
   private suscrita = false;
   private abiertos = 0;
 
@@ -32,6 +35,15 @@ export class NotificadorTableroRedis implements NotificadorTablero, OnModuleDest
       const aviso = leerAviso(canal, mensaje);
       if (aviso) this.avisos.next(aviso);
     });
+    // Tras una reconexión, ioredis vuelve a suscribir al quedar lista; al cerrarse, deja de llegar todo.
+    this.sub.on('ready', () => {
+      if (this.suscrita) this.suscripcionActiva.next(true);
+    });
+    this.sub.on('close', () => this.suscripcionActiva.next(false));
+  }
+
+  disponible(): Observable<boolean> {
+    return this.suscripcionActiva.pipe(distinctUntilChanged());
   }
 
   async publicar(aviso: AvisoTablero): Promise<void> {
@@ -57,6 +69,7 @@ export class NotificadorTableroRedis implements NotificadorTablero, OnModuleDest
 
   onModuleDestroy(): void {
     this.avisos.complete(); // termina los flujos abiertos antes de que se cierre el servidor HTTP
+    this.suscripcionActiva.complete();
     this.pub.disconnect();
     this.sub.disconnect();
   }
@@ -64,10 +77,13 @@ export class NotificadorTableroRedis implements NotificadorTablero, OnModuleDest
   private suscribir(): void {
     if (this.suscrita) return;
     this.suscrita = true;
-    this.sub.psubscribe(PATRON_CANALES).catch((e: unknown) => {
-      this.suscrita = false;
-      this.logger.warn(`No se pudo suscribir a los avisos del tablero: ${e instanceof Error ? e.message : String(e)}`);
-    });
+    this.sub.psubscribe(PATRON_CANALES).then(
+      () => this.suscripcionActiva.next(true),
+      (e: unknown) => {
+        this.suscrita = false;
+        this.logger.warn(`No se pudo suscribir a los avisos del tablero: ${describirError(e)}`);
+      },
+    );
   }
 
   /** Sin manejador de 'error', ioredis tumba el proceso. Se registra una vez por caída, no en cada reintento. */
@@ -76,7 +92,7 @@ export class NotificadorTableroRedis implements NotificadorTablero, OnModuleDest
     cliente.on('error', (e: Error) => {
       if (caido) return;
       caido = true;
-      this.logger.warn(`Redis (${rol}) no disponible: ${e.message}`);
+      this.logger.warn(`Redis (${rol}) no disponible: ${describirError(e)}`);
     });
     cliente.on('ready', () => {
       if (caido) this.logger.log(`Redis (${rol}) disponible de nuevo`);

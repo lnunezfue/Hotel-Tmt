@@ -103,6 +103,7 @@ describe('Tablero en vivo (e2e)', () => {
       expect(f.cabeceras['cache-control']).toContain('no-transform');
       expect(f.cabeceras['x-accel-buffering']).toBe('no');
       expect(await f.esperar('latido')).toEqual({ tipo: 'latido', datos: '' });
+      expect(await f.esperar('servicio')).toEqual({ tipo: 'servicio', datos: '{"avisos":true}' });
     });
 
     it('un aviso publicado en una réplica llega al flujo abierto en la otra', async () => {
@@ -246,7 +247,7 @@ describe('Tablero en vivo (e2e)', () => {
     });
 
     it('si el notificador falla, el cambio de estado se guarda igual', async () => {
-      const caido = { publicar: () => Promise.reject(new Error('notificador caído')), escuchar: () => NEVER };
+      const caido = { publicar: () => Promise.reject(new Error('notificador caído')), escuchar: () => NEVER, disponible: () => NEVER };
       const { app: c } = await crearApp({ sustituir: [{ token: NOTIFICADOR_TABLERO, valor: caido }] });
       try {
         const nuevo = await siguiente();

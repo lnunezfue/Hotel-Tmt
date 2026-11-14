@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { describirError } from '../../../common/describir-error';
 import { MotivoAviso } from '../domain/aviso-tablero';
 import { NOTIFICADOR_TABLERO, NotificadorTablero } from '../domain/notificador-tablero.port';
 
@@ -28,7 +29,7 @@ export class AvisosTablero {
       // `publicar` puede lanzar de forma síncrona: se envuelve para que la carrera lo trate como un rechazo más.
       await Promise.race([Promise.resolve().then(() => this.notificador.publicar({ sucursalId, motivo })), vencido]);
     } catch (e) {
-      this.logger.warn(`No se pudo avisar al tablero de la sucursal ${sucursalId} (${motivo}): ${e instanceof Error ? e.message : String(e)}`);
+      this.logger.warn(`No se pudo avisar al tablero de la sucursal ${sucursalId} (${motivo}): ${describirError(e)}`);
     } finally {
       clearTimeout(reloj);
     }
@@ -40,7 +41,7 @@ export class AvisosTablero {
     try {
       sucursales = await this.prisma.sucursal.findMany({ where: { empresa_id: empresaId }, select: { id: true } });
     } catch (e) {
-      this.logger.warn(`No se pudo avisar a los tableros de la empresa ${empresaId} (${motivo}): ${e instanceof Error ? e.message : String(e)}`);
+      this.logger.warn(`No se pudo avisar a los tableros de la empresa ${empresaId} (${motivo}): ${describirError(e)}`);
       return;
     }
     await Promise.all(sucursales.map((s) => this.avisar(s.id, motivo))); // en paralelo: los plazos no se suman
