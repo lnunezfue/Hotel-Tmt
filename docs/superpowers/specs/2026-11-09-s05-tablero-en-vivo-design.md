@@ -39,7 +39,7 @@ En concreto: con dos navegadores en la misma sucursal, un cambio hecho en uno ap
 | D4 | El aviso se publica **después** de confirmar la transacción y su fallo no falla la petición | El cambio de estado es lo que importa; si Redis no responde, lo cubre la consulta de respaldo |
 | D5 | El flujo se cierra al vencer el token de acceso con el que se abrió | Una sesión revocada deja de recibir avisos en 15 min como máximo, el mismo plazo aceptado en S-02 §5.3. No se consulta la base por cada aviso |
 | D6 | Se mantiene la consulta periódica, de 15 s a 60 s | Red de seguridad ante avisos perdidos; además refresca las alertas de salida, que cambian con el reloj y no con un evento |
-| D7 | El flujo solo vive con el tablero en pantalla y la pestaña visible | Los navegadores limitan a 6 las conexiones HTTP/1.1 por origen; varias pestañas con flujo abierto bloquearían el resto de peticiones |
+| D7 | El flujo solo vive con el tablero en pantalla; se corta tras 15 s con la pestaña oculta | Los navegadores limitan a 6 las conexiones HTTP/1.1 por origen; varias pestañas con flujo abierto bloquearían el resto de peticiones |
 
 ## 4. API
 
@@ -52,7 +52,8 @@ En concreto: con dos navegadores en la misma sucursal, un cambio hecho en uno ap
 - Cabeceras: `Cache-Control: no-cache, no-transform` y `X-Accel-Buffering: no` (evita que Nginx retenga los eventos).
 - Eventos:
   - `tablero` con datos `{ "motivo": "estado" | "habitacion" | "piso" | "tipo" }`. El motivo es informativo; el cliente reacciona igual a todos.
-  - `latido`, sin datos: uno al abrir y luego cada 25 s, para que el proxy no cierre la conexión por inactividad. El inicial es necesario porque Nest 11 retiene las cabeceras SSE hasta el primer mensaje; sin él, el navegador no vería el flujo abierto hasta 25 s después.
+  - `latido`, sin datos: uno al abrir y luego cada 25 s, para que el proxy no cierre la conexión por inactividad. El inicial es un resguardo: garantiza un primer byte aunque un proxy retenga la respuesta (Nest 11 ya envía las cabeceras al suscribirse).
+  - `servicio` con datos `{ "avisos": true | false }`: al abrir y cada vez que cambia la suscripción a Redis de esta réplica. Con `false`, el tablero muestra *Actualizando cada minuto*; al volver a `true`, recarga una vez lo que se perdió.
 - El servidor termina el flujo cuando llega el `exp` del token (D5).
 - El flujo no renueva la sesión ni cuenta como actividad del usuario: es una petición GET con el token de acceso, y la inactividad se mide en el cliente (S-02).
 
@@ -101,7 +102,7 @@ Detalles del adaptador:
 
 Devuelve el estado de conexión: `conectando`, `en-vivo` o `reconectando`.
 
-- Abre `EventSource('/api/hospedaje/tablero/eventos')` mientras `TableroPage` está montada y la pestaña es visible (D7). Al ocultarse la pestaña, cierra; al volver, abre de nuevo.
+- Abre `EventSource('/api/hospedaje/tablero/eventos')` mientras `TableroPage` está montada (D7). Si la pestaña lleva 15 s oculta, cierra; al volver, abre de nuevo. La espera evita una reconexión por cada cambio breve de ventana.
 - **Al abrir** (`open`): invalida la consulta `['tablero']`. Cubre los cambios ocurridos entre la carga inicial y la apertura del flujo, y los ocurridos con la pestaña oculta.
 - **Al recibir `tablero`**: invalida `['tablero']` y, si hay una habitación seleccionada, su `['historial', id]`.
 - **Al fallar** (`error`): cierra el `EventSource` (no se usa su reintento automático, que no distingue un 401 de un corte de red), pasa a `reconectando` y:

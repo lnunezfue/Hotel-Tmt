@@ -157,7 +157,7 @@ export function TableroPage() {
         <div className="flex items-center gap-1.5 text-xs text-tinta-suave" role="status">
           <span className={clsx('h-2 w-2 flex-none rounded-full', enVivo ? 'bg-desocupada' : 'bg-limpieza')} />
           <span className={clsx('font-semibold', enVivo ? 'text-desocupada' : 'text-limpieza')}>
-            {enVivo ? 'En vivo' : conexion === 'reconectando' ? 'Reconectando…' : 'Conectando…'}
+            {{ 'en-vivo': 'En vivo', respaldo: 'Actualizando cada minuto', reconectando: 'Reconectando…', conectando: 'Conectando…' }[conexion]}
           </span>
           <span>· última lectura {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('es-PE') : '—'}</span>
         </div>

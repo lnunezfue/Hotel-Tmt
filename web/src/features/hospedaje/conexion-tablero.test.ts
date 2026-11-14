@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { crearConexionTablero, esperaReconexion, type EstadoConexion, type ManejadoresFlujo } from './conexion-tablero';
+import { crearConexionTablero, crearControlVisibilidad, ESPERA_OCULTA_MS, esperaReconexion, type EstadoConexion, type ManejadoresFlujo } from './conexion-tablero';
 
 /** Deja correr las promesas pendientes (la revalidación es asíncrona). */
 const asentar = async () => {
@@ -187,5 +187,99 @@ describe('crearConexionTablero', () => {
     revalidaciones.shift()!(true);
     await asentar();
     expect(programados).toHaveLength(1);
+  });
+
+  describe('estado de los avisos (Redis)', () => {
+    it('sin avisos pasa a respaldo; al volver, a en-vivo y recarga lo que se perdió', () => {
+      conexion.iniciar();
+      ultimo().m.alAbrir();
+      ultimo().m.alServicio(false);
+      expect(estados).toEqual(['conectando', 'en-vivo', 'respaldo']);
+      const antes = cambios;
+      ultimo().m.alServicio(true);
+      expect(estados[estados.length - 1]).toBe('en-vivo');
+      expect(cambios).toBe(antes + 1);
+    });
+
+    it('confirmar que los avisos funcionan no recarga ni repite el estado', () => {
+      conexion.iniciar();
+      ultimo().m.alAbrir();
+      const antes = cambios;
+      ultimo().m.alServicio(true);
+      expect(estados).toEqual(['conectando', 'en-vivo']);
+      expect(cambios).toBe(antes);
+    });
+
+    it('una conexión nueva parte confiando en los avisos hasta que el servidor diga lo contrario', async () => {
+      conexion.iniciar();
+      ultimo().m.alAbrir();
+      ultimo().m.alServicio(false);
+      (await fallarYRevalidar()).fn();
+      ultimo().m.alAbrir();
+      expect(estados[estados.length - 1]).toBe('en-vivo');
+    });
+
+    it('se ignora el estado de un flujo detenido', () => {
+      conexion.iniciar();
+      const viejo = ultimo().m;
+      viejo.alAbrir();
+      conexion.detener();
+      const antes = [...estados];
+      viejo.alServicio(false);
+      expect(estados).toEqual(antes);
+    });
+  });
+});
+
+describe('crearControlVisibilidad', () => {
+  let llamadas: string[];
+  let programados: Array<{ fn: () => void; ms: number; cancelado: boolean }>;
+  let control: ReturnType<typeof crearControlVisibilidad>;
+
+  beforeEach(() => {
+    llamadas = [];
+    programados = [];
+    control = crearControlVisibilidad(
+      { iniciar: () => llamadas.push('iniciar'), detener: () => llamadas.push('detener') },
+      (fn, ms) => {
+        const p = { fn, ms, cancelado: false };
+        programados.push(p);
+        return () => {
+          p.cancelado = true;
+        };
+      },
+    );
+  });
+
+  it(`al ocultarse no corta de inmediato: espera ${ESPERA_OCULTA_MS / 1000} s`, () => {
+    control.visible();
+    control.oculta();
+    expect(llamadas).toEqual(['iniciar']);
+    expect(programados.map((p) => p.ms)).toEqual([ESPERA_OCULTA_MS]);
+    programados[0].fn();
+    expect(llamadas).toEqual(['iniciar', 'detener']);
+  });
+
+  it('si vuelve a verse antes del plazo, sigue conectada', () => {
+    control.visible();
+    control.oculta();
+    control.visible();
+    expect(programados[0].cancelado).toBe(true);
+    expect(llamadas).toEqual(['iniciar', 'iniciar']);
+  });
+
+  it('parpadeos seguidos no acumulan esperas', () => {
+    control.visible();
+    control.oculta();
+    control.oculta();
+    expect(programados.filter((p) => !p.cancelado)).toHaveLength(1);
+  });
+
+  it('liberar corta ya y cancela la espera pendiente', () => {
+    control.visible();
+    control.oculta();
+    control.liberar();
+    expect(programados[0].cancelado).toBe(true);
+    expect(llamadas).toEqual(['iniciar', 'detener']);
   });
 });
