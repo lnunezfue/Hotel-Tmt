@@ -27,6 +27,11 @@ function renovar(): Promise<void> {
 }
 
 async function peticion<T>(ruta: string, init: RequestInit): Promise<T> {
+  // Demostración web (VITE_DEMO=1): responde una API simulada en el navegador. En el build normal este bloque no existe.
+  if (import.meta.env.VITE_DEMO === '1') {
+    const { responder } = await import('../../demo/servidor');
+    return responder<T>(ruta, init);
+  }
   const res = await fetch(`/api${ruta}`, {
     credentials: 'include',
     ...init,

@@ -12,6 +12,7 @@ const iconos = {
   usuarios: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21c.8-3.6 3.6-6 7-6s6.2 2.4 7 6M16 3.5a4 4 0 0 1 0 7.5M18 14.5c2 .8 3.3 2.8 3.8 6.5',
   ventas: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6',
   caja: 'M3 7h18v13H3zM3 11h18',
+  plano: 'M3 3h18v18H3zM3 10h7v11M10 3v4M14 10h7M14 10v11',
   hotel: 'M3 21h18M5 21V5l7-2 7 2v16M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4',
 };
 
@@ -26,7 +27,7 @@ function Icono({ d }: { d: string }) {
 function Enlace({ to, icono, children, proximo }: { to: string; icono: string; children: string; proximo?: string }) {
   if (proximo) {
     return (
-      <span className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/40" title={`Disponible en ${proximo}`}>
+      <span className="hidden items-center gap-3 rounded-lg px-3 py-2 text-sm text-white/40 lg:flex" title={`Disponible en ${proximo}`}>
         <Icono d={icono} />
         {children}
         <span className="ml-auto font-mono text-[10px] tracking-wide">{proximo}</span>
@@ -37,7 +38,7 @@ function Enlace({ to, icono, children, proximo }: { to: string; icono: string; c
     <NavLink
       to={to}
       end
-      className={({ isActive }) => clsx('flex items-center gap-3 rounded-lg px-3 py-2 text-sm', isActive ? 'bg-lateral-activo font-semibold text-white' : 'text-white/75 hover:bg-white/5')}
+      className={({ isActive }) => clsx('flex flex-none items-center gap-3 whitespace-nowrap rounded-lg px-3 py-2 text-sm lg:whitespace-normal', isActive ? 'bg-lateral-activo font-semibold text-white' : 'text-white/75 hover:bg-white/5')}
     >
       <Icono d={icono} />
       {children}
@@ -55,27 +56,32 @@ export function Layout() {
 
   return (
     <div className="grid min-h-full grid-cols-1 lg:grid-cols-[236px_1fr]">
-      <aside className="flex flex-col gap-6 bg-lateral px-4 py-5 text-white">
-        <div>
+      <aside className="flex flex-col gap-3 bg-lateral px-4 py-3 text-white lg:gap-6 lg:py-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
           <div className="text-[15px] font-semibold">{empresa?.razon_social ?? 'Hotel'}</div>
           <div className="text-xs text-white/60">RUC {empresa?.ruc}</div>
           {empresa?.sunat_entorno === 'BETA' && (
             <span className="mt-2 inline-block rounded bg-white/10 px-2 py-0.5 font-mono text-[10px] tracking-wider text-white/80">SUNAT · BETA</span>
           )}
+          </div>
+          {/* En pantallas chicas el pie del menú se oculta: aquí queda la salida */}
+          <button className="text-xs text-white/70 underline-offset-2 hover:underline lg:hidden" onClick={() => logout.mutate()}>Cerrar sesión</button>
         </div>
-        <nav className="flex flex-col gap-1" aria-label="Menú principal">
-          <span className="px-3 pt-1 pb-1 text-[11px] tracking-widest text-white/45 uppercase">Hotel</span>
+        <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0" aria-label="Menú principal">
+          <span className="hidden px-3 pt-1 pb-1 text-[11px] tracking-widest text-white/45 uppercase lg:block">Hotel</span>
           <Enlace to="/" icono={iconos.tablero}>Tablero de habitaciones</Enlace>
-          <Enlace to="/reservas" icono={iconos.reservas}>Reservas</Enlace>
+          <Enlace to="/plano" icono={iconos.plano}>Plano del hotel</Enlace>
+          {puede(sesion, 'reserva.ver') && <Enlace to="/reservas" icono={iconos.reservas}>Reservas</Enlace>}
           <Enlace to="/ventas" icono={iconos.ventas} proximo="F3">Ventas y comprobantes</Enlace>
           <Enlace to="/caja" icono={iconos.caja} proximo="F4">Caja</Enlace>
           {(puede(sesion, 'usuario.ver') || puede(sesion, 'habitacion.gestionar')) && (
-            <span className="px-3 pt-3 pb-1 text-[11px] tracking-widest text-white/45 uppercase">Configuración</span>
+            <span className="hidden px-3 pt-3 pb-1 text-[11px] tracking-widest text-white/45 uppercase lg:block">Configuración</span>
           )}
           {puede(sesion, 'habitacion.gestionar') && <Enlace to="/configuracion/hotel" icono={iconos.hotel}>Hotel y tarifas</Enlace>}
           {puede(sesion, 'usuario.ver') && <Enlace to="/usuarios" icono={iconos.usuarios}>Usuarios y roles</Enlace>}
         </nav>
-        <div className="mt-auto flex flex-col gap-3 border-t border-white/10 pt-4 text-sm">
+        <div className="mt-auto hidden flex-col gap-3 border-t border-white/10 pt-4 text-sm lg:flex">
           {sucursales && sucursales.length > 0 && (
             <label className="flex flex-col gap-1">
               <span className="text-[11px] tracking-widest text-white/45 uppercase">Sucursal</span>

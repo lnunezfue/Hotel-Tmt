@@ -16,6 +16,7 @@ export function useTableroEnVivo(): EstadoConexion {
 
   useEffect(() => {
     if (sucursalId === undefined) return;
+    if (import.meta.env.VITE_DEMO === '1') return setEstado('respaldo'); // la demo no tiene servidor de avisos
 
     const conexion = crearConexionTablero({
       abrir: (m) => {

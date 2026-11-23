@@ -14,6 +14,9 @@ const HabitacionSchema = z.object({
   pisoId: z.number().int().positive(),
   tipoHabitacionId: z.number().int().positive(),
   descripcion: z.string().max(300).optional(),
+  /** Posición en el plano del piso (S-06); sin ella, el plano la propone en el primer hueco libre. */
+  plano: z.object({ x: z.number().int().min(0).max(30), y: z.number().int().min(0).max(20), ancho: z.number().int().min(1).max(10), alto: z.number().int().min(1).max(10) }).optional(),
+  amenidades: z.array(z.string().min(1).max(30)).max(40).optional(),
 });
 
 @ApiTags('hospedaje')

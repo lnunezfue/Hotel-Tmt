@@ -69,13 +69,14 @@ api/
         infrastructure/pse/  Adaptador simulado (NubeFacT / FactuSmart irán aquí)
   test/                Pruebas de integración contra MySQL y Redis reales
 web/
-  src/pages/          Login, tablero, reservas (maqueta), usuarios y roles, hotel y tarifas, cambio de contraseña
+  src/pages/          Login, tablero, plano del hotel, reservas, usuarios y roles, hotel y tarifas, cambio de contraseña
+  src/demo/           API simulada para la demostración web (solo con VITE_DEMO=1)
   src/features/       Lógica por dominio: sesión e inactividad, hospedaje (incluida la conexión en vivo), organización
   src/components/ui/  Componentes base
   src/lib/api/        Cliente HTTP tipado y tipos compartidos
 ```
 
-## Avance (semana 2 · al 9 de noviembre)
+## Avance (semana 4 · al 23 de noviembre)
 
 | Sprint (DT-001) | Alcance | Estado |
 |---|---|---|
@@ -84,12 +85,24 @@ web/
 | S-03 Usuarios y roles | Alta con contraseña temporal (obligatorio cambiarla al primer ingreso), edición de datos, rol y sucursales con principal, activar/desactivar, desbloquear, restablecer contraseña y cerrar sesiones. Desactivar o cambiar rol/sucursales cierra las sesiones del usuario. Roles nuevos y matriz de permisos editable (ADMINISTRADOR protegido). Cambio de la propia contraseña. Todo auditado | **Completo** (series por usuario pasan a S-08 y certificado digital a S-09) |
 | S-04 Configuración del hotel | Pantalla *Hotel y tarifas*: habitaciones (alta, edición, desactivar si no está ocupada), pisos, tipos de habitación y tarifas por tipo × canal × turno con vigencia. Un precio nuevo se programa con fecha y cierra el anterior el día previo; historial por celda. API de precio vigente lista para reservas | **Completo** |
 | S-05 Tablero en vivo y canales | Tablero por piso con colores, cambio de estado con reglas y historial, alertas de salida. Los cambios de estado, habitaciones, pisos y tipos llegan a los demás tableros de la sucursal sin recargar (Server-Sent Events, repartidos entre réplicas con Redis), con indicador *En vivo* y consulta de respaldo cada 60 s. Pestaña *Canales*: alta, edición y desactivación de canales de venta con su comisión (permiso `tarifa.editar`; no se desactiva el último activo) | **Implementado** (falta la prueba manual con dos navegadores; la administración de turnos queda pendiente) |
-| S-06 Reservas | Maqueta del calendario y del formulario de reserva para validar con recepción | **Maqueta** |
+| S-06 Plano del hotel y comodidades | Pantalla *Plano del hotel*: fachada del edificio con un piso por banda y ventanas del color de cada estado; plano de cada piso con las habitaciones dibujadas desde arriba (camas según el tipo, baño, puerta hacia el pasillo, ventana) y sus íconos de comodidades. Modo *Diseñar*: agregar un piso con vista previa, agregar habitaciones, pasillos, escaleras, ascensor, recepción y áreas comunes, arrastrar y redimensionar con validación de choques. Comodidades por habitación (aire acondicionado, wifi, TV, jacuzzi…, 12 de partida y se pueden crear más) o para todas las de un tipo | **Completo** (pedido de gerencia del 23/11) |
+| S-06 Reservas y check-in | Calendario de 14 días por habitación, llegadas y salidas de hoy, reserva con búsqueda o alta de huésped (DNI, RUC con dígito verificador, CE, pasaporte), habitación libre y precio de la tarifa vigente; el sistema impide fechas que se cruzan. Confirmar, cancelar con motivo, «no se presentó» y check-in que crea la estancia y ocupa la habitación. También se reserva haciendo clic en una habitación libre del plano, filtrando por comodidades | **Completo** (check-out con cobro en S-07) |
 | F3 Facturación | Puerto del proveedor y adaptador simulado | **Diseño listo** |
 
-Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 05, 08 y 15 (API); RNF-12, 13, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
+Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 12, 15 y 18; RNF-12, 13, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
 
-Pruebas: 130 unitarias de API, 66 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 43 del cliente.
+Pruebas: 159 unitarias de API, 77 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 58 del cliente.
+
+**Demostración web** (sin instalar nada): `pnpm --filter web build:demo` genera en `web/dist-demo` el cliente con una API simulada en el navegador, cargada con una foto del seed. Entra con `admin` o `recepcion1` (`Hotel2026!`); los cambios quedan solo en ese navegador y *Reiniciar demo* vuelve al inicio. El build normal no la incluye.
+
+### Qué mostrar de la semana 4
+
+1. **Plano del hotel → Ver estado**: el edificio muestra la ocupación de cada piso. Clic en la 101: dibujo, estado, huésped y comodidades.
+2. **Diseñar plano → + Agregar piso**: elegir 6 habitaciones Doble; la vista previa se arma sola y el piso «cae» sobre el edificio. Arrastrar una habitación, agregar un ascensor, guardar.
+3. Clic en una habitación → marcar *Jacuzzi* y *Aplicar a todas las Doble* → el dibujo cambia.
+4. **Reservar**: fecha de mañana, filtrar por aire acondicionado, clic en una libre → buscar huésped o registrarlo → el precio sale de la tarifa → registrar.
+5. **Reservas**: la reserva aparece en el calendario; abrir una de las que *llegan hoy* → *Hacer check-in* → la habitación pasa a OCUPADA en el tablero y en el plano.
+6. Intentar reservar la misma habitación en fechas que se cruzan: el sistema lo impide.
 
 ### Qué mostrar de la semana 2
 
@@ -111,7 +124,7 @@ Pruebas: 130 unitarias de API, 66 de integración contra MySQL y Redis reales (`
 ## Próximos pasos
 
 1. Probar el tablero en vivo con dos navegadores (S-05).
-2. Administración de turnos, hoy de solo lectura (S-05). Al hacer reservas (S-06), guardar en cada una la comisión vigente del canal, para que cambiarla después no altere los reportes.
-3. Reservas y check-in reales sobre la maqueta validada, usando el precio vigente de `GET /hospedaje/tarifas/vigente` (S-06).
+2. Administración de turnos, hoy de solo lectura (S-05). Guardar en cada reserva la comisión vigente del canal (necesita una columna nueva), para que cambiarla después no altere los reportes.
+3. Check-out con cobro, reservas de varias habitaciones a la vez y huéspedes acompañantes (S-07).
 4. Series por usuario cuando existan series operativas (S-08).
 5. Pendiente de gerencia para F3: elegir proveedor (NubeFacT o FactuSmart) y volumen mensual de comprobantes (A-01, A-03).
