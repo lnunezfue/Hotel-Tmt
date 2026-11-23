@@ -12,6 +12,7 @@ const iconos = {
   usuarios: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21c.8-3.6 3.6-6 7-6s6.2 2.4 7 6M16 3.5a4 4 0 0 1 0 7.5M18 14.5c2 .8 3.3 2.8 3.8 6.5',
   ventas: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6',
   caja: 'M3 7h18v13H3zM3 11h18',
+  plano: 'M3 3h18v18H3zM3 10h7v11M10 3v4M14 10h7M14 10v11',
   hotel: 'M3 21h18M5 21V5l7-2 7 2v16M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4',
 };
 
@@ -66,7 +67,8 @@ export function Layout() {
         <nav className="flex flex-col gap-1" aria-label="Menú principal">
           <span className="px-3 pt-1 pb-1 text-[11px] tracking-widest text-white/45 uppercase">Hotel</span>
           <Enlace to="/" icono={iconos.tablero}>Tablero de habitaciones</Enlace>
-          <Enlace to="/reservas" icono={iconos.reservas}>Reservas</Enlace>
+          <Enlace to="/plano" icono={iconos.plano}>Plano del hotel</Enlace>
+          {puede(sesion, 'reserva.ver') && <Enlace to="/reservas" icono={iconos.reservas}>Reservas</Enlace>}
           <Enlace to="/ventas" icono={iconos.ventas} proximo="F3">Ventas y comprobantes</Enlace>
           <Enlace to="/caja" icono={iconos.caja} proximo="F4">Caja</Enlace>
           {(puede(sesion, 'usuario.ver') || puede(sesion, 'habitacion.gestionar')) && (
