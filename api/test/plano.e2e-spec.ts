@@ -44,6 +44,8 @@ describe('Plano del hotel y comodidades (e2e)', () => {
     expect(piso.elementos.map((e: { tipo: string }) => e.tipo).sort()).toEqual(['ESCALERA', 'PASILLO']);
     expect(piso.habitaciones).toHaveLength(6);
     expect(piso.habitaciones.every((h: { ubicada: boolean; estado: string }) => h.ubicada && h.estado === 'DESOCUPADA')).toBe(true);
+    // Salen equipadas como las otras Doble de la sucursal
+    expect(piso.habitaciones[0].amenidades).toEqual(expect.arrayContaining(['WIFI', 'AIRE']));
   });
 
   it('guarda el plano y rechaza superposiciones nombrando las piezas', async () => {

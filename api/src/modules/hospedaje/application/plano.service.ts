@@ -163,6 +163,15 @@ export class PlanoService {
       if (!tipo) throw new BadRequestException('El tipo de habitación no existe o está inactivo');
     }
     const plan = distribucionInicial(d.habitaciones);
+    // Las habitaciones nuevas salen equipadas como las demás de su tipo en la sucursal (se cambia luego por habitación)
+    const modelo = d.tipoHabitacionId
+      ? await this.prisma.habitacion.findFirst({
+          where: { sucursal_id: c.sucursalId, tipo_habitacion_id: d.tipoHabitacionId, activo: true, habitacion_amenidad: { some: {} } },
+          orderBy: { id: 'asc' },
+          include: { habitacion_amenidad: true },
+        })
+      : null;
+    const equipamiento = modelo?.habitacion_amenidad.map((a) => ({ amenidad_id: a.amenidad_id })) ?? [];
     const desocupada = await this.prisma.estado_habitacion.findUniqueOrThrow({ where: { codigo: 'DESOCUPADA' } });
     try {
       const creado = await this.prisma.$transaction(async (tx) => {
@@ -182,6 +191,7 @@ export class PlanoService {
             data: {
               sucursal_id: c.sucursalId, piso_id: piso.id, tipo_habitacion_id: d.tipoHabitacionId!, estado_habitacion_id: desocupada.id,
               numero, plano_x: r.x, plano_y: r.y, plano_ancho: r.ancho, plano_alto: r.alto,
+              habitacion_amenidad: { create: equipamiento },
             },
           });
           await this.auditoria.registrar(tx, { accion: 'habitacion.crear', tabla: 'habitacion', registroId: hab.id, despues: hab });
