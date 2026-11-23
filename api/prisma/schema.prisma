@@ -408,6 +408,7 @@ model empresa {
   created_at             DateTime              @default(now()) @db.Timestamp(0)
   updated_at             DateTime              @default(now()) @db.Timestamp(0)
   ubigeo                 ubigeo                @relation(fields: [ubigeo_codigo], references: [codigo], onDelete: NoAction, onUpdate: NoAction, map: "fk_empresa_ubigeo")
+  amenidad               amenidad[]
   canal_venta            canal_venta[]
   categoria_producto     categoria_producto[]
   certificado_digital    certificado_digital[]
@@ -497,6 +498,10 @@ model habitacion {
   estado_habitacion_id        Int                           @db.UnsignedTinyInt
   numero                      String                        @db.VarChar(10)
   descripcion                 String?                       @db.VarChar(300)
+  plano_x                     Int?                          @db.UnsignedTinyInt
+  plano_y                     Int?                          @db.UnsignedTinyInt
+  plano_ancho                 Int                           @default(3) @db.UnsignedTinyInt
+  plano_alto                  Int                           @default(2) @db.UnsignedTinyInt
   activo                      Boolean                       @default(true) @db.TinyInt
   created_at                  DateTime                      @default(now()) @db.Timestamp(0)
   updated_at                  DateTime                      @default(now()) @db.Timestamp(0)
@@ -507,6 +512,7 @@ model habitacion {
   estancia                    estancia[]
   habitacion_estado_historial habitacion_estado_historial[]
   reserva_habitacion          reserva_habitacion[]
+  habitacion_amenidad         habitacion_amenidad[]
 
   @@unique([sucursal_id, numero], map: "uk_habitacion_num")
   @@index([estado_habitacion_id], map: "fk_hab_estado")
@@ -655,9 +661,12 @@ model piso {
   sucursal_id Int          @db.UnsignedInt
   numero      Int          @db.SmallInt
   nombre      String       @db.VarChar(50)
+  plano_columnas Int          @default(12) @db.UnsignedTinyInt
+  plano_filas    Int          @default(6) @db.UnsignedTinyInt
   activo      Boolean      @default(true) @db.TinyInt
   sucursal    sucursal     @relation(fields: [sucursal_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_piso_sucursal")
   habitacion  habitacion[]
+  plano_elemento plano_elemento[]
 
   @@unique([sucursal_id, numero], map: "uk_piso")
 }
@@ -1199,4 +1208,54 @@ enum tipo_afectacion_igv_grupo {
   INAFECTO
   EXPORTACION
   GRATUITO
+}
+
+/// Comodidades que puede tener una habitación (S-06)
+model amenidad {
+  id                  Int                   @id @default(autoincrement()) @db.UnsignedSmallInt
+  empresa_id          Int                   @db.UnsignedInt
+  codigo              String                @db.VarChar(30)
+  nombre              String                @db.VarChar(60)
+  /// Clave del dibujo en el cliente (aire, wifi, tv...)
+  icono               String                @db.VarChar(30)
+  orden               Int                   @default(0) @db.UnsignedTinyInt
+  activo              Boolean               @default(true) @db.TinyInt
+  empresa             empresa               @relation(fields: [empresa_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_amenidad_empresa")
+  habitacion_amenidad habitacion_amenidad[]
+
+  @@unique([empresa_id, codigo], map: "uk_amenidad")
+}
+
+model habitacion_amenidad {
+  habitacion_id Int        @db.UnsignedInt
+  amenidad_id   Int        @db.UnsignedSmallInt
+  amenidad      amenidad   @relation(fields: [amenidad_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ha_amenidad")
+  habitacion    habitacion @relation(fields: [habitacion_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ha_habitacion")
+
+  @@id([habitacion_id, amenidad_id])
+  @@index([amenidad_id], map: "ix_ha_amenidad")
+}
+
+/// Pasillos, escaleras y áreas comunes dibujados en el plano del piso (S-06)
+model plano_elemento {
+  id       Int                 @id @default(autoincrement()) @db.UnsignedInt
+  piso_id  Int                 @db.UnsignedInt
+  tipo     plano_elemento_tipo
+  etiqueta String?             @db.VarChar(40)
+  x        Int                 @db.UnsignedTinyInt
+  y        Int                 @db.UnsignedTinyInt
+  ancho    Int                 @default(1) @db.UnsignedTinyInt
+  alto     Int                 @default(1) @db.UnsignedTinyInt
+  piso     piso                @relation(fields: [piso_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pe_piso")
+
+  @@index([piso_id], map: "ix_pe_piso")
+}
+
+enum plano_elemento_tipo {
+  PASILLO
+  ESCALERA
+  ASCENSOR
+  RECEPCION
+  AREA_COMUN
+  BANO_COMUN
 }

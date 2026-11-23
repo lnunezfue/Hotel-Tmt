@@ -6,6 +6,8 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import * as argon2 from 'argon2';
 import 'dotenv/config';
+import { distribucionInicial } from '../src/modules/hospedaje/domain/plano';
+import { codigoReserva, fechaLima, rangoPorNoches } from '../src/modules/reservas/domain/reserva';
 
 const url = new URL(process.env.DATABASE_URL ?? '');
 const prisma = new PrismaClient({
@@ -29,6 +31,7 @@ async function main() {
     { codigo: 'usuario.ver', modulo: 'CONFIG', descripcion: 'Ver usuarios y roles' },
     { codigo: 'habitacion.cambiar_estado', modulo: 'RESERVAS', descripcion: 'Cambiar el estado de una habitación' },
     { codigo: 'habitacion.gestionar', modulo: 'RESERVAS', descripcion: 'Crear y editar habitaciones, pisos y tipos' },
+    { codigo: 'reserva.ver', modulo: 'RESERVAS', descripcion: 'Ver el calendario de reservas y la disponibilidad' },
   ];
   for (const p of extra) await prisma.permiso.upsert({ where: { codigo: p.codigo }, update: {}, create: p });
   await prisma.rol.upsert({ where: { nombre: 'LIMPIEZA' }, update: {}, create: { nombre: 'LIMPIEZA', descripcion: 'Solo cambia el estado de habitaciones' } });
@@ -39,7 +42,7 @@ async function main() {
   const rid = (n: string) => roles.find((r) => r.nombre === n)!.id;
   const asignacion: Record<string, string[]> = {
     ADMINISTRADOR: permisos.map((p) => p.codigo),
-    RECEPCIONISTA: ['reserva.crear', 'reserva.cancelar', 'estancia.checkin', 'estancia.checkout', 'comprobante.emitir', 'descuento.aplicar', 'caja.abrir', 'caja.cerrar', 'habitacion.cambiar_estado'],
+    RECEPCIONISTA: ['reserva.ver', 'reserva.crear', 'reserva.cancelar', 'estancia.checkin', 'estancia.checkout', 'comprobante.emitir', 'descuento.aplicar', 'caja.abrir', 'caja.cerrar', 'habitacion.cambiar_estado'],
     CAJERO: ['comprobante.emitir', 'caja.abrir', 'caja.cerrar'],
     ALMACEN: ['compra.registrar', 'reporte.ver'],
     CONTADOR: ['reporte.ver', 'comprobante.anular'],
@@ -77,8 +80,8 @@ async function main() {
   }
 
   const tipos = await Promise.all(
-    [['Simple', 1], ['Doble', 2], ['Matrimonial', 2], ['Suite', 3]].map(([nombre, cap]) =>
-      prisma.tipo_habitacion.create({ data: { empresa_id: empresa.id, nombre: nombre as string, capacidad_adultos: cap as number } }),
+    ([['Simple', 1, 0], ['Doble', 2, 1], ['Matrimonial', 2, 1], ['Suite', 3, 2]] as const).map(([nombre, cap, ninos]) =>
+      prisma.tipo_habitacion.create({ data: { empresa_id: empresa.id, nombre, capacidad_adultos: cap, capacidad_ninos: ninos } }),
     ),
   );
   const estados = await prisma.estado_habitacion.findMany();
@@ -109,6 +112,27 @@ async function main() {
     }
   }
 
+  // Comodidades: la migración las crea para empresas existentes; esta empresa nace después.
+  const catalogo: Array<[string, string, string]> = [
+    ['AIRE', 'Aire acondicionado', 'aire'], ['WIFI', 'Internet wifi', 'wifi'], ['TV', 'Televisor', 'tv'], ['AGUA_CALIENTE', 'Agua caliente', 'ducha'],
+    ['BANO_PRIVADO', 'Baño privado', 'bano'], ['FRIGOBAR', 'Frigobar', 'frigobar'], ['CAJA_FUERTE', 'Caja fuerte', 'caja_fuerte'],
+    ['CALEFACCION', 'Calefacción', 'calefaccion'], ['BALCON', 'Balcón', 'balcon'], ['JACUZZI', 'Jacuzzi', 'jacuzzi'],
+    ['ESCRITORIO', 'Escritorio de trabajo', 'escritorio'], ['ACCESIBLE', 'Accesible (silla de ruedas)', 'accesible'],
+  ];
+  const amen: Record<string, number> = {};
+  for (const [i, [codigo, nombre, icono]] of catalogo.entries()) {
+    const a = await prisma.amenidad.upsert({ where: { empresa_id_codigo: { empresa_id: empresa.id, codigo } }, update: {}, create: { empresa_id: empresa.id, codigo, nombre, icono, orden: i + 1 } });
+    amen[codigo] = a.id;
+  }
+  const equipamiento = (tipo: string, numero: string): string[] => {
+    const base = ['WIFI', 'TV', 'AGUA_CALIENTE', 'BANO_PRIVADO'];
+    const extra: Record<string, string[]> = { Simple: [], Doble: ['AIRE'], Matrimonial: ['AIRE', 'FRIGOBAR'], Suite: ['AIRE', 'FRIGOBAR', 'CAJA_FUERTE', 'JACUZZI', 'ESCRITORIO', 'BALCON'] };
+    const r = [...base, ...(extra[tipo] ?? [])];
+    if (numero.endsWith('01') && !r.includes('BALCON')) r.push('BALCON');
+    if (numero === '101') r.push('ACCESIBLE');
+    return r;
+  };
+
   // Pisos y habitaciones
   const plan: Array<{ suc: number; pisos: Array<[number, number]> }> = [
     { suc: centro.id, pisos: [[1, 8], [2, 8], [3, 6]] },
@@ -117,12 +141,24 @@ async function main() {
   const habs: Record<string, number> = {};
   for (const p of plan) {
     for (const [num, cant] of p.pisos) {
-      const piso = await prisma.piso.create({ data: { sucursal_id: p.suc, numero: num, nombre: `Piso ${num}` } });
+      // Plano de partida: habitaciones arriba y abajo de un pasillo con escalera (S-06)
+      const dist = distribucionInicial(cant);
+      const piso = await prisma.piso.create({ data: { sucursal_id: p.suc, numero: num, nombre: `Piso ${num}`, plano_columnas: dist.columnas, plano_filas: dist.filas } });
+      await prisma.plano_elemento.createMany({
+        data: [
+          { piso_id: piso.id, tipo: 'PASILLO', ...dist.pasillo },
+          { piso_id: piso.id, tipo: num === 1 ? 'RECEPCION' : 'ESCALERA', etiqueta: num === 1 ? 'Recepción' : null, ...dist.escalera },
+        ],
+      });
       for (let k = 1; k <= cant; k++) {
         const numero = `${num}${String(k).padStart(2, '0')}`;
         const tipo = num === 3 && k >= 5 ? tipos[3] : tipos[(k - 1) % 3];
         const hab = await prisma.habitacion.create({
-          data: { sucursal_id: p.suc, piso_id: piso.id, tipo_habitacion_id: tipo.id, estado_habitacion_id: eid('DESOCUPADA'), numero },
+          data: {
+            sucursal_id: p.suc, piso_id: piso.id, tipo_habitacion_id: tipo.id, estado_habitacion_id: eid('DESOCUPADA'), numero,
+            plano_x: dist.habitaciones[k - 1].x, plano_y: dist.habitaciones[k - 1].y,
+            habitacion_amenidad: { create: equipamiento(tipo.nombre, numero).map((c) => ({ amenidad_id: amen[c] })) },
+          },
         });
         habs[`${p.suc}-${numero}`] = hab.id;
       }
@@ -169,6 +205,44 @@ async function main() {
     [`${centro.id}-301`, 'CONFIRMADA'], [`${centro.id}-206`, 'LIMPIEZA'], [`${alto.id}-201`, 'RESERVADA'], [`${alto.id}-105`, 'MANTENIMIENTO'],
   ];
   for (const [key, est] of otros) await prisma.habitacion.update({ where: { id: habs[key] }, data: { estado_habitacion_id: eid(est) } });
+
+  // Reservas de ejemplo para el calendario (S-06): llegadas de hoy y de los próximos días
+  const hoy = fechaLima(new Date());
+  const dia = (n: number) => { const d = new Date(`${hoy}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const masHuespedes = [
+    { tipo: dni.id, doc: '42315678', nombres: 'Martín', apellidos: 'Quispe Rojas', pais: 'PE' },
+    { tipo: dni.id, doc: '40998877', nombres: 'Gabriela', apellidos: 'Torres Vela', pais: 'PE' },
+    { tipo: pas.id, doc: 'AR3399120', nombres: 'Julián', apellidos: 'Ferreyra', pais: 'AR' },
+  ];
+  for (const c of masHuespedes) {
+    clientes.push(await prisma.cliente.create({ data: { empresa_id: empresa.id, tipo_documento_id: c.tipo, numero_documento: c.doc, nombres: c.nombres, apellidos: c.apellidos, pais_codigo: c.pais } }));
+  }
+  const precioTarifa = (tipoIdx: number, canalIdx: number) => Math.round(base[tipoIdx] * (canales[canalIdx].nombre === 'Booking' ? 1.15 : 1));
+  const tipoIdx = (habKey: string) => { const n = Number(habKey.split('-')[1].slice(-2)); const piso = habKey.split('-')[1][0]; return piso === '3' && n >= 5 ? 3 : (n - 1) % 3; };
+  const ejemplos: Array<[string, number, number, number, number, 'PENDIENTE' | 'CONFIRMADA']> = [
+    // [habitación, cliente, canal, llega en (días), noches, estado]
+    [`${centro.id}-203`, 4, 0, 0, 2, 'PENDIENTE'],
+    [`${centro.id}-301`, 5, 1, 0, 3, 'CONFIRMADA'],
+    [`${centro.id}-103`, 6, 2, 1, 2, 'CONFIRMADA'],
+    [`${centro.id}-201`, 1, 1, 2, 4, 'CONFIRMADA'],
+    [`${centro.id}-305`, 3, 1, 3, 2, 'PENDIENTE'],
+    [`${centro.id}-106`, 2, 0, 4, 1, 'PENDIENTE'],
+    [`${centro.id}-204`, 5, 2, 5, 3, 'CONFIRMADA'],
+    [`${centro.id}-108`, 6, 1, 6, 2, 'PENDIENTE'],
+  ];
+  for (const [i, [key, ci, cn, en, noches, estado]] of ejemplos.entries()) {
+    const r = rangoPorNoches(dia(en), noches);
+    const precio = precioTarifa(tipoIdx(key), cn);
+    await prisma.reserva.create({
+      data: {
+        sucursal_id: centro.id, codigo: codigoReserva(i + 1), cliente_id: clientes[ci].id, canal_venta_id: canales[cn].id,
+        codigo_externo: canales[cn].es_ota ? `BK-${4410200 + i * 37}` : null, fecha_entrada: r.entrada, fecha_salida: r.salida,
+        adultos: 1, estado, moneda_id: pen.id, monto_total: precio * noches, monto_adelanto: estado === 'CONFIRMADA' ? precio : 0,
+        usuario_id: creados.recepcion1,
+        reserva_habitacion: { create: [{ habitacion_id: habs[key], turno_id: turno(24).id, fecha_entrada: r.entrada, fecha_salida: r.salida, cantidad_turnos: noches, precio_unitario: precio }] },
+      },
+    });
+  }
 
   // Series y cajas (preparadas para la fase de facturación)
   const tc = await prisma.tipo_comprobante.findMany();
