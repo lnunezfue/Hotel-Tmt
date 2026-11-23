@@ -1,6 +1,6 @@
 import { StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { BrowserRouter, HashRouter, Navigate, Route, Routes } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
 import { Layout } from './components/Layout';
@@ -13,6 +13,11 @@ import { ConfiguracionHotelPage } from './pages/ConfiguracionHotelPage';
 import { CambiarClavePage } from './pages/CambiarClavePage';
 import { puede, useSesion } from './features/auth/sesion';
 import { alCerrarSesion } from './lib/api';
+import { AvisoDemo } from './demo/AvisoDemo';
+
+const DEMO = import.meta.env.VITE_DEMO === '1';
+/** La demo web se sirve como archivos estáticos: rutas con # para que recargar no dé 404. */
+const Router = DEMO ? HashRouter : BrowserRouter;
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true } } });
 
@@ -20,7 +25,10 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, ref
 alCerrarSesion((motivo) => {
   queryClient.setQueryData(['sesion'], null);
   queryClient.clear();
-  if (location.pathname !== '/login') location.replace('/login' + (motivo ? '?motivo=' + encodeURIComponent(motivo) : ''));
+  const destino = '/login' + (motivo ? '?motivo=' + encodeURIComponent(motivo) : '');
+  if (DEMO) {
+    if (!location.hash.startsWith('#/login')) location.replace('#' + destino);
+  } else if (location.pathname !== '/login') location.replace(destino);
 });
 
 /** Rutas protegidas según la sesión y el permiso del rol (la API vuelve a verificar cada acción). */
@@ -36,7 +44,7 @@ function Protegida({ children, permiso }: { children: ReactNode; permiso?: strin
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route element={<Protegida><Layout /></Protegida>}>
@@ -49,7 +57,8 @@ createRoot(document.getElementById('root')!).render(
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
+      </Router>
+      {DEMO && <AvisoDemo />}
     </QueryClientProvider>
   </StrictMode>,
 );

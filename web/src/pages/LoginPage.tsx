@@ -38,9 +38,15 @@ export function LoginPage() {
         <Button variante="primario" className="h-10" disabled={login.isPending || !username || !password}>
           {login.isPending ? 'Ingresando…' : 'Ingresar'}
         </Button>
+        {import.meta.env.VITE_DEMO === '1' ? (
+          <p className="rounded-lg bg-acento-suave px-3 py-2 text-xs text-tinta">
+            <b>Demostración web.</b> Entra con <span className="font-mono">admin</span> o <span className="font-mono">recepcion1</span> · clave <span className="font-mono">Hotel2026!</span>. Los datos son de ejemplo y los cambios quedan solo en este navegador.
+          </p>
+        ) : (
         <p className="text-xs text-tinta-suave">
           Datos de ejemplo: <span className="font-mono">admin</span>, <span className="font-mono">recepcion1</span>, <span className="font-mono">recepcion2</span>, <span className="font-mono">limpieza1</span> · clave <span className="font-mono">Hotel2026!</span>
         </p>
+        )}
       </form>
     </div>
   );
