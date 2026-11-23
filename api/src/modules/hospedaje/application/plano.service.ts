@@ -164,14 +164,19 @@ export class PlanoService {
     }
     const plan = distribucionInicial(d.habitaciones);
     // Las habitaciones nuevas salen equipadas como las demás de su tipo en la sucursal (se cambia luego por habitación)
-    const modelo = d.tipoHabitacionId
-      ? await this.prisma.habitacion.findFirst({
-          where: { sucursal_id: c.sucursalId, tipo_habitacion_id: d.tipoHabitacionId, activo: true, habitacion_amenidad: { some: {} } },
-          orderBy: { id: 'asc' },
-          include: { habitacion_amenidad: true },
-        })
-      : null;
-    const equipamiento = modelo?.habitacion_amenidad.map((a) => ({ amenidad_id: a.amenidad_id })) ?? [];
+    // El equipamiento más común entre las habitaciones de ese tipo (no el de una habitación con extras propios)
+    const delTipo = d.tipoHabitacionId
+      ? await this.prisma.habitacion.findMany({ where: { sucursal_id: c.sucursalId, tipo_habitacion_id: d.tipoHabitacionId, activo: true }, include: { habitacion_amenidad: true } })
+      : [];
+    const conteo = new Map<string, { n: number; ids: number[] }>();
+    for (const h of delTipo) {
+      const ids = h.habitacion_amenidad.map((a) => a.amenidad_id).sort((x, y) => x - y);
+      if (!ids.length) continue;
+      const k = ids.join(',');
+      conteo.set(k, { n: (conteo.get(k)?.n ?? 0) + 1, ids });
+    }
+    const modelo = [...conteo.values()].sort((x, y) => y.n - x.n)[0];
+    const equipamiento = modelo?.ids.map((amenidad_id) => ({ amenidad_id })) ?? [];
     const desocupada = await this.prisma.estado_habitacion.findUniqueOrThrow({ where: { codigo: 'DESOCUPADA' } });
     try {
       const creado = await this.prisma.$transaction(async (tx) => {
