@@ -6,6 +6,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { OrganizacionModule } from './modules/organizacion/organizacion.module';
 import { CatalogosModule } from './modules/catalogos/catalogos.module';
 import { HospedajeModule } from './modules/hospedaje/hospedaje.module';
+import { ReservasModule } from './modules/reservas/reservas.module';
 import { FacturacionModule } from './modules/facturacion/facturacion.module';
 import { HealthController } from './health.controller';
 
@@ -18,6 +19,7 @@ import { HealthController } from './health.controller';
     OrganizacionModule,
     CatalogosModule,
     HospedajeModule,
+    ReservasModule,
     FacturacionModule,
   ],
   controllers: [HealthController],
