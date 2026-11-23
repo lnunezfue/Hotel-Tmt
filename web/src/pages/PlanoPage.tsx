@@ -353,7 +353,10 @@ export function PlanoPage() {
               key={m}
               role="tab"
               aria-selected={modo === m}
-              onClick={() => { if (sucio && m !== 'editar' && !confirm('Hay cambios sin guardar en el plano. ¿Descartarlos?')) return; setSel(null); setAviso(null); setModo(m); }}
+              onClick={() => {
+                if (sucio && m !== 'editar') return setAviso({ tipo: 'error', texto: 'Guarda o descarta los cambios del plano antes de salir del diseño.' });
+                setSel(null); setAviso(null); setModo(m);
+              }}
               className={clsx('rounded-lg px-4 py-1.5 text-sm font-medium', modo === m ? 'bg-tinta text-white' : 'text-tinta-suave hover:text-tinta')}
             >
               {t}
@@ -366,7 +369,10 @@ export function PlanoPage() {
         <Edificio
           pisos={pisos}
           selId={piso?.id ?? null}
-          onElegir={(id) => { if (sucio && !confirm('Hay cambios sin guardar en este piso. ¿Descartarlos?')) return; setBorrador(null); setPisoId(id); setSel(null); }}
+          onElegir={(id) => {
+            if (sucio && id !== piso?.id) return setAviso({ tipo: 'error', texto: 'Guarda o descarta los cambios de este piso antes de pasar a otro.' });
+            setBorrador(null); setPisoId(id); setSel(null);
+          }}
           onAgregar={() => setNuevoPiso(true)}
           puedeAgregar={puedeEditar && modo === 'editar'}
           nuevoId={recienCreado}
@@ -663,6 +669,7 @@ function EditorHabitacion({ h, tipos, amenidades, onAviso, onCerrar }: { h: Habi
   const [aTodas, setATodas] = useState(false);
   const [nuevaNombre, setNuevaNombre] = useState('');
   const [nuevaIcono, setNuevaIcono] = useState('estrella');
+  const [confirmaQuitar, setConfirmaQuitar] = useState(false);
   const refrescar = () => { qc.invalidateQueries({ queryKey: ['plano'] }); qc.invalidateQueries({ queryKey: ['amenidades'] }); qc.invalidateQueries({ queryKey: ['tablero'] }); };
   const datos = useMutation({
     mutationFn: () => api(`/hospedaje/habitaciones/${h.id}`, json('PATCH', { ...(numero !== h.numero && { numero }), ...(tipoId !== h.tipo.id && { tipoHabitacionId: tipoId }) })),
@@ -731,7 +738,17 @@ function EditorHabitacion({ h, tipos, amenidades, onAviso, onCerrar }: { h: Habi
         </div>
       </details>
 
-      <Button className="text-ocupada" onClick={() => { if (confirm(`¿Quitar la habitación ${h.numero} del plano? Se desactiva y deja de venderse.`)) quitar.mutate(); }}>Quitar habitación</Button>
+      {confirmaQuitar ? (
+        <div className="flex flex-col gap-2 rounded-lg bg-ocupada/5 p-3 text-sm">
+          <span>¿Quitar la habitación {h.numero}? Se desactiva y deja de venderse; su historial se conserva.</span>
+          <div className="flex gap-2">
+            <Button className="text-ocupada" disabled={quitar.isPending} onClick={() => quitar.mutate()}>Sí, quitar</Button>
+            <Button variante="fantasma" onClick={() => setConfirmaQuitar(false)}>No</Button>
+          </div>
+        </div>
+      ) : (
+        <Button className="text-ocupada" onClick={() => setConfirmaQuitar(true)}>Quitar habitación…</Button>
+      )}
     </Card>
   );
 }
