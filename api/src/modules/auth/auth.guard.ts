@@ -58,9 +58,10 @@ export class AuthGuard implements CanActivate {
       throw new ForbiddenException({ message: 'Cambia tu contraseña temporal para continuar', codigo: 'CAMBIO_CLAVE_REQUERIDO' });
     }
 
-    const permiso = this.reflector.getAllAndOverride<string>(PERMISO_KEY, objetivo);
-    if (permiso && !usuario.permisos.includes(permiso)) {
-      throw new ForbiddenException(`Tu rol no tiene el permiso «${permiso}»`);
+    const permisos = this.reflector.getAllAndOverride<string[] | undefined>(PERMISO_KEY, objetivo);
+    if (permisos && !permisos.some((p) => usuario.permisos.includes(p))) {
+      const lista = permisos.map((p) => `«${p}»`).join(' o ');
+      throw new ForbiddenException(`Tu rol no tiene el permiso ${lista}`);
     }
     return true;
   }

@@ -441,6 +441,7 @@ model estancia {
   habitacion_id         Int                   @db.UnsignedInt
   reserva_habitacion_id BigInt?               @db.UnsignedBigInt
   canal_venta_id        Int                   @db.UnsignedSmallInt
+  comision_porcentaje   Decimal               @default(0.00) @db.Decimal(5, 2)
   turno_id              Int                   @db.UnsignedTinyInt
   checkin_at            DateTime              @db.DateTime(0)
   checkout_previsto     DateTime              @db.DateTime(0)
@@ -730,33 +731,37 @@ model proveedor {
 }
 
 model reserva {
-  id                 BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
-  sucursal_id        Int                  @db.UnsignedInt
-  codigo             String               @db.VarChar(20)
-  cliente_id         BigInt               @db.UnsignedBigInt
-  canal_venta_id     Int                  @db.UnsignedSmallInt
-  codigo_externo     String?              @db.VarChar(50)
-  fecha_entrada      DateTime             @db.DateTime(0)
-  fecha_salida       DateTime             @db.DateTime(0)
-  adultos            Int                  @default(1) @db.UnsignedTinyInt
-  ninos              Int                  @default(0) @db.UnsignedTinyInt
-  estado             reserva_estado       @default(PENDIENTE)
-  moneda_id          Int                  @db.UnsignedTinyInt
-  monto_total        Decimal              @default(0.00) @db.Decimal(14, 2)
-  monto_adelanto     Decimal              @default(0.00) @db.Decimal(14, 2)
-  observaciones      String?              @db.VarChar(500)
-  motivo_cancelacion String?              @db.VarChar(250)
-  usuario_id         Int                  @db.UnsignedInt
-  created_at         DateTime             @default(now()) @db.Timestamp(0)
-  updated_at         DateTime             @default(now()) @db.Timestamp(0)
-  canal_venta        canal_venta          @relation(fields: [canal_venta_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_canal")
-  cliente            cliente              @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_cliente")
-  moneda             moneda               @relation(fields: [moneda_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_moneda")
-  sucursal           sucursal             @relation(fields: [sucursal_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_sucursal")
-  usuario            usuario              @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_usuario")
-  caja_movimiento    caja_movimiento[]
-  comprobante        comprobante[]
-  reserva_habitacion reserva_habitacion[]
+  id                     BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  sucursal_id            Int                  @db.UnsignedInt
+  codigo                 String               @db.VarChar(20)
+  cliente_id             BigInt               @db.UnsignedBigInt
+  canal_venta_id         Int                  @db.UnsignedSmallInt
+  comision_porcentaje    Decimal              @default(0.00) @db.Decimal(5, 2)
+  codigo_externo         String?              @db.VarChar(50)
+  fecha_entrada          DateTime             @db.DateTime(0)
+  fecha_salida           DateTime             @db.DateTime(0)
+  adultos                Int                  @default(1) @db.UnsignedTinyInt
+  ninos                  Int                  @default(0) @db.UnsignedTinyInt
+  estado                 reserva_estado       @default(PENDIENTE)
+  moneda_id              Int                  @db.UnsignedTinyInt
+  monto_total            Decimal              @default(0.00) @db.Decimal(14, 2)
+  monto_adelanto         Decimal              @default(0.00) @db.Decimal(14, 2)
+  observaciones          String?              @db.VarChar(500)
+  motivo_cancelacion     String?              @db.VarChar(250)
+  usuario_cancelacion_id Int?                 @db.UnsignedInt
+  cancelada_at           DateTime?            @db.DateTime(0)
+  usuario_id             Int                  @db.UnsignedInt
+  created_at             DateTime             @default(now()) @db.Timestamp(0)
+  updated_at             DateTime             @default(now()) @db.Timestamp(0)
+  canal_venta            canal_venta          @relation(fields: [canal_venta_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_canal")
+  cliente                cliente              @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_cliente")
+  moneda                 moneda               @relation(fields: [moneda_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_moneda")
+  sucursal               sucursal             @relation(fields: [sucursal_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_sucursal")
+  usuario_cancelacion    usuario?             @relation("reserva_usuario_cancelacion_id", fields: [usuario_cancelacion_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_ucan")
+  usuario                usuario              @relation("reserva_usuario_id", fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_usuario")
+  caja_movimiento        caja_movimiento[]
+  comprobante            comprobante[]
+  reserva_habitacion     reserva_habitacion[]
 
   @@unique([sucursal_id, codigo], map: "uk_reserva_codigo")
   @@index([moneda_id], map: "fk_reserva_moneda")
@@ -766,6 +771,7 @@ model reserva {
   @@index([sucursal_id, estado], map: "ix_reserva_estado")
   @@index([canal_venta_id, codigo_externo], map: "ix_reserva_ext")
   @@index([sucursal_id, fecha_entrada, fecha_salida], map: "ix_reserva_fechas")
+  @@index([usuario_cancelacion_id], map: "ix_reserva_ucan")
 }
 
 model reserva_habitacion {
@@ -1029,37 +1035,37 @@ model unidad_medida {
 }
 
 model usuario {
-  id                           Int                           @id @default(autoincrement()) @db.UnsignedInt
-  empresa_id                   Int                           @db.UnsignedInt
-  rol_id                       Int                           @db.UnsignedSmallInt
-  username                     String                        @db.VarChar(50)
-  password_hash                String                        @db.VarChar(255)
-  nombres                      String                        @db.VarChar(100)
-  apellidos                    String                        @db.VarChar(100)
-  email                        String?                       @db.VarChar(120)
-  ultimo_acceso                DateTime?                     @db.DateTime(0)
-  intentos_fallidos            Int                           @default(0) @db.UnsignedTinyInt
-  /// 1 = contraseña temporal asignada por un administrador; debe cambiarla al ingresar
-  debe_cambiar_clave           Boolean                       @default(false) @db.TinyInt
-  activo                       Boolean                       @default(true) @db.TinyInt
-  created_at                   DateTime                      @default(now()) @db.Timestamp(0)
-  updated_at                   DateTime                      @default(now()) @db.Timestamp(0)
-  empresa                      empresa                       @relation(fields: [empresa_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_usuario_empresa")
-  rol                          rol                           @relation(fields: [rol_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_usuario_rol")
-  auditoria                    auditoria[]
-  caja_movimiento              caja_movimiento[]
-  caja_sesion                  caja_sesion[]
-  compra                       compra[]
-  comprobante                  comprobante[]
-  estancia_usuario_checkin_id  estancia[]                    @relation("estancia_usuario_checkin_id")
-  estancia_usuario_checkout_id estancia[]                    @relation("estancia_usuario_checkout_id")
-  habitacion_estado_historial  habitacion_estado_historial[]
-  lote_sunat                   lote_sunat[]
-  movimiento_inventario        movimiento_inventario[]
-  reserva                      reserva[]
-  sesion_usuario               sesion_usuario[]
-  usuario_serie                usuario_serie[]
-  usuario_sucursal             usuario_sucursal[]
+  id                             Int                           @id @default(autoincrement()) @db.UnsignedInt
+  empresa_id                     Int                           @db.UnsignedInt
+  rol_id                         Int                           @db.UnsignedSmallInt
+  username                       String                        @db.VarChar(50)
+  password_hash                  String                        @db.VarChar(255)
+  nombres                        String                        @db.VarChar(100)
+  apellidos                      String                        @db.VarChar(100)
+  email                          String?                       @db.VarChar(120)
+  ultimo_acceso                  DateTime?                     @db.DateTime(0)
+  intentos_fallidos              Int                           @default(0) @db.UnsignedTinyInt
+  debe_cambiar_clave             Boolean                       @default(false) @db.TinyInt
+  activo                         Boolean                       @default(true) @db.TinyInt
+  created_at                     DateTime                      @default(now()) @db.Timestamp(0)
+  updated_at                     DateTime                      @default(now()) @db.Timestamp(0)
+  empresa                        empresa                       @relation(fields: [empresa_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_usuario_empresa")
+  rol                            rol                           @relation(fields: [rol_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_usuario_rol")
+  auditoria                      auditoria[]
+  caja_movimiento                caja_movimiento[]
+  caja_sesion                    caja_sesion[]
+  compra                         compra[]
+  comprobante                    comprobante[]
+  estancia_usuario_checkin_id    estancia[]                    @relation("estancia_usuario_checkin_id")
+  estancia_usuario_checkout_id   estancia[]                    @relation("estancia_usuario_checkout_id")
+  habitacion_estado_historial    habitacion_estado_historial[]
+  lote_sunat                     lote_sunat[]
+  movimiento_inventario          movimiento_inventario[]
+  reserva_usuario_cancelacion_id reserva[]                     @relation("reserva_usuario_cancelacion_id")
+  reserva_usuario_id             reserva[]                     @relation("reserva_usuario_id")
+  sesion_usuario                 sesion_usuario[]
+  usuario_serie                  usuario_serie[]
+  usuario_sucursal               usuario_sucursal[]
 
   @@unique([empresa_id, username], map: "uk_usuario_username")
   @@index([rol_id], map: "ix_usuario_rol")

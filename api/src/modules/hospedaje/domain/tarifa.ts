@@ -76,3 +76,13 @@ export function planificarTarifa(existentes: Vigencia[], desde: string, hoy: str
   const hasta = sumarDias(desde, -1);
   return { cerrar: activas.filter((t) => cubre(t, desde)).map((t) => ({ id: t.id, hasta })) };
 }
+
+/** Instante en que empieza un día de Lima (`YYYY-MM-DD`, UTC−5 todo el año). */
+export const inicioDiaLima = (fecha: string): Date => new Date(`${fecha}T00:00:00-05:00`);
+
+/**
+ * Hora sin fracciones: las columnas DATETIME(0) redondean los milisegundos, y un rango guardado redondeado hacia
+ * arriba se cruzaría con el siguiente que empieza justo donde termina.
+ */
+export const aMinuto = (d: Date): Date => new Date(Math.floor(d.getTime() / 60_000) * 60_000);
+export const aSegundo = (d: Date): Date => new Date(Math.floor(d.getTime() / 1000) * 1000);

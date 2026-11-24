@@ -13,6 +13,11 @@ export class CatalogosController {
     return this.prisma.tipo_documento_identidad.findMany({ where: { activo: true } });
   }
 
+  @Get('paises')
+  paises() {
+    return this.prisma.pais.findMany({ orderBy: { nombre: 'asc' } });
+  }
+
   @Get('tipos-comprobante')
   tiposComprobante() {
     return this.prisma.tipo_comprobante.findMany({ where: { activo: true } });

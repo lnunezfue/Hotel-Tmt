@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/application/auditoria.service';
 import { HabitacionRepository } from '../infrastructure/habitacion.repository';
 import { AvisosTablero } from './avisos-tablero.service';
+import { ReservasService } from './reservas.service';
 import { alertaSalida, esEstado, EstadoHabitacion, TransicionInvalidaError, transicionesPermitidas, validarTransicion } from '../domain/estado-habitacion';
 
 @Injectable()
@@ -12,10 +13,11 @@ export class HospedajeService {
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     private readonly avisos: AvisosTablero,
+    private readonly reservas: ReservasService,
   ) {}
 
   async tablero(sucursalId: number) {
-    const pisos = await this.repo.tablero(sucursalId);
+    const [pisos, llegadas] = await Promise.all([this.repo.tablero(sucursalId), this.reservas.llegadasDeHoy(sucursalId)]);
     const ahora = new Date();
     const resumen: Record<string, number> = {};
     const data = pisos.map((p) => ({
@@ -34,7 +36,9 @@ export class HospedajeService {
           estado: codigo,
           estadoDescripcion: h.estado_habitacion.descripcion,
           color: h.estado_habitacion.color_hex,
-          siguientes: transicionesPermitidas(codigo),
+          // OCUPADA entra con el check-in y sale con el check-out (spec S-06): no se ofrece a mano.
+          siguientes: est ? [] : transicionesPermitidas(codigo).filter((x) => x !== 'OCUPADA'),
+          llegada: llegadas.get(h.id) ?? null,
           estancia: est
             ? {
                 id: Number(est.id),
@@ -54,6 +58,10 @@ export class HospedajeService {
     if (!esEstado(nuevo)) throw new BadRequestException(`Estado desconocido: ${nuevo}`);
     const hab = await this.repo.buscar(sucursalId, habitacionId);
     if (!hab) throw new NotFoundException('La habitación no existe en tu sucursal');
+    if (nuevo === 'OCUPADA') throw new ConflictException('La habitación se ocupa con el check-in');
+    if (await this.prisma.estancia.count({ where: { habitacion_id: habitacionId, estado: 'ACTIVA' } })) {
+      throw new ConflictException('La habitación tiene una estancia en curso; libérala con el check-out');
+    }
     try {
       validarTransicion(hab.estado_habitacion.codigo as EstadoHabitacion, nuevo);
     } catch (e) {

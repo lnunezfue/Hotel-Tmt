@@ -31,9 +31,9 @@ export function validarTransicion(desde: EstadoHabitacion, hacia: EstadoHabitaci
   if (desde === hacia || !TRANSICIONES[desde].includes(hacia)) throw new TransicionInvalidaError(desde, hacia);
 }
 
-/** Salida prevista según el turno contratado (3, 6, 12 o 24 h) y la cantidad de turnos (RF-RES-08, RF-RES-12). */
+/** Salida prevista según la duración del turno (1 a 24 h) y la cantidad de turnos (RF-RES-08, RF-RES-12). */
 export function calcularSalidaPrevista(checkin: Date, horasTurno: number, cantidadTurnos: number): Date {
-  if (![3, 6, 12, 24].includes(horasTurno)) throw new Error(`Turno no válido: ${horasTurno} h`);
+  if (!Number.isInteger(horasTurno) || horasTurno < 1 || horasTurno > 24) throw new Error(`Turno no válido: ${horasTurno} h`);
   if (!Number.isInteger(cantidadTurnos) || cantidadTurnos < 1) throw new Error('La cantidad de turnos debe ser un entero mayor a 0');
   return new Date(checkin.getTime() + horasTurno * cantidadTurnos * 3_600_000);
 }

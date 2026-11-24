@@ -2,7 +2,7 @@
  * Aviso de que el tablero de una sucursal cambió (S-05 D2). No lleva datos: quien lo recibe vuelve a pedir
  * el tablero. Viaja por Redis en el canal de la sucursal, de modo que llega a todas las réplicas de la API.
  */
-export const MOTIVOS_AVISO = ['estado', 'habitacion', 'piso', 'tipo'] as const;
+export const MOTIVOS_AVISO = ['estado', 'habitacion', 'piso', 'tipo', 'reserva'] as const;
 export type MotivoAviso = (typeof MOTIVOS_AVISO)[number];
 
 export interface AvisoTablero {

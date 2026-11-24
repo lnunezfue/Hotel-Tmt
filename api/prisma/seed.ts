@@ -39,8 +39,8 @@ async function main() {
   const rid = (n: string) => roles.find((r) => r.nombre === n)!.id;
   const asignacion: Record<string, string[]> = {
     ADMINISTRADOR: permisos.map((p) => p.codigo),
-    RECEPCIONISTA: ['reserva.crear', 'reserva.cancelar', 'estancia.checkin', 'estancia.checkout', 'comprobante.emitir', 'descuento.aplicar', 'caja.abrir', 'caja.cerrar', 'habitacion.cambiar_estado'],
-    CAJERO: ['comprobante.emitir', 'caja.abrir', 'caja.cerrar'],
+    RECEPCIONISTA: ['reserva.crear', 'reserva.cancelar', 'estancia.checkin', 'estancia.checkout', 'cliente.gestionar', 'comprobante.emitir', 'descuento.aplicar', 'caja.abrir', 'caja.cerrar', 'habitacion.cambiar_estado'],
+    CAJERO: ['cliente.gestionar', 'comprobante.emitir', 'caja.abrir', 'caja.cerrar'],
     ALMACEN: ['compra.registrar', 'reporte.ver'],
     CONTADOR: ['reporte.ver', 'comprobante.anular'],
     LIMPIEZA: ['habitacion.cambiar_estado'],
@@ -157,9 +157,9 @@ async function main() {
     const precio = 100;
     await prisma.estancia.create({
       data: {
-        sucursal_id: Number(key.split('-')[0]), habitacion_id: habs[key], canal_venta_id: canales[ci % 2].id, turno_id: turno(horas).id,
+        sucursal_id: Number(key.split('-')[0]), habitacion_id: habs[key], canal_venta_id: canales[ci % 2].id, comision_porcentaje: canales[ci % 2].comision_porcentaje, turno_id: turno(horas).id,
         checkin_at: checkin, checkout_previsto: new Date(checkin.getTime() + h(horas * cant)), cantidad_turnos: cant, precio_unitario: precio,
-        procedencia: clientes[ci].pais_codigo === 'PE' ? 'Lima, Perú' : 'Exterior', usuario_checkin_id: creados.recepcion1,
+        procedencia: clientes[ci].pais_codigo === 'PE' ? 'Lima, Perú' : 'Exterior', motivo_viaje: 'Turismo', usuario_checkin_id: creados.recepcion1,
         estancia_huesped: { create: [{ cliente_id: clientes[ci].id, es_titular: true }] },
       },
     });
@@ -168,6 +168,47 @@ async function main() {
     [`${centro.id}-102`, 'LIMPIEZA'], [`${centro.id}-107`, 'MANTENIMIENTO'], [`${centro.id}-203`, 'RESERVADA'],
     [`${centro.id}-301`, 'CONFIRMADA'], [`${centro.id}-206`, 'LIMPIEZA'], [`${alto.id}-201`, 'RESERVADA'], [`${alto.id}-105`, 'MANTENIMIENTO'],
   ];
+
+  // Reservas de ejemplo para el calendario: llegadas de hoy (203, 301) y de los próximos días
+  const titulares = [
+    ...clientes,
+    await prisma.cliente.create({ data: { empresa_id: empresa.id, tipo_documento_id: dni.id, numero_documento: '41237788', nombres: 'Martha', apellidos: 'Quispe Mamani', pais_codigo: 'PE', telefono: '952 111 222' } }),
+    await prisma.cliente.create({
+      data: { empresa_id: empresa.id, tipo_documento_id: (await prisma.tipo_documento_identidad.findUniqueOrThrow({ where: { codigo_sunat: '6' } })).id, numero_documento: '20100047218', razon_social: 'Empresa Minera Sur S.A.C.', pais_codigo: 'PE' },
+    }),
+  ];
+  const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+  const diaLima = (dias: number, hora: number) => new Date(new Date(`${hoyLima}T${String(hora).padStart(2, '0')}:00:00-05:00`).getTime() + dias * h(24));
+  const reservas: Array<{ habs: string[]; titular: number; canal: number; dias: number; hora: number; noches: number; estado: 'PENDIENTE' | 'CONFIRMADA'; externo?: string }> = [
+    { habs: [`${centro.id}-203`], titular: 4, canal: 0, dias: 0, hora: 18, noches: 2, estado: 'PENDIENTE' },
+    { habs: [`${centro.id}-301`], titular: 1, canal: 1, dias: 0, hora: 14, noches: 3, estado: 'CONFIRMADA', externo: 'BK-4471209' },
+    { habs: [`${centro.id}-103`, `${centro.id}-106`], titular: 5, canal: 2, dias: 2, hora: 14, noches: 4, estado: 'CONFIRMADA' },
+    { habs: [`${centro.id}-201`], titular: 3, canal: 1, dias: 3, hora: 14, noches: 2, estado: 'PENDIENTE', externo: 'BK-4473361' },
+    { habs: [`${alto.id}-201`], titular: 2, canal: 0, dias: 0, hora: 20, noches: 1, estado: 'CONFIRMADA' },
+  ];
+  const correlativo: Record<number, number> = {};
+  for (const r of reservas) {
+    const suc = Number(r.habs[0].split('-')[0]);
+    correlativo[suc] = (correlativo[suc] ?? 0) + 1;
+    const entrada = diaLima(r.dias, r.hora);
+    const salida = new Date(entrada.getTime() + h(24 * r.noches));
+    const canal = canales[r.canal];
+    const lineas = [];
+    for (const key of r.habs) {
+      const hab = await prisma.habitacion.findUniqueOrThrow({ where: { id: habs[key] } });
+      const tarifa = await prisma.tarifa.findFirstOrThrow({ where: { sucursal_id: suc, tipo_habitacion_id: hab.tipo_habitacion_id, canal_venta_id: canal.id, turno_id: turno(24).id } });
+      lineas.push({ habitacion_id: hab.id, tarifa_id: tarifa.id, turno_id: turno(24).id, fecha_entrada: entrada, fecha_salida: salida, cantidad_turnos: r.noches, precio_unitario: tarifa.precio });
+    }
+    await prisma.reserva.create({
+      data: {
+        sucursal_id: suc, codigo: `R-${hoyLima.slice(0, 4)}-${String(correlativo[suc]).padStart(6, '0')}`, cliente_id: titulares[r.titular].id,
+        canal_venta_id: canal.id, comision_porcentaje: canal.comision_porcentaje, codigo_externo: r.externo ?? null, fecha_entrada: entrada, fecha_salida: salida,
+        adultos: r.habs.length, estado: r.estado, moneda_id: pen.id,
+        monto_total: lineas.reduce((s, l) => s + Number(l.precio_unitario) * l.cantidad_turnos, 0), usuario_id: creados.recepcion1,
+        reserva_habitacion: { create: lineas },
+      },
+    });
+  }
   for (const [key, est] of otros) await prisma.habitacion.update({ where: { id: habs[key] }, data: { estado_habitacion_id: eid(est) } });
 
   // Series y cajas (preparadas para la fase de facturación)
