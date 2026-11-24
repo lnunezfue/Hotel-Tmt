@@ -442,6 +442,8 @@ model estancia {
   habitacion_id         Int                   @db.UnsignedInt
   reserva_habitacion_id BigInt?               @db.UnsignedBigInt
   canal_venta_id        Int                   @db.UnsignedSmallInt
+  /// Comisión del canal al momento del check-in (S-07)
+  comision_porcentaje   Decimal               @default(0.00) @db.Decimal(5, 2)
   turno_id              Int                   @db.UnsignedTinyInt
   checkin_at            DateTime              @db.DateTime(0)
   checkout_previsto     DateTime              @db.DateTime(0)
@@ -468,6 +470,7 @@ model estancia {
   comprobante           comprobante[]
   comprobante_detalle   comprobante_detalle[]
   estancia_huesped      estancia_huesped[]
+  estancia_cargo        estancia_cargo[]
 
   @@index([usuario_checkin_id], map: "fk_est_uci")
   @@index([usuario_checkout_id], map: "fk_est_uco")
@@ -697,6 +700,7 @@ model producto {
   comprobante_detalle    comprobante_detalle[]
   movimiento_inventario  movimiento_inventario[]
   producto_stock         producto_stock[]
+  estancia_cargo         estancia_cargo[]
 
   @@unique([empresa_id, codigo], map: "uk_producto_codigo")
   @@index([tipo_afectacion_igv_id], map: "ix_producto_afec")
@@ -744,6 +748,8 @@ model reserva {
   codigo             String               @db.VarChar(20)
   cliente_id         BigInt               @db.UnsignedBigInt
   canal_venta_id     Int                  @db.UnsignedSmallInt
+  /// Comisión del canal al momento de reservar (S-07)
+  comision_porcentaje Decimal              @default(0.00) @db.Decimal(5, 2)
   codigo_externo     String?              @db.VarChar(50)
   fecha_entrada      DateTime             @db.DateTime(0)
   fecha_salida       DateTime             @db.DateTime(0)
@@ -1069,6 +1075,7 @@ model usuario {
   sesion_usuario               sesion_usuario[]
   usuario_serie                usuario_serie[]
   usuario_sucursal             usuario_sucursal[]
+  estancia_cargo               estancia_cargo[]
 
   @@unique([empresa_id, username], map: "uk_usuario_username")
   @@index([rol_id], map: "ix_usuario_rol")
@@ -1258,4 +1265,27 @@ enum plano_elemento_tipo {
   RECEPCION
   AREA_COMUN
   BANO_COMUN
+}
+
+/// Cargos de una estadía que se facturan al salir (S-07)
+model estancia_cargo {
+  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  estancia_id     BigInt    @db.UnsignedBigInt
+  /// NULL = cargo libre (p. ej. hora extra)
+  producto_id     Int?      @db.UnsignedInt
+  descripcion     String    @db.VarChar(200)
+  cantidad        Decimal   @default(1.00) @db.Decimal(10, 2)
+  /// Con IGV
+  precio_unitario Decimal   @db.Decimal(14, 2)
+  total           Decimal?  @db.Decimal(14, 2) /// columna generada por la BD (solo lectura)
+  anulado         Boolean   @default(false) @db.TinyInt
+  usuario_id      Int       @db.UnsignedInt
+  created_at      DateTime  @default(now()) @db.Timestamp(0)
+  estancia        estancia  @relation(fields: [estancia_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ec_estancia")
+  producto        producto? @relation(fields: [producto_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ec_producto")
+  usuario         usuario   @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ec_usuario")
+
+  @@index([estancia_id], map: "ix_ec_estancia")
+  @@index([producto_id], map: "ix_ec_producto")
+  @@index([usuario_id], map: "ix_ec_usuario")
 }

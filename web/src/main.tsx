@@ -8,6 +8,7 @@ import { LoginPage } from './pages/LoginPage';
 import { TableroPage } from './pages/TableroPage';
 import { ReservasPage } from './pages/ReservasPage';
 import { PlanoPage } from './pages/PlanoPage';
+import { CajaPage } from './pages/CajaPage';
 import { UsuariosPage } from './pages/UsuariosPage';
 import { ConfiguracionHotelPage } from './pages/ConfiguracionHotelPage';
 import { CambiarClavePage } from './pages/CambiarClavePage';
@@ -50,6 +51,7 @@ createRoot(document.getElementById('root')!).render(
           <Route element={<Protegida><Layout /></Protegida>}>
             <Route index element={<TableroPage />} />
             <Route path="plano" element={<PlanoPage />} />
+            <Route path="caja" element={<Protegida permiso="caja.abrir"><CajaPage /></Protegida>} />
             <Route path="reservas" element={<Protegida permiso="reserva.ver"><ReservasPage /></Protegida>} />
             <Route path="usuarios" element={<Protegida permiso="usuario.ver"><UsuariosPage /></Protegida>} />
             <Route path="configuracion/hotel" element={<Protegida permiso="habitacion.gestionar"><ConfiguracionHotelPage /></Protegida>} />

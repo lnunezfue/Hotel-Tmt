@@ -19,6 +19,8 @@ export interface HabitacionTablero {
   id: number;
   numero: string;
   tipo: string;
+  /** Para el precio del check-in directo (S-07). */
+  tipoId?: number;
   capacidad: number;
   estado: Estado;
   estadoDescripcion: string;
@@ -94,6 +96,8 @@ export interface Reserva {
   adultos: number;
   ninos: number;
   total: string;
+  /** Comisión del canal fijada al reservar (S-07). */
+  comision: { porcentaje: string; monto: string };
   adelanto: string;
   saldo: string;
   observaciones: string | null;
@@ -117,4 +121,92 @@ export interface Cliente {
   nombre: string;
   telefono: string | null;
   pais: string;
+}
+
+// ── Estadía, cobro y caja (S-07) ─────────────────────────────────
+
+export interface LineaCuenta {
+  tipo: 'HOSPEDAJE' | 'CARGO';
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: string;
+  total: string;
+  cargoId?: string;
+}
+
+export interface Cuenta {
+  lineas: LineaCuenta[];
+  total: string;
+  adelanto: string;
+  saldo: string;
+  comision: { porcentaje: string; monto: string };
+  reserva: { id: number; codigo: string } | null;
+}
+
+export interface Estancia {
+  id: number;
+  estado: 'ACTIVA' | 'FINALIZADA' | 'ANULADA';
+  habitacion: { id: number; numero: string; tipo: string; capacidad: number };
+  checkin: string;
+  salidaPrevista: string;
+  checkout: string | null;
+  turno: string;
+  horasTurno: number;
+  cantidad: number;
+  precio: string;
+  canal: string;
+  procedencia: string | null;
+  placa: string | null;
+  reserva: string | null;
+  huespedes: Array<{ id: number; titular: boolean; nombre: string; documento: string }>;
+  cargos: Array<{ id: number; descripcion: string; cantidad: number; precio: string; total: string; fecha: string }>;
+  cuenta: Cuenta;
+  grupo: Array<{ id: number; habitacion: string }>;
+}
+
+export interface Producto { id: number; codigo: string; nombre: string; precio: string; categoria: string; tipo: 'BIEN' | 'SERVICIO' }
+export interface MetodoPago { id: number; codigo: string; descripcion: string; es_efectivo: boolean }
+
+export interface ResultadoCheckout { comprobanteId: number; comprobante: string; total: string; vuelto: string }
+
+export interface Comprobante {
+  id: number;
+  tipo: 'BOLETA' | 'FACTURA' | 'INTERNO';
+  tipoDescripcion: string;
+  numero: string;
+  fecha: string;
+  hora: string;
+  emisor: { ruc: string; razonSocial: string; nombreComercial: string | null; direccion: string | null; sucursal: string };
+  cliente: { tipoDoc: string; documento: string; nombre: string; direccion: string | null };
+  lineas: Array<{ item: number; descripcion: string; cantidad: number; precio: string; total: string }>;
+  gravada: string;
+  igv: string;
+  total: string;
+  letras: string | null;
+  pagos: Array<{ metodo: string; monto: string; referencia: string | null }>;
+  estadoSunat: string;
+  reserva: string | null;
+  cajero: string;
+}
+
+export interface SesionCaja {
+  id: number;
+  caja: { id: number; nombre: string };
+  usuario: string;
+  apertura: string;
+  montoApertura: string;
+  estado: 'ABIERTA' | 'CERRADA';
+  efectivoEsperado: string;
+  porMetodo: Array<{ codigo: string; metodo: string; efectivo: boolean; ingresos: string; egresos: string }>;
+  movimientos: Array<{ id: number; fecha: string; concepto: string; codigo: string; tipo: 'INGRESO' | 'EGRESO'; metodo: string; monto: string; descripcion: string | null; reserva: string | null; usuario: string }>;
+  cierre?: string;
+  esperado?: string;
+  declarado?: string;
+  diferencia?: string;
+}
+
+export interface EstadoCaja {
+  cajas: Array<{ id: number; nombre: string }>;
+  sesion: SesionCaja | null;
+  ultimoCierre: null | { id: number; cierre: string; esperado: string; declarado: string; diferencia: string; usuario: string };
 }

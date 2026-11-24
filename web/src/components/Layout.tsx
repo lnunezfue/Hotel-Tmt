@@ -73,8 +73,8 @@ export function Layout() {
           <Enlace to="/" icono={iconos.tablero}>Tablero de habitaciones</Enlace>
           <Enlace to="/plano" icono={iconos.plano}>Plano del hotel</Enlace>
           {puede(sesion, 'reserva.ver') && <Enlace to="/reservas" icono={iconos.reservas}>Reservas</Enlace>}
+          {puede(sesion, 'caja.abrir') && <Enlace to="/caja" icono={iconos.caja}>Caja</Enlace>}
           <Enlace to="/ventas" icono={iconos.ventas} proximo="F3">Ventas y comprobantes</Enlace>
-          <Enlace to="/caja" icono={iconos.caja} proximo="F4">Caja</Enlace>
           {(puede(sesion, 'usuario.ver') || puede(sesion, 'habitacion.gestionar')) && (
             <span className="hidden px-3 pt-3 pb-1 text-[11px] tracking-widest text-white/45 uppercase lg:block">Configuración</span>
           )}

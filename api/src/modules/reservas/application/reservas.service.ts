@@ -5,6 +5,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/application/auditoria.service';
 import { AvisosTablero } from '../../hospedaje/application/avisos-tablero.service';
 import { ConfiguracionService } from '../../hospedaje/application/configuracion.service';
+import { CajaService } from '../../caja/application/caja.service';
 import { sumarDias } from '../../hospedaje/domain/tarifa';
 import { validarTransicion, esEstado, TransicionInvalidaError } from '../../hospedaje/domain/estado-habitacion';
 import {
@@ -25,7 +26,9 @@ export interface NuevaReserva {
   clienteId: number;
   canalId: number;
   turnoId: number;
-  habitacionId: number;
+  /** Una habitación (compatibilidad con S-06) o varias en `habitaciones`. */
+  habitacionId?: number;
+  habitaciones?: Array<{ habitacionId: number; adultos: number; ninos: number }>;
   llegada: string;
   /** Noches (turno de 24 h) o turnos (3, 6 o 12 h). */
   cantidad: number;
@@ -34,6 +37,8 @@ export interface NuevaReserva {
   adultos: number;
   ninos: number;
   adelanto?: number;
+  /** Método con el que se pagó el adelanto (entra a la caja abierta). */
+  metodoPagoId?: number;
   confirmar?: boolean;
   codigoExterno?: string | null;
   observaciones?: string | null;
@@ -64,6 +69,7 @@ const SELECCION = {
   observaciones: true,
   codigo_externo: true,
   motivo_cancelacion: true,
+  comision_porcentaje: true,
   created_at: true,
   canal_venta: { select: { id: true, nombre: true, es_ota: true } },
   cliente: { select: { id: true, numero_documento: true, nombre_completo: true, razon_social: true, telefono: true, pais_codigo: true, tipo_documento: { select: { abreviatura: true } } } },
@@ -89,6 +95,7 @@ export class ReservasService {
     private readonly auditoria: AuditoriaService,
     private readonly avisos: AvisosTablero,
     private readonly config: ConfiguracionService,
+    private readonly caja: CajaService,
   ) {}
 
   /** Reservas que se cruzan con [desde, hasta] (fechas de Lima), para el calendario. */
@@ -149,7 +156,7 @@ export class ReservasService {
           tipo: { id: h.tipo_habitacion.id, nombre: h.tipo_habitacion.nombre, adultos: h.tipo_habitacion.capacidad_adultos, ninos: h.tipo_habitacion.capacidad_ninos },
           libre: !r && !ocupada,
           motivo: r ? `Reservada (${r.reserva.codigo} · ${r.reserva.cliente.nombre_completo ?? r.reserva.cliente.razon_social})` : ocupada ? 'Ocupada en esas fechas' : null,
-          aviso: h.estado_habitacion.codigo === 'MANTENIMIENTO' ? 'En mantenimiento ahora' : null,
+          aviso: h.estado_habitacion.codigo === 'MANTENIMIENTO' ? 'En mantenimiento ahora' : h.estado_habitacion.codigo === 'LIMPIEZA' ? 'En limpieza ahora: márcala lista antes del check-in' : null,
         };
       }),
     };
@@ -157,53 +164,82 @@ export class ReservasService {
 
   async crear(actor: UsuarioSesion, d: NuevaReserva) {
     const c = { empresaId: actor.empresaId, sucursalId: actor.sucursalId };
-    const [hab, turno, cliente] = await Promise.all([
-      this.prisma.habitacion.findFirst({ where: { id: d.habitacionId, sucursal_id: c.sucursalId, activo: true }, include: { tipo_habitacion: true, estado_habitacion: true } }),
+    const pedidas = d.habitaciones?.length ? d.habitaciones : d.habitacionId ? [{ habitacionId: d.habitacionId, adultos: d.adultos, ninos: d.ninos }] : [];
+    if (!pedidas.length) throw new BadRequestException('Elige al menos una habitación');
+    if (new Set(pedidas.map((p) => p.habitacionId)).size !== pedidas.length) throw new BadRequestException('Hay habitaciones repetidas');
+    const [habs, turno, cliente, canal] = await Promise.all([
+      this.prisma.habitacion.findMany({ where: { id: { in: pedidas.map((p) => p.habitacionId) }, sucursal_id: c.sucursalId, activo: true }, include: { tipo_habitacion: true, estado_habitacion: true } }),
       this.prisma.turno.findFirst({ where: { id: d.turnoId, activo: true } }),
       this.prisma.cliente.findFirst({ where: { id: d.clienteId, empresa_id: c.empresaId, activo: true } }),
+      this.prisma.canal_venta.findFirst({ where: { id: d.canalId, empresa_id: c.empresaId, activo: true } }),
     ]);
-    if (!hab) throw new BadRequestException('La habitación no existe o está inactiva en tu sucursal');
+    if (habs.length !== pedidas.length) throw new BadRequestException('Hay habitaciones que no existen o están inactivas en tu sucursal');
     if (!turno) throw new BadRequestException('Turno no válido');
     if (!cliente) throw new BadRequestException('El huésped no existe');
+    if (!canal) throw new BadRequestException('Canal no válido');
 
     let rango: { entrada: Date; salida: Date };
     try {
       rango = turno.duracion_horas === 24 ? rangoPorNoches(d.llegada, d.cantidad) : rangoPorHoras(d.llegada, d.hora ?? '', turno.duracion_horas, d.cantidad);
       if (rango.salida <= new Date()) throw new ReglaReservaError('Las fechas de la reserva ya pasaron');
-      validarHuespedes(d.adultos, d.ninos, { adultos: hab.tipo_habitacion.capacidad_adultos, ninos: hab.tipo_habitacion.capacidad_ninos });
+      for (const p of pedidas) {
+        const h = habs.find((x) => x.id === p.habitacionId)!;
+        try {
+          validarHuespedes(p.adultos, p.ninos, { adultos: h.tipo_habitacion.capacidad_adultos, ninos: h.tipo_habitacion.capacidad_ninos });
+        } catch (e) {
+          throw new ReglaReservaError(pedidas.length > 1 ? `Habitación ${h.numero}: ${(e as Error).message.charAt(0).toLowerCase()}${(e as Error).message.slice(1)}` : (e as Error).message);
+        }
+      }
     } catch (e) {
       traducir(e);
     }
-    // Precio pactado: la tarifa vigente el día de llegada para el tipo, canal y turno (S-04).
-    const tarifa = await this.config.precioVigente(c, { tipoId: hab.tipo_habitacion_id, canalId: d.canalId, turnoId: d.turnoId }, d.llegada);
-    const precio = new Prisma.Decimal(tarifa.precio);
-    const total = precio.mul(d.cantidad);
+    // Precio pactado por habitación: la tarifa vigente el día de llegada para su tipo, el canal y el turno (S-04).
+    const lineas: Array<{ hab: (typeof habs)[number]; tarifaId: number; precio: Prisma.Decimal }> = [];
+    for (const p of pedidas) {
+      const h = habs.find((x) => x.id === p.habitacionId)!;
+      const t = await this.config.precioVigente(c, { tipoId: h.tipo_habitacion_id, canalId: d.canalId, turnoId: d.turnoId }, d.llegada);
+      lineas.push({ hab: h, tarifaId: t.tarifaId, precio: new Prisma.Decimal(t.precio) });
+    }
+    const total = lineas.reduce((acc, l) => acc.add(l.precio.mul(d.cantidad)), new Prisma.Decimal(0));
     const adelanto = new Prisma.Decimal((d.adelanto ?? 0).toFixed(2));
     if (adelanto.lt(0) || adelanto.gt(total)) throw new BadRequestException('El adelanto no puede superar el total');
+    if (adelanto.gt(0) && !d.metodoPagoId) throw new BadRequestException('Indica cómo pagó el adelanto');
     const pen = await this.prisma.moneda.findUniqueOrThrow({ where: { codigo_iso: 'PEN' } });
     const esHoy = fechaLima(rango.entrada) === fechaLima(new Date());
 
     try {
       const creada = await this.prisma.$transaction(async (tx) => {
+        // El adelanto entra a la caja abierta; sin caja abierta no se registra dinero
+        const sesion = adelanto.gt(0) ? await this.caja.exigirSesion(tx, c.sucursalId) : null;
         // El correlativo se calcula con la sucursal bloqueada: dos altas simultáneas no repiten código.
         await tx.$queryRaw`SELECT id FROM sucursal WHERE id = ${c.sucursalId} FOR UPDATE`;
         const n = (await tx.reserva.count({ where: { sucursal_id: c.sucursalId } })) + 1;
         const estado: EstadoReserva = d.confirmar || adelanto.gt(0) ? 'CONFIRMADA' : 'PENDIENTE';
         const r = await tx.reserva.create({
           data: {
-            sucursal_id: c.sucursalId, codigo: codigoReserva(n), cliente_id: d.clienteId, canal_venta_id: d.canalId,
+            sucursal_id: c.sucursalId, codigo: codigoReserva(n), cliente_id: d.clienteId, canal_venta_id: d.canalId, comision_porcentaje: canal.comision_porcentaje,
             codigo_externo: d.codigoExterno?.trim() || null, fecha_entrada: rango.entrada, fecha_salida: rango.salida,
-            adultos: d.adultos, ninos: d.ninos, estado, moneda_id: pen.id, monto_total: total, monto_adelanto: adelanto,
-            observaciones: d.observaciones?.trim() || null, usuario_id: actor.sub,
+            adultos: pedidas.reduce((a, p) => a + p.adultos, 0), ninos: pedidas.reduce((a, p) => a + p.ninos, 0), estado, moneda_id: pen.id,
+            monto_total: total, monto_adelanto: adelanto, observaciones: d.observaciones?.trim() || null, usuario_id: actor.sub,
             reserva_habitacion: {
-              create: [{ habitacion_id: hab.id, tarifa_id: tarifa.tarifaId, turno_id: turno.id, fecha_entrada: rango.entrada, fecha_salida: rango.salida, cantidad_turnos: d.cantidad, precio_unitario: precio }],
+              create: lineas.map((l) => ({ habitacion_id: l.hab.id, tarifa_id: l.tarifaId, turno_id: turno.id, fecha_entrada: rango.entrada, fecha_salida: rango.salida, cantidad_turnos: d.cantidad, precio_unitario: l.precio })),
             },
           },
           select: SELECCION,
         });
-        // Llega hoy: la habitación libre pasa a RESERVADA (o CONFIRMADA) para que recepción la vea en el tablero.
-        if (esHoy && hab.estado_habitacion.codigo === 'DESOCUPADA') await this.cambiarEstadoHabitacion(tx, hab.id, estado === 'CONFIRMADA' ? 'CONFIRMADA' : 'RESERVADA', actor.sub, `Reserva ${r.codigo}`);
-        await this.auditoria.registrar(tx, { accion: 'reserva.crear', tabla: 'reserva', registroId: r.id, despues: { codigo: r.codigo, habitacion: hab.numero, entrada: rango.entrada, salida: rango.salida, total, estado } });
+        if (sesion) {
+          await this.caja.registrar(tx, { sesionId: sesion.id, concepto: 'ADELANTO_RESERVA', metodoPagoId: d.metodoPagoId!, monto: adelanto, usuarioId: actor.sub, reservaId: r.id, descripcion: `Adelanto ${r.codigo} · ${cliente.nombre_completo ?? cliente.razon_social}` });
+        }
+        // Llega hoy: las habitaciones libres pasan a RESERVADA (o CONFIRMADA) para que recepción las vea en el tablero.
+        for (const l of lineas) {
+          if (esHoy && l.hab.estado_habitacion.codigo === 'DESOCUPADA') await this.cambiarEstadoHabitacion(tx, l.hab.id, estado === 'CONFIRMADA' ? 'CONFIRMADA' : 'RESERVADA', actor.sub, `Reserva ${r.codigo}`);
+        }
+        await this.auditoria.registrar(tx, {
+          accion: 'reserva.crear',
+          tabla: 'reserva',
+          registroId: r.id,
+          despues: { codigo: r.codigo, habitaciones: lineas.map((l) => l.hab.numero), entrada: rango.entrada, salida: rango.salida, total, adelanto, comision: canal.comision_porcentaje, estado },
+        });
         return r;
       });
       if (esHoy) await this.avisos.avisar(c.sucursalId, 'estado');
@@ -253,13 +289,31 @@ export class ReservasService {
    * Check-in de la reserva: crea la estancia con el precio pactado, pone la habitación OCUPADA y la reserva
    * EN_CURSO, todo en una transacción. La salida prevista es la de la reserva.
    */
-  async checkin(actor: UsuarioSesion, id: number, datos: { procedencia?: string | null; placa?: string | null }) {
+  async checkin(
+    actor: UsuarioSesion,
+    id: number,
+    datos: { procedencia?: string | null; placa?: string | null; huespedes?: Array<{ habitacionId: number; titularId?: number; acompanantes?: number[] }> },
+  ) {
     const r = await this.prisma.reserva.findFirst({
       where: { id, sucursal_id: actor.sucursalId },
-      include: { reserva_habitacion: { where: { estado: 'ACTIVA' }, include: { habitacion: { include: { estado_habitacion: true } } } } },
+      include: { reserva_habitacion: { where: { estado: 'ACTIVA' }, include: { habitacion: { include: { estado_habitacion: true, tipo_habitacion: true } } } } },
     });
     if (!r) throw new NotFoundException('La reserva no existe en tu sucursal');
     const ahora = new Date();
+    // Huéspedes por habitación: el titular de la reserva va en la primera si no se indica otro (S-07 §3)
+    const porHab = new Map<number, bigint[]>();
+    for (const rh of r.reserva_habitacion) {
+      const dato = datos.huespedes?.find((h) => h.habitacionId === rh.habitacion_id);
+      const titular = dato?.titularId ? BigInt(dato.titularId) : r.cliente_id;
+      const lista = [titular, ...(dato?.acompanantes ?? []).map(BigInt)];
+      if (new Set(lista.map(String)).size !== lista.length) throw new BadRequestException(`Habitación ${rh.habitacion.numero}: hay huéspedes repetidos`);
+      const cap = rh.habitacion.tipo_habitacion.capacidad_adultos + rh.habitacion.tipo_habitacion.capacidad_ninos;
+      if (lista.length > cap) throw new BadRequestException(`Habitación ${rh.habitacion.numero}: admite como máximo ${cap} personas`);
+      porHab.set(rh.habitacion_id, lista);
+    }
+    const todos = [...new Set([...porHab.values()].flat().map(String))];
+    const existen = await this.prisma.cliente.count({ where: { id: { in: todos.map(BigInt) }, empresa_id: actor.empresaId } });
+    if (existen !== todos.length) throw new BadRequestException('Hay huéspedes que no existen');
     try {
       aplicarAccion(r.estado, 'checkin', { entrada: r.fecha_entrada, salida: r.fecha_salida }, ahora);
       for (const rh of r.reserva_habitacion) {
@@ -278,9 +332,9 @@ export class ReservasService {
           const e = await tx.estancia.create({
             data: {
               sucursal_id: actor.sucursalId, habitacion_id: rh.habitacion_id, reserva_habitacion_id: rh.id, canal_venta_id: r.canal_venta_id,
-              turno_id: rh.turno_id, checkin_at: ahora, checkout_previsto: rh.fecha_salida, cantidad_turnos: rh.cantidad_turnos,
+              comision_porcentaje: r.comision_porcentaje, turno_id: rh.turno_id, checkin_at: ahora, checkout_previsto: rh.fecha_salida, cantidad_turnos: rh.cantidad_turnos,
               precio_unitario: rh.precio_unitario, procedencia: datos.procedencia?.trim() || null, placa_vehiculo: datos.placa?.trim().toUpperCase() || null,
-              usuario_checkin_id: actor.sub, estancia_huesped: { create: [{ cliente_id: r.cliente_id, es_titular: true }] },
+              usuario_checkin_id: actor.sub, estancia_huesped: { create: porHab.get(rh.habitacion_id)!.map((cid, i) => ({ cliente_id: cid, es_titular: i === 0 })) },
             },
           });
           estancias.push(e.id);
@@ -314,6 +368,7 @@ export class ReservasService {
       adultos: f.adultos,
       ninos: f.ninos,
       total: f.monto_total.toFixed(2),
+      comision: { porcentaje: f.comision_porcentaje.toFixed(2), monto: f.monto_total.mul(f.comision_porcentaje).div(100).toDecimalPlaces(2).toFixed(2) },
       adelanto: f.monto_adelanto.toFixed(2),
       saldo: f.monto_total.sub(f.monto_adelanto).toFixed(2),
       observaciones: f.observaciones,

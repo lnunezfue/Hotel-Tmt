@@ -31,6 +31,7 @@ export class HospedajeService {
           id: h.id,
           numero: h.numero,
           tipo: h.tipo_habitacion.nombre,
+          tipoId: h.tipo_habitacion.id,
           capacidad: h.tipo_habitacion.capacidad_adultos,
           estado: codigo,
           estadoDescripcion: h.estado_habitacion.descripcion,

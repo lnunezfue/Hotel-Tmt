@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import clsx from 'clsx';
-import { api, type EstadoReserva, type Reserva, type Tablero } from '../lib/api';
+import { api, type Cliente, type EstadoReserva, type Reserva, type Tablero } from '../lib/api';
 import { puede, useSesion } from '../features/auth/sesion';
 import { soles } from '../features/hospedaje/formato';
 import { diaCorto, fechaDe, horaLima, hoyLima, posicionEnDias, sumarDias } from '../features/reservas/fechas';
-import { PanelNuevaReserva, type InicialReserva } from '../features/reservas/PanelNuevaReserva';
+import { ElegirHuesped, PanelNuevaReserva, type InicialReserva } from '../features/reservas/PanelNuevaReserva';
+import { CajonEstancia } from '../features/estancias/Cajones';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Aviso, Campo, Entrada, PanelLateral, Pildora } from '../components/ui/form';
@@ -29,6 +30,9 @@ function DetalleReserva({ r, onListo }: { r: Reserva; onListo: (msg: string) => 
   const [motivo, setMotivo] = useState('');
   const [cancelando, setCancelando] = useState(false);
   const [procedencia, setProcedencia] = useState('');
+  const [acomp, setAcomp] = useState<Record<number, Cliente[]>>({});
+  const [eligiendo, setEligiendo] = useState<number | null>(null);
+  const [cajon, setCajon] = useState<{ id: number; numero: string } | null>(null);
   const accion = useMutation({
     mutationFn: ({ ruta, cuerpo }: { ruta: string; cuerpo?: unknown }) => api<Reserva>(`/reservas/${r.id}/${ruta}`, { method: 'POST', body: cuerpo ? JSON.stringify(cuerpo) : undefined }),
     onSuccess: (x, { ruta }) => {
@@ -56,15 +60,22 @@ function DetalleReserva({ r, onListo }: { r: Reserva; onListo: (msg: string) => 
       <div className="grid grid-cols-2 gap-2 text-sm">
         <div className="rounded-lg bg-fondo p-2"><div className="text-xs text-tinta-suave">Llega</div><b>{horaLima(r.entrada)}</b></div>
         <div className="rounded-lg bg-fondo p-2"><div className="text-xs text-tinta-suave">Sale</div><b>{horaLima(r.salida)}</b></div>
-        <div className="rounded-lg bg-fondo p-2"><div className="text-xs text-tinta-suave">Habitación</div><b>{h?.numero}</b> · {h?.tipo}</div>
+        <div className="rounded-lg bg-fondo p-2"><div className="text-xs text-tinta-suave">{r.habitaciones.length > 1 ? 'Habitaciones' : 'Habitación'}</div><b>{r.habitaciones.map((x) => x.numero).join(', ')}</b>{r.habitaciones.length === 1 ? ` · ${h?.tipo}` : ''}</div>
         <div className="rounded-lg bg-fondo p-2"><div className="text-xs text-tinta-suave">Personas</div><b>{r.adultos}</b> adultos{r.ninos ? ` + ${r.ninos} niños` : ''}</div>
       </div>
       <div className="rounded-lg border border-borde p-3 text-sm">
-        <div className="flex justify-between"><span>{h?.cantidad} × {h && h.horasTurno === 24 ? 'noche' : `turno de ${h?.horasTurno} h`} · {r.canal.nombre}</span><span className="tabular-nums">{h && soles(h.precio)}</span></div>
+        {r.habitaciones.map((x) => (
+          <div key={x.id} className="flex justify-between"><span>{x.numero}: {x.cantidad} × {x.horasTurno === 24 ? 'noche' : `turno de ${x.horasTurno} h`} a {soles(x.precio)}</span><span className="tabular-nums">{soles(Number(x.precio) * x.cantidad)}</span></div>
+        ))}
         <div className="flex justify-between font-semibold"><span>Total</span><span className="tabular-nums">{soles(r.total)}</span></div>
         <div className="flex justify-between text-tinta-suave"><span>Adelanto</span><span className="tabular-nums">{soles(r.adelanto)}</span></div>
         <div className="flex justify-between font-semibold text-acento"><span>Saldo por cobrar</span><span className="tabular-nums">{soles(r.saldo)}</span></div>
       </div>
+      {Number(r.comision.monto) > 0 && <p className="text-xs text-tinta-suave">Comisión de {r.canal.nombre} ({Number(r.comision.porcentaje)} %): {soles(r.comision.monto)}, fijada al reservar.</p>}
+      {r.estado === 'EN_CURSO' && (
+        <Button variante="primario" onClick={() => setCajon({ id: r.habitaciones[0].id, numero: r.habitaciones[0].numero })}>Ver cuenta y hacer check-out</Button>
+      )}
+      <CajonEstancia habitacionId={cajon?.id ?? null} numero={cajon?.numero} onCerrar={() => setCajon(null)} />
       {r.observaciones && <p className="rounded-lg bg-acento-suave/50 p-2 text-sm">{r.observaciones}</p>}
       {r.motivoCancelacion && <p className="text-sm text-tinta-suave">Motivo: {r.motivoCancelacion}</p>}
       {accion.error && <Aviso>{accion.error.message}</Aviso>}
@@ -72,9 +83,30 @@ function DetalleReserva({ r, onListo }: { r: Reserva; onListo: (msg: string) => 
       {abierta && (
         <div className="flex flex-col gap-2 border-t border-borde pt-4">
           {llegaHoyOAntes && puede(sesion, 'estancia.checkin') && (
-            <div className="flex flex-col gap-2 rounded-lg bg-desocupada/8 p-3">
+            <div className="flex flex-col gap-3 rounded-lg bg-desocupada/8 p-3">
+              <span className="text-sm font-semibold">Check-in: ¿quién se queda en cada habitación?</span>
+              {r.habitaciones.map((hab) => (
+                <div key={hab.id} className="flex flex-col gap-1 rounded-md bg-white p-2 text-sm">
+                  <b>Habitación {hab.numero} · {hab.tipo}</b>
+                  <span className="text-xs text-tinta-suave">Titular: {r.cliente.nombre}</span>
+                  {(acomp[hab.id] ?? []).map((a) => (
+                    <span key={a.id} className="flex justify-between text-xs">+ {a.nombre}<button className="text-tinta-suave" onClick={() => setAcomp({ ...acomp, [hab.id]: acomp[hab.id].filter((x) => x.id !== a.id) })}>Quitar</button></span>
+                  ))}
+                  {eligiendo === hab.id ? (
+                    <ElegirHuesped valor={null} onCambio={(c) => { if (c) setAcomp({ ...acomp, [hab.id]: [...(acomp[hab.id] ?? []), c] }); setEligiendo(null); }} />
+                  ) : (
+                    <button className="self-start text-xs font-medium text-acento hover:underline" onClick={() => setEligiendo(hab.id)}>+ Acompañante</button>
+                  )}
+                </div>
+              ))}
               <Campo etiqueta="Procedencia (opcional)"><Entrada value={procedencia} onChange={(e) => setProcedencia(e.target.value)} placeholder="Ciudad o país de donde viene" /></Campo>
-              <Button variante="primario" disabled={accion.isPending} onClick={() => accion.mutate({ ruta: 'checkin', cuerpo: { procedencia: procedencia || null } })}>Hacer check-in</Button>
+              <Button
+                variante="primario"
+                disabled={accion.isPending}
+                onClick={() => accion.mutate({ ruta: 'checkin', cuerpo: { procedencia: procedencia || null, huespedes: r.habitaciones.map((hab) => ({ habitacionId: hab.id, acompanantes: (acomp[hab.id] ?? []).map((a) => a.id) })) } })}
+              >
+                Hacer check-in{r.habitaciones.length > 1 ? ` de ${r.habitaciones.length} habitaciones` : ''}
+              </Button>
             </div>
           )}
           {r.estado === 'PENDIENTE' && puede(sesion, 'reserva.crear') && <Button disabled={accion.isPending} onClick={() => accion.mutate({ ruta: 'confirmar' })}>Confirmar reserva</Button>}
@@ -251,7 +283,7 @@ export function ReservasPage() {
         {nueva && <PanelNuevaReserva key={JSON.stringify(nueva)} inicial={nueva} onListo={(r) => { setNueva(null); setSelId(r.id); setAviso(`Reserva ${r.codigo} registrada para ${r.cliente.nombre}.`); }} />}
       </PanelLateral>
       <PanelLateral titulo={sel ? `Reserva ${sel.codigo}` : 'Reserva'} abierto={!!sel && !nueva} onCerrar={() => setSelId(null)}>
-        {sel && <DetalleReserva key={sel.id + sel.estado} r={sel} onListo={(m) => { setAviso(m); }} />}
+        {sel && <DetalleReserva key={sel.id} r={sel} onListo={(m) => { setAviso(m); }} />}
       </PanelLateral>
     </div>
   );

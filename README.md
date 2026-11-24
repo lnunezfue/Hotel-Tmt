@@ -76,7 +76,7 @@ web/
   src/lib/api/        Cliente HTTP tipado y tipos compartidos
 ```
 
-## Avance (semana 4 · al 23 de noviembre)
+## Avance (semana 4 · al 24 de noviembre)
 
 | Sprint (DT-001) | Alcance | Estado |
 |---|---|---|
@@ -86,14 +86,15 @@ web/
 | S-04 Configuración del hotel | Pantalla *Hotel y tarifas*: habitaciones (alta, edición, desactivar si no está ocupada), pisos, tipos de habitación y tarifas por tipo × canal × turno con vigencia. Un precio nuevo se programa con fecha y cierra el anterior el día previo; historial por celda. API de precio vigente lista para reservas | **Completo** |
 | S-05 Tablero en vivo y canales | Tablero por piso con colores, cambio de estado con reglas y historial, alertas de salida. Los cambios de estado, habitaciones, pisos y tipos llegan a los demás tableros de la sucursal sin recargar (Server-Sent Events, repartidos entre réplicas con Redis), con indicador *En vivo* y consulta de respaldo cada 60 s. Pestaña *Canales*: alta, edición y desactivación de canales de venta con su comisión (permiso `tarifa.editar`; no se desactiva el último activo) | **Implementado** (falta la prueba manual con dos navegadores; la administración de turnos queda pendiente) |
 | S-06 Plano del hotel y comodidades | Pantalla *Plano del hotel*: fachada del edificio con un piso por banda y ventanas del color de cada estado; plano de cada piso con las habitaciones dibujadas desde arriba (camas según el tipo, baño, puerta hacia el pasillo, ventana) y sus íconos de comodidades. Modo *Diseñar*: agregar un piso con vista previa, agregar habitaciones, pasillos, escaleras, ascensor, recepción y áreas comunes, arrastrar y redimensionar con validación de choques. Comodidades por habitación (aire acondicionado, wifi, TV, jacuzzi…, 12 de partida y se pueden crear más) o para todas las de un tipo | **Completo** (pedido de gerencia del 23/11) |
-| S-06 Reservas y check-in | Calendario de 14 días por habitación, llegadas y salidas de hoy, reserva con búsqueda o alta de huésped (DNI, RUC con dígito verificador, CE, pasaporte), habitación libre y precio de la tarifa vigente; el sistema impide fechas que se cruzan. Confirmar, cancelar con motivo, «no se presentó» y check-in que crea la estancia y ocupa la habitación. También se reserva haciendo clic en una habitación libre del plano, filtrando por comodidades | **Completo** (check-out con cobro en S-07) |
+| S-06 Reservas y check-in | Calendario de 14 días por habitación, llegadas y salidas de hoy, reserva con búsqueda o alta de huésped (DNI, RUC con dígito verificador, CE, pasaporte), habitación libre y precio de la tarifa vigente; el sistema impide fechas que se cruzan. Confirmar, cancelar con motivo, «no se presentó» y check-in que crea la estancia y ocupa la habitación. También se reserva haciendo clic en una habitación libre del plano, filtrando por comodidades | **Completo** |
+| S-07 Estadía, cobro y caja | Reservas de varias habitaciones con adelanto (entra a caja) y comisión del canal fijada al reservar; check-in con acompañantes por habitación; check-in directo sin reserva (por noche o por horas); consumos del frigobar y servicios; check-out con cuenta (hospedaje + consumos − adelanto), pago dividido con vuelto en efectivo, boleta, factura o nota interna con IGV y ticket imprimible, habitaciones a limpieza. Caja: apertura, gastos y retiros, cierre con arqueo (faltante o sobrante) | **Completo** (el envío a SUNAT es F3) |
 | F3 Facturación | Puerto del proveedor y adaptador simulado | **Diseño listo** |
 
 Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 12, 15 y 18; RNF-12, 13, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
 
-Pruebas: 159 unitarias de API, 77 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 58 del cliente.
+Pruebas: 173 unitarias de API, 80 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 58 del cliente.
 
-**Demostración web** (sin instalar nada): `pnpm --filter web build:demo` genera en `web/dist-demo` el cliente con una API simulada en el navegador, cargada con una foto del seed. Entra con `admin` o `recepcion1` (`Hotel2026!`); los cambios quedan solo en ese navegador y *Reiniciar demo* vuelve al inicio. El build normal no la incluye.
+**Demostración web** (sin instalar nada, publicada en https://lnunezfue.github.io/Hotel-Tmt/ desde la rama `gh-pages`): `pnpm --filter web build:demo` genera en `web/dist-demo` el cliente con una API simulada en el navegador, cargada con una foto del seed. Entra con `admin` o `recepcion1` (`Hotel2026!`); los cambios quedan solo en ese navegador y *Reiniciar demo* vuelve al inicio. El build normal no la incluye. Trae un **recorrido guiado** de 7 pasos con el día completo del hotel: abrir caja → reservar para una familia → check-in → consumo → check-out con cobro → limpieza → cierre de caja.
 
 ### Qué mostrar de la semana 4
 
@@ -124,7 +125,7 @@ Pruebas: 159 unitarias de API, 77 de integración contra MySQL y Redis reales (`
 ## Próximos pasos
 
 1. Probar el tablero en vivo con dos navegadores (S-05).
-2. Administración de turnos, hoy de solo lectura (S-05). Guardar en cada reserva la comisión vigente del canal (necesita una columna nueva), para que cambiarla después no altere los reportes.
-3. Check-out con cobro, reservas de varias habitaciones a la vez y huéspedes acompañantes (S-07).
+2. Administración de turnos, hoy de solo lectura (S-05).
+3. Envío de boletas y facturas a SUNAT por el PSE, anulaciones y notas de crédito (F3).
 4. Series por usuario cuando existan series operativas (S-08).
 5. Pendiente de gerencia para F3: elegir proveedor (NubeFacT o FactuSmart) y volumen mensual de comprobantes (A-01, A-03).
