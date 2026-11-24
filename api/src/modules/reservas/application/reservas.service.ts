@@ -30,7 +30,7 @@ export interface NuevaReserva {
   habitacionId?: number;
   habitaciones?: Array<{ habitacionId: number; adultos: number; ninos: number }>;
   llegada: string;
-  /** Noches (turno de 24 h) o turnos (3, 6 o 12 h). */
+  /** Noches (turno de 24 h) o turnos por horas (cualquier otra duración). */
   cantidad: number;
   /** Solo para turnos por horas: HH:MM. */
   hora?: string;
