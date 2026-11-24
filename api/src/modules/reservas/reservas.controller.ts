@@ -13,14 +13,19 @@ const Id = z.number().int().positive();
 const RangoSchema = z.object({ desde: Fecha, hasta: Fecha }).refine((r) => r.desde <= r.hasta, 'El rango está invertido');
 const DisponibilidadSchema = z.object({ llegada: Fecha, cantidad: z.coerce.number().int().min(1).max(60), turnoId: z.coerce.number().int().positive(), hora: z.string().optional() });
 const NuevaReservaSchema = z.object({
-  clienteId: Id, canalId: Id, turnoId: Id, habitacionId: Id, llegada: Fecha,
+  clienteId: Id, canalId: Id, turnoId: Id, habitacionId: Id.optional(), llegada: Fecha,
+  habitaciones: z.array(z.object({ habitacionId: Id, adultos: z.number().int().min(1).max(20), ninos: z.number().int().min(0).max(20).default(0) })).max(10).optional(),
   cantidad: z.number().int().min(1).max(60), hora: z.string().optional(),
-  adultos: z.number().int().min(1).max(20), ninos: z.number().int().min(0).max(20).default(0),
-  adelanto: z.number().min(0).max(999_999).optional(), confirmar: z.boolean().optional(),
+  adultos: z.number().int().min(1).max(20).default(1), ninos: z.number().int().min(0).max(20).default(0),
+  adelanto: z.number().min(0).max(999_999).optional(), metodoPagoId: Id.optional(), confirmar: z.boolean().optional(),
   codigoExterno: z.string().max(50).nullable().optional(), observaciones: z.string().max(500).nullable().optional(),
 });
 const CancelarSchema = z.object({ motivo: z.string().trim().min(3).max(250) });
-const CheckinSchema = z.object({ procedencia: z.string().max(100).nullable().optional(), placa: z.string().max(10).nullable().optional() });
+const CheckinSchema = z.object({
+  procedencia: z.string().max(100).nullable().optional(),
+  placa: z.string().max(10).nullable().optional(),
+  huespedes: z.array(z.object({ habitacionId: Id, titularId: Id.optional(), acompanantes: z.array(Id).max(10).default([]) })).max(10).optional(),
+});
 const BuscarSchema = z.object({ q: z.string().max(100).default('') });
 const ClienteSchema = z.object({
   tipoDocumentoId: z.number().int().positive(), numeroDocumento: z.string().min(1).max(15),

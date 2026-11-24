@@ -7,6 +7,8 @@ import { OrganizacionModule } from './modules/organizacion/organizacion.module';
 import { CatalogosModule } from './modules/catalogos/catalogos.module';
 import { HospedajeModule } from './modules/hospedaje/hospedaje.module';
 import { ReservasModule } from './modules/reservas/reservas.module';
+import { CajaModule } from './modules/caja/caja.module';
+import { EstanciasModule } from './modules/estancias/estancias.module';
 import { FacturacionModule } from './modules/facturacion/facturacion.module';
 import { HealthController } from './health.controller';
 
@@ -20,6 +22,8 @@ import { HealthController } from './health.controller';
     CatalogosModule,
     HospedajeModule,
     ReservasModule,
+    CajaModule,
+    EstanciasModule,
     FacturacionModule,
   ],
   controllers: [HealthController],
