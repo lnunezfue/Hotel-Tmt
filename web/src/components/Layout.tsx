@@ -14,6 +14,8 @@ const iconos = {
   caja: 'M3 7h18v13H3zM3 11h18',
   plano: 'M3 3h18v18H3zM3 10h7v11M10 3v4M14 10h7M14 10v11',
   hotel: 'M3 21h18M5 21V5l7-2 7 2v16M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4',
+  clientes: 'M4 5h16v14H4zM8 10a2 2 0 1 0 4 0 2 2 0 1 0-4 0M6.5 16c.5-1.7 1.9-2.6 3.5-2.6s3 .9 3.5 2.6M15 9h3M15 12h3',
+  libro: 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11M9 8h6',
 };
 
 function Icono({ d }: { d: string }) {
@@ -73,6 +75,8 @@ export function Layout() {
           <Enlace to="/" icono={iconos.tablero}>Tablero de habitaciones</Enlace>
           <Enlace to="/plano" icono={iconos.plano}>Plano del hotel</Enlace>
           {puede(sesion, 'reserva.ver') && <Enlace to="/reservas" icono={iconos.reservas}>Reservas</Enlace>}
+          {(puede(sesion, 'reserva.ver') || puede(sesion, 'cliente.gestionar')) && <Enlace to="/clientes" icono={iconos.clientes}>Clientes</Enlace>}
+          {(puede(sesion, 'estancia.checkin') || puede(sesion, 'reporte.ver')) && <Enlace to="/libro-huespedes" icono={iconos.libro}>Libro de huéspedes</Enlace>}
           {puede(sesion, 'caja.abrir') && <Enlace to="/caja" icono={iconos.caja}>Caja</Enlace>}
           <Enlace to="/ventas" icono={iconos.ventas} proximo="F3">Ventas y comprobantes</Enlace>
           {(puede(sesion, 'usuario.ver') || puede(sesion, 'habitacion.gestionar')) && (

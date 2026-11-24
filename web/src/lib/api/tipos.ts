@@ -103,6 +103,9 @@ export interface Reserva {
   observaciones: string | null;
   codigoExterno: string | null;
   motivoCancelacion: string | null;
+  /** Quién canceló o marcó «no se presentó», y cuándo (RF-RES-16). */
+  canceladaPor: string | null;
+  canceladaEn: string | null;
   creada: string;
   canal: { id: number; nombre: string; esOta: boolean };
   cliente: { id: number; documento: string; nombre: string; telefono: string | null; pais: string };
@@ -121,6 +124,38 @@ export interface Cliente {
   nombre: string;
   telefono: string | null;
   pais: string;
+}
+
+/** Ficha completa del cliente (pantalla Clientes). */
+export interface ClienteDetalle extends Cliente {
+  tipoDocumentoId: number;
+  numeroDocumento: string;
+  nombres: string | null;
+  apellidos: string | null;
+  razonSocial: string | null;
+  paisNombre: string;
+  direccion: string | null;
+  fechaNacimiento: string | null;
+  sexo: 'M' | 'F' | 'X' | null;
+  email: string | null;
+  observaciones: string | null;
+  activo: boolean;
+}
+
+export interface FilaLibro {
+  estanciaId: number;
+  entrada: string;
+  salida: string | null;
+  habitacion: string;
+  huesped: string;
+  documento: string;
+  nacionalidad: string;
+  fechaNacimiento: string | null;
+  sexo: string | null;
+  procedencia: string | null;
+  destino: string | null;
+  motivoViaje: string | null;
+  titular: boolean;
 }
 
 // ── Estadía, cobro y caja (S-07) ─────────────────────────────────
@@ -156,6 +191,8 @@ export interface Estancia {
   precio: string;
   canal: string;
   procedencia: string | null;
+  destino: string | null;
+  motivoViaje: string | null;
   placa: string | null;
   reserva: string | null;
   huespedes: Array<{ id: number; titular: boolean; nombre: string; documento: string }>;

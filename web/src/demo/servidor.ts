@@ -36,6 +36,8 @@ interface EstanciaDemo {
   canal: string;
   comision: string;
   procedencia: string | null;
+  destino?: string | null;
+  motivoViaje?: string | null;
   huespedes: Estancia['huespedes'];
   cargos: Estancia['cargos'];
 }
@@ -266,7 +268,7 @@ function vistaEstancia(h: Hab): Estancia {
   const grupo = grupoDe(h);
   return {
     id: e.id, estado: 'ACTIVA', habitacion: { id: h.id, numero: h.numero, tipo: t.nombre, capacidad: t.adultos + t.ninos }, checkin: e.checkin, salidaPrevista: e.salidaPrevista, checkout: null,
-    turno: e.turno, horasTurno: e.horasTurno, cantidad: e.cantidad, precio: e.precio, canal: e.canal, procedencia: e.procedencia, placa: null,
+    turno: e.turno, horasTurno: e.horasTurno, cantidad: e.cantidad, precio: e.precio, canal: e.canal, procedencia: e.procedencia, destino: e.destino ?? null, motivoViaje: e.motivoViaje ?? null, placa: null,
     reserva: db.reservas.find((r) => r.id === e.reservaId)?.codigo ?? null, huespedes: e.huespedes, cargos: e.cargos, cuenta: cuenta(grupo),
     grupo: grupo.map((g) => ({ id: g.estancia!.id, habitacion: g.numero })),
   };
@@ -430,7 +432,7 @@ function crearReserva(b: Record<string, unknown>): Reserva {
     adultos: pedidas.reduce((s, p) => s + p.adultos, 0), ninos: pedidas.reduce((s, p) => s + (p.ninos ?? 0), 0),
     total: soles(total), comision: { porcentaje: canal.comisionPorcentaje, monto: soles(Math.round((total * Number(canal.comisionPorcentaje)) / 100)) },
     adelanto: soles(adelanto), saldo: soles(total - adelanto), observaciones: (b.observaciones as string) || null, codigoExterno: (b.codigoExterno as string) || null,
-    motivoCancelacion: null, creada: new Date().toISOString(), canal: { id: canal.id, nombre: canal.nombre, esOta: canal.esOta }, cliente,
+    motivoCancelacion: null, canceladaPor: null, canceladaEn: null, creada: new Date().toISOString(), canal: { id: canal.id, nombre: canal.nombre, esOta: canal.esOta }, cliente,
     habitaciones: lineas.map((l) => ({ id: l.h.id, numero: l.h.numero, tipo: l.t.nombre, turno: turno.nombre, horasTurno: turno.duracion_horas, cantidad, precio: l.pr })),
   };
   db.reservas.push(nueva);
@@ -451,8 +453,9 @@ function accionReserva(r: Reserva, accion: string, b: Record<string, unknown>): 
   } else if (accion === 'cancelar' || accion === 'no-show') {
     if (!abierta) return error(400, 'La reserva ya no está abierta');
     if (accion === 'no-show' && hoy < fechaDe(r.entrada)) return error(400, 'Solo se marca «no se presentó» desde el día de llegada');
+    if (!String(b.motivo ?? '').trim()) return error(400, 'Indica el motivo');
     r.estado = accion === 'cancelar' ? 'CANCELADA' : 'NO_SHOW';
-    if (accion === 'cancelar') r.motivoCancelacion = String(b.motivo ?? '');
+    Object.assign(r, { motivoCancelacion: String(b.motivo), canceladaPor: db.usuario, canceladaEn: new Date().toISOString() });
     for (const h of habs) if (h.estado === 'RESERVADA' || h.estado === 'CONFIRMADA') cambiarEstado(h, 'DESOCUPADA', `Reserva ${r.codigo} ${accion === 'cancelar' ? 'cancelada' : 'no se presentó'}`);
   } else if (accion === 'checkin') {
     if (!abierta) return error(400, 'No se puede hacer check-in de esta reserva');
@@ -465,7 +468,8 @@ function accionReserva(r: Reserva, accion: string, b: Record<string, unknown>): 
       const acomp = datos.find((d) => d.habitacionId === h.id)?.acompanantes ?? [];
       h.estancia = {
         id: id(), reservaId: r.id, checkin: new Date().toISOString(), salidaPrevista: r.salida, turno: rh.turno, horasTurno: rh.horasTurno, cantidad: rh.cantidad, precio: rh.precio,
-        canal: r.canal.nombre, comision: canal?.comisionPorcentaje ?? '0.00', procedencia: (b.procedencia as string) || null, cargos: [],
+        canal: r.canal.nombre, comision: canal?.comisionPorcentaje ?? '0.00', procedencia: (b.procedencia as string) || null,
+        destino: (b.destino as string) || null, motivoViaje: (b.motivoViaje as string) || null, cargos: [],
         huespedes: [{ id: r.cliente.id, titular: true, nombre: r.cliente.nombre, documento: r.cliente.documento }, ...acomp.map((cid) => {
           const c = db.clientes.find((x) => x.id === cid)!;
           return { id: c.id, titular: false, nombre: c.nombre, documento: c.documento };
@@ -521,6 +525,30 @@ export async function responder<T>(rutaCompleta: string, init: RequestInit): Pro
     if (ruta === '/clientes') {
       const t = (q.get('q') ?? '').toLowerCase();
       return salida(t.length < 2 ? [] : db.clientes.filter((c) => `${c.nombre} ${c.documento}`.toLowerCase().includes(t)).slice(0, 8));
+    }
+    if (ruta === '/clientes/cartera') {
+      const t = (q.get('q') ?? '').toLowerCase();
+      return salida(db.clientes.filter((c) => !t || `${c.nombre} ${c.documento}`.toLowerCase().includes(t)).slice(0, 50).map((c) => ({ ...c, email: null, activo: true })));
+    }
+    const ficha = m(/^\/clientes\/(\d+)$/);
+    if (ficha) {
+      const c = db.clientes.find((x) => x.id === Number(ficha[1])) ?? error(404, 'El cliente no existe');
+      const [abrev, numero] = c.documento.split(' ');
+      const tipos = R<Array<{ id: number; abreviatura: string }>>('/clientes/tipos-documento');
+      const empresa = abrev === 'RUC' && numero.startsWith('20');
+      const [nombres, ...resto] = c.nombre.split(' ');
+      return salida({
+        ...c, tipoDocumentoId: tipos.find((t) => t.abreviatura === abrev)?.id ?? 1, numeroDocumento: numero, paisNombre: c.pais,
+        nombres: empresa ? null : nombres, apellidos: empresa ? null : resto.join(' ') || '-', razonSocial: empresa ? c.nombre : null,
+        direccion: null, fechaNacimiento: null, sexo: null, email: null, observaciones: null, activo: true,
+      });
+    }
+    if (ruta === '/libro-huespedes') {
+      return salida(db.habs.filter((h) => h.estancia).flatMap((h) => h.estancia!.huespedes.map((x) => ({
+        estanciaId: h.estancia!.id, entrada: h.estancia!.checkin, salida: null, habitacion: h.numero, huesped: x.nombre, documento: x.documento,
+        nacionalidad: 'Perú', fechaNacimiento: null, sexo: null, procedencia: h.estancia!.procedencia, destino: h.estancia!.destino ?? null,
+        motivoViaje: h.estancia!.motivoViaje ?? null, titular: x.titular,
+      }))));
     }
     if (ruta === '/hospedaje/tarifas/vigente') {
       const p = precio(Number(q.get('tipoId')), Number(q.get('canalId')), Number(q.get('turnoId')));
@@ -591,7 +619,8 @@ export async function responder<T>(rutaCompleta: string, init: RequestInit): Pro
     const ids = [Number(b.clienteId), ...((b.acompanantes as number[]) ?? [])];
     h.estancia = {
       id: id(), reservaId: null, checkin: new Date(ahora).toISOString(), salidaPrevista: salidaPrev, turno: turno.nombre, horasTurno: turno.duracion_horas, cantidad, precio: p,
-      canal: canal.nombre, comision: canal.comisionPorcentaje, procedencia: (b.procedencia as string) || null, cargos: [],
+      canal: canal.nombre, comision: canal.comisionPorcentaje, procedencia: (b.procedencia as string) || null,
+      destino: (b.destino as string) || null, motivoViaje: (b.motivoViaje as string) || null, cargos: [],
       huespedes: ids.map((cid, i) => {
         const c = db.clientes.find((x) => x.id === cid)!;
         return { id: c.id, titular: i === 0, nombre: c.nombre, documento: c.documento };
@@ -624,6 +653,41 @@ export async function responder<T>(rutaCompleta: string, init: RequestInit): Pro
     const h = habDeEstancia(Number(anular[1]));
     h.estancia!.cargos = h.estancia!.cargos.filter((c) => c.id !== Number(anular[2]));
     return salida(vistaEstancia(h));
+  }
+  const ext = m(/^\/estancias\/(\d+)\/extension$/);
+  if (ext) {
+    const h = habDeEstancia(Number(ext[1]));
+    const turnos = Number(b.turnos);
+    if (!Number.isInteger(turnos) || turnos < 1 || turnos > 30) return error(400, 'La extensión debe ser de 1 a 30 turnos');
+    const e = h.estancia!;
+    const nueva = new Date(Date.parse(e.salidaPrevista) + e.horasTurno * turnos * 3_600_000).toISOString();
+    if (db.reservas.some((x) => x.id !== e.reservaId && abiertas(x) && x.habitaciones.some((y) => y.id === h.id) && cruza(x, { entrada: e.salidaPrevista, salida: nueva }))) {
+      return error(409, `La habitación ${h.numero} ya está reservada en ese horario`);
+    }
+    Object.assign(e, { cantidad: e.cantidad + turnos, salidaPrevista: nueva });
+    return salida(vistaEstancia(h));
+  }
+  const tras = m(/^\/estancias\/(\d+)\/traslado$/);
+  if (tras) {
+    const origen = habDeEstancia(Number(tras[1]));
+    const destino = db.habs.find((x) => x.id === b.habitacionId) ?? error(400, 'La habitación de destino no existe');
+    if (String(b.motivo ?? '').trim().length < 5) return error(400, 'El motivo del traslado debe tener entre 5 y 200 caracteres');
+    if (destino.id === origen.id) return error(400, 'Elige una habitación distinta');
+    if (destino.estancia || !TRANSICIONES[destino.estado].includes('OCUPADA')) return error(409, `La habitación ${destino.numero} no está lista (está ${destino.estado.toLowerCase()})`);
+    destino.estancia = origen.estancia;
+    origen.estancia = null;
+    cambiarEstado(origen, 'LIMPIEZA', `Traslado a la ${destino.numero}: ${b.motivo}`);
+    cambiarEstado(destino, 'OCUPADA', `Traslado desde la ${origen.numero}: ${b.motivo}`);
+    return salida(vistaEstancia(destino));
+  }
+  const edCliente = m(/^\/clientes\/(\d+)$/);
+  if (edCliente && metodoHttp === 'PATCH') {
+    const c = db.clientes.find((x) => x.id === Number(edCliente[1])) ?? error(404, 'El cliente no existe');
+    const nombre = (b.razonSocial as string) || [b.nombres, b.apellidos].filter(Boolean).join(' ');
+    if (nombre) c.nombre = nombre;
+    if (b.telefono !== undefined) c.telefono = (b.telefono as string) || null;
+    if (typeof b.pais === 'string') c.pais = b.pais;
+    return salida(c);
   }
   const co = m(/^\/estancias\/(\d+)\/checkout$/);
   if (co) return salida(checkout(habDeEstancia(Number(co[1])), b));

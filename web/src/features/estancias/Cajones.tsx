@@ -7,6 +7,7 @@ import { ElegirHuesped } from '../reservas/PanelNuevaReserva';
 import { Button } from '../../components/ui/Button';
 import { Aviso, Campo, Entrada, PanelLateral, Selector } from '../../components/ui/form';
 import { PanelEstancia, useRefrescarHotel } from './PanelEstancia';
+import { MOTIVOS_VIAJE } from './libro';
 import { VistaComprobante } from './VistaComprobante';
 
 interface Turno { id: number; nombre: string; duracion_horas: number }
@@ -27,11 +28,11 @@ export function ComprobanteEmitido({ r, onListo }: { r: ResultadoCheckout; onLis
 }
 
 /** Cajón lateral de una habitación ocupada: estadía, consumos, check-out y comprobante. */
-export function CajonEstancia({ habitacionId, numero, onCerrar }: { habitacionId: number | null; numero?: string; onCerrar: () => void }) {
+export function CajonEstancia({ habitacionId, onCerrar }: { habitacionId: number | null; numero?: string; onCerrar: () => void }) {
   const [hecho, setHecho] = useState<ResultadoCheckout | null>(null);
   const cerrar = () => { setHecho(null); onCerrar(); };
   return (
-    <PanelLateral titulo={hecho ? 'Comprobante' : `Habitación ${numero ?? ''} · estadía`} abierto={habitacionId !== null} onCerrar={cerrar}>
+    <PanelLateral titulo={hecho ? 'Comprobante' : 'Estadía en curso'} abierto={habitacionId !== null} onCerrar={cerrar}>
       {habitacionId !== null && (hecho ? <ComprobanteEmitido r={hecho} onListo={cerrar} /> : <PanelEstancia key={habitacionId} habitacionId={habitacionId} onComprobante={setHecho} />)}
     </PanelLateral>
   );
@@ -48,6 +49,8 @@ export function CajonCheckinDirecto({ habitacion, onCerrar }: { habitacion: { id
   const [turnoId, setTurnoId] = useState<number | null>(null);
   const [cantidad, setCantidad] = useState(1);
   const [procedencia, setProcedencia] = useState('');
+  const [destino, setDestino] = useState('');
+  const [motivoViaje, setMotivoViaje] = useState<string>('Turismo');
   const turno = turnos.data?.find((t) => t.id === turnoId) ?? turnos.data?.find((t) => t.duracion_horas === 24);
   const canal = canales.data?.find((c) => c.nombre === 'Recepción' && c.activo !== false) ?? canales.data?.find((c) => c.activo !== false);
   const precio = useQuery({
@@ -57,7 +60,7 @@ export function CajonCheckinDirecto({ habitacion, onCerrar }: { habitacion: { id
     retry: false,
   });
   const crear = useMutation({
-    mutationFn: () => api<Estancia>('/estancias', { method: 'POST', body: JSON.stringify({ habitacionId: habitacion!.id, clienteId: titular!.id, acompanantes: acomp.map((a) => a.id), canalId: canal!.id, turnoId: turno!.id, cantidad, procedencia: procedencia || null }) }),
+    mutationFn: () => api<Estancia>('/estancias', { method: 'POST', body: JSON.stringify({ habitacionId: habitacion!.id, clienteId: titular!.id, acompanantes: acomp.map((a) => a.id), canalId: canal!.id, turnoId: turno!.id, cantidad, procedencia, destino: destino || null, motivoViaje }) }),
     onSuccess: () => { refrescar(); setTitular(null); setAcomp([]); onCerrar(); },
   });
   const lleno = 1 + acomp.length >= (habitacion?.capacidad ?? 1);
@@ -82,13 +85,21 @@ export function CajonCheckinDirecto({ habitacion, onCerrar }: { habitacion: { id
           </Campo>
           <Campo etiqueta={turno?.duracion_horas === 24 ? 'Noches' : 'Turnos'}><Entrada type="number" min={1} max={30} value={cantidad} onChange={(e) => setCantidad(Math.max(1, Number(e.target.value)))} /></Campo>
         </div>
-        <Campo etiqueta="Procedencia (opcional)"><Entrada value={procedencia} onChange={(e) => setProcedencia(e.target.value)} placeholder="Arequipa, Lima, Chile…" /></Campo>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo etiqueta="Procedencia"><Entrada value={procedencia} onChange={(e) => setProcedencia(e.target.value)} placeholder="Arequipa, Lima, Chile…" /></Campo>
+          <Campo etiqueta="Destino (opcional)"><Entrada value={destino} onChange={(e) => setDestino(e.target.value)} placeholder="A dónde sigue" /></Campo>
+          <Campo etiqueta="Motivo del viaje" className="col-span-2">
+            <Selector value={motivoViaje} onChange={(e) => setMotivoViaje(e.target.value)}>
+              {MOTIVOS_VIAJE.map((m) => <option key={m}>{m}</option>)}
+            </Selector>
+          </Campo>
+        </div>
         <div className="rounded-lg bg-fondo p-3 text-sm">
           {precio.data ? <div className="flex justify-between"><span>{soles(precio.data.precio)} × {cantidad}</span><b className="tabular-nums">{soles(Number(precio.data.precio) * cantidad)}</b></div> : <span className="text-tinta-suave">{precio.isError ? 'No hay tarifa para este turno.' : 'Calculando precio…'}</span>}
           <div className="text-xs text-tinta-suave">Se cobra al salir, junto con los consumos.</div>
         </div>
         {crear.error && <Aviso>{crear.error.message}</Aviso>}
-        <Button variante="primario" className="h-10" disabled={!titular || !precio.data || crear.isPending} onClick={() => crear.mutate()}>Hacer check-in</Button>
+        <Button variante="primario" className="h-10" disabled={!titular || !precio.data || procedencia.trim().length < 2 || crear.isPending} onClick={() => crear.mutate()}>Hacer check-in</Button>
       </div>
     </PanelLateral>
   );

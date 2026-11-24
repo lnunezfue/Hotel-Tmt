@@ -9,5 +9,6 @@ export default defineConfig({
   base: process.env.VITE_DEMO === '1' ? './' : '/',
   // La demo se publica como una sola página: un único archivo JS
   build: process.env.VITE_DEMO === '1' ? { rollupOptions: { output: { inlineDynamicImports: true } } } : undefined,
-  server: { port: 5173, proxy: { '/api': 'http://localhost:3000' } },
+  // API_URL permite apuntar a otra instancia de la API (p. ej. dos copias del proyecto levantadas a la vez).
+  server: { port: 5173, proxy: { '/api': process.env.API_URL ?? 'http://localhost:3000' } },
 });

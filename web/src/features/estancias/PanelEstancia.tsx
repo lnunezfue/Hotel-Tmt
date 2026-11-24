@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { api, type Cliente, type Estancia, type MetodoPago, type Producto, type ResultadoCheckout } from '../../lib/api';
+import { api, type Cliente, type Estancia, type MetodoPago, type Producto, type ResultadoCheckout, type Tablero } from '../../lib/api';
 import { puede, useSesion } from '../auth/sesion';
 import { soles } from '../hospedaje/formato';
 import { horaLima } from '../reservas/fechas';
@@ -143,13 +143,85 @@ export function PanelCheckout({ e, onListo, onVolver }: { e: Estancia; onListo: 
   );
 }
 
+// ── Extensión y traslado ────────────────────────────────────────
+
+/** Suma turnos al mismo precio (RF-RES-13) o lleva al huésped a otra habitación con su motivo (RF-RES-14). */
+function ExtenderOTrasladar({ e, onCambio }: { e: Estancia; onCambio: () => void }) {
+  const [modo, setModo] = useState<'extender' | 'trasladar' | null>(null);
+  const [turnos, setTurnos] = useState('1');
+  const [destino, setDestino] = useState<number | null>(null);
+  const [motivo, setMotivo] = useState('');
+  const tablero = useQuery({ queryKey: ['tablero'], queryFn: () => api<Tablero>('/hospedaje/tablero'), enabled: modo === 'trasladar' });
+  const libres = (tablero.data?.pisos.flatMap((pi) => pi.habitaciones) ?? []).filter(
+    (h) => h.id !== e.habitacion.id && !h.estancia && ['DESOCUPADA', 'RESERVADA', 'CONFIRMADA'].includes(h.estado),
+  );
+  const n = Number(turnos);
+  const accion = useMutation({
+    mutationFn: () =>
+      modo === 'extender'
+        ? api<Estancia>(`/estancias/${e.id}/extension`, json('POST', { turnos: n }))
+        : api<Estancia>(`/estancias/${e.id}/traslado`, json('POST', { habitacionId: destino, motivo })),
+    onSuccess: () => { setModo(null); setMotivo(''); setDestino(null); setTurnos('1'); onCambio(); },
+  });
+  const unidad = e.horasTurno === 24 ? 'noche' : `turno de ${e.horasTurno} h`;
+
+  if (!modo) {
+    return (
+      <div className="flex gap-2">
+        <Button className="flex-1" onClick={() => setModo('extender')}>Extender estadía</Button>
+        <Button className="flex-1" onClick={() => setModo('trasladar')}>Cambiar de habitación</Button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-borde p-3 text-sm">
+      {modo === 'extender' ? (
+        <>
+          <span className="font-medium">Extender la estadía</span>
+          <div className="flex items-center gap-2">
+            <Entrada type="number" min={1} max={30} className="h-9 w-20" value={turnos} onChange={(ev) => setTurnos(ev.target.value)} aria-label="Turnos a agregar" />
+            <span>{n === 1 ? unidad : `${unidad === 'noche' ? 'noches' : `turnos de ${e.horasTurno} h`}`} más a {soles(e.precio)} = <b className="tabular-nums">{soles(Number(e.precio) * (Number.isInteger(n) && n > 0 ? n : 0))}</b></span>
+          </div>
+          <span className="text-xs text-tinta-suave">Mismo precio pactado. Si la habitación ya está reservada para después, el sistema no lo permite.</span>
+        </>
+      ) : (
+        <>
+          <span className="font-medium">Cambiar de habitación</span>
+          <Selector value={destino ?? ''} onChange={(ev) => setDestino(Number(ev.target.value) || null)} aria-label="Habitación de destino">
+            <option value="">Elige una habitación libre…</option>
+            {libres.map((h) => <option key={h.id} value={h.id}>{h.numero} · {h.tipo} · {h.capacidad} pers.</option>)}
+          </Selector>
+          <Entrada value={motivo} maxLength={200} onChange={(ev) => setMotivo(ev.target.value)} placeholder="Motivo (ej. fuga de agua en el baño)" />
+          <span className="text-xs text-tinta-suave">El precio pactado no cambia. La habitación {e.habitacion.numero} pasa a limpieza.</span>
+        </>
+      )}
+      {accion.error && <Aviso>{accion.error.message}</Aviso>}
+      <div className="flex gap-2">
+        <Button
+          variante="primario"
+          disabled={accion.isPending || (modo === 'extender' ? !(Number.isInteger(n) && n >= 1 && n <= 30) : !destino || motivo.trim().length < 5)}
+          onClick={() => accion.mutate()}
+        >
+          {modo === 'extender' ? 'Extender' : 'Trasladar'}
+        </Button>
+        <Button variante="fantasma" onClick={() => setModo(null)}>Volver</Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Estadía en curso ────────────────────────────────────────────
 
 export function PanelEstancia({ estanciaId, habitacionId, onComprobante }: { estanciaId?: number; habitacionId?: number; onComprobante: (r: ResultadoCheckout) => void }) {
   const refrescar = useRefrescarHotel();
   const { data: sesion } = useSesion();
-  const ruta = estanciaId ? `/estancias/${estanciaId}` : `/estancias/habitacion/${habitacionId}`;
+  // Una vez cargada se sigue por su id: tras un traslado, la estadía ya no está en la habitación de origen.
+  const [fija, setFija] = useState<number | undefined>(estanciaId);
+  const ruta = fija ? `/estancias/${fija}` : `/estancias/habitacion/${habitacionId}`;
   const q = useQuery({ queryKey: ['estancia', ruta], queryFn: () => api<Estancia>(ruta) });
+  useEffect(() => {
+    if (q.data && !fija) setFija(q.data.id);
+  }, [q.data, fija]);
   const productos = useQuery({ queryKey: ['productos'], queryFn: () => api<Producto[]>('/productos') });
   const [modo, setModo] = useState<'ver' | 'checkout'>('ver');
   const [agregando, setAgregando] = useState(false);
@@ -173,8 +245,10 @@ export function PanelEstancia({ estanciaId, habitacionId, onComprobante }: { est
       <div className="grid grid-cols-2 gap-2 text-sm">
         <div className="rounded-lg bg-fondo p-2"><div className="text-xs text-tinta-suave">Entró</div><b>{horaLima(e.checkin)}</b></div>
         <div className={clsx('rounded-lg p-2', Date.parse(e.salidaPrevista) < Date.now() ? 'bg-ocupada/10 text-ocupada' : 'bg-fondo')}><div className="text-xs text-tinta-suave">Sale</div><b>{horaLima(e.salidaPrevista)}</b></div>
-        <div className="col-span-2 text-xs text-tinta-suave">{e.cantidad} × {e.horasTurno === 24 ? 'noche' : `turno de ${e.horasTurno} h`} a {soles(e.precio)} · {e.canal}{e.reserva ? ` · reserva ${e.reserva}` : ' · sin reserva'}{e.procedencia ? ` · viene de ${e.procedencia}` : ''}</div>
+        <div className="col-span-2 text-xs text-tinta-suave"><b className="text-tinta">Habitación {e.habitacion.numero}</b> · {e.cantidad} × {e.horasTurno === 24 ? 'noche' : `turno de ${e.horasTurno} h`} a {soles(e.precio)} · {e.canal}{e.reserva ? ` · reserva ${e.reserva}` : ' · sin reserva'}{e.procedencia ? ` · viene de ${e.procedencia}` : ''}{e.destino ? ` · sigue a ${e.destino}` : ''}{e.motivoViaje ? ` · ${e.motivoViaje.toLowerCase()}` : ''}</div>
       </div>
+
+      {puede(sesion, 'estancia.checkin') && <ExtenderOTrasladar e={e} onCambio={refrescar} />}
 
       <div className="flex flex-col gap-2">
         <span className="text-xs tracking-widest text-tinta-suave uppercase">Huéspedes ({e.huespedes.length}/{e.habitacion.capacidad})</span>
