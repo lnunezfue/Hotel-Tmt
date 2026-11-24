@@ -10,6 +10,7 @@ import { IconoAmenidad, ICONOS_DISPONIBLES } from '../features/hospedaje/iconos-
 import { buscarHueco, cabe, distribucionInicial, LIMITES, ladoPuerta, siguienteNumero, type Rect } from '../features/hospedaje/plano';
 import { hoyLima } from '../features/reservas/fechas';
 import { PanelNuevaReserva, type InicialReserva } from '../features/reservas/PanelNuevaReserva';
+import { CajonCheckinDirecto, CajonEstancia } from '../features/estancias/Cajones';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Aviso, Campo, Entrada, PanelLateral, Selector } from '../components/ui/form';
@@ -154,6 +155,7 @@ export function PlanoPage() {
   const [recienCreado, setRecienCreado] = useState<number | null>(null);
   const [reservando, setReservando] = useState<InicialReserva | null>(null);
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [cajon, setCajon] = useState<'estancia' | 'checkin' | null>(null);
 
   const pisos = plano.data ?? [];
   const piso = pisos.find((p) => p.id === pisoId) ?? pisos[0] ?? null;
@@ -529,6 +531,8 @@ export function PlanoPage() {
               onCerrar={() => setSel(null)}
               onReservar={puedeReservar ? () => setReservando({ habitacionId: habSel.id, llegada: modo === 'reservar' ? llegada : hoyLima(), noches: modo === 'reservar' ? noches : 1 }) : undefined}
               onTablero={() => navigate('/')}
+              onEstancia={puede(sesion, 'estancia.checkout') ? () => setCajon('estancia') : undefined}
+              onCheckin={puede(sesion, 'estancia.checkin') ? () => setCajon('checkin') : undefined}
             />
           )}
           {habSel && modo === 'editar' && piso && (
@@ -564,6 +568,11 @@ export function PlanoPage() {
         </div>
       </div>
 
+      <CajonEstancia habitacionId={cajon === 'estancia' && habSel ? habSel.id : null} numero={habSel?.numero} onCerrar={() => setCajon(null)} />
+      <CajonCheckinDirecto
+        habitacion={cajon === 'checkin' && habSel ? { id: habSel.id, numero: habSel.numero, tipoId: habSel.tipo.id, capacidad: habSel.tipo.adultos + habSel.tipo.ninos } : null}
+        onCerrar={() => setCajon(null)}
+      />
       <PanelLateral titulo="Nueva reserva" abierto={!!reservando} onCerrar={() => setReservando(null)}>
         {reservando && (
           <PanelNuevaReserva
@@ -622,7 +631,7 @@ function ResumenPiso({ piso }: { piso: PisoPlano }) {
   );
 }
 
-function PanelHabitacion({ h, amenidades, onCerrar, onReservar, onTablero }: { h: HabitacionPlano; amenidades: Amenidad[]; onCerrar: () => void; onReservar?: () => void; onTablero: () => void }) {
+function PanelHabitacion({ h, amenidades, onCerrar, onReservar, onTablero, onEstancia, onCheckin }: { h: HabitacionPlano; amenidades: Amenidad[]; onCerrar: () => void; onReservar?: () => void; onTablero: () => void; onEstancia?: () => void; onCheckin?: () => void }) {
   const e = ESTILO_ESTADO[h.estado];
   const lista = h.amenidades.map((c) => amenidades.find((a) => a.codigo === c)).filter((a): a is Amenidad => !!a);
   return (
@@ -654,8 +663,10 @@ function PanelHabitacion({ h, amenidades, onCerrar, onReservar, onTablero }: { h
       </div>
       {h.descripcion && <p className="text-sm text-tinta-suave">{h.descripcion}</p>}
       <div className="flex flex-wrap gap-2">
-        {onReservar && <Button variante="primario" onClick={onReservar}>Reservar esta habitación</Button>}
-        <Button onClick={onTablero}>Ir al tablero</Button>
+        {h.estado === 'OCUPADA' && onEstancia && <Button variante="primario" onClick={onEstancia}>Ver cuenta y hacer check-out</Button>}
+        {['DESOCUPADA', 'RESERVADA', 'CONFIRMADA'].includes(h.estado) && onCheckin && <Button variante="primario" onClick={onCheckin}>Check-in directo</Button>}
+        {onReservar && <Button onClick={onReservar}>Reservar esta habitación</Button>}
+        <Button variante="fantasma" onClick={onTablero}>Ir al tablero</Button>
       </div>
     </Card>
   );

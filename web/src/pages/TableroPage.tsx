@@ -7,6 +7,7 @@ import { useTableroEnVivo } from '../features/hospedaje/useTableroEnVivo';
 import { puede, useSesion } from '../features/auth/sesion';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { CajonCheckinDirecto, CajonEstancia } from '../features/estancias/Cajones';
 
 const hora = (iso: string) => new Date(iso).toLocaleString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -62,6 +63,7 @@ function PanelHabitacion({ h, onCerrar }: { h: HabitacionTablero; onCerrar: () =
   });
   const e = ESTILO_ESTADO[h.estado];
   const puedeCambiar = puede(sesion, 'habitacion.cambiar_estado');
+  const [cajon, setCajon] = useState<'estancia' | 'checkin' | null>(null);
 
   return (
     <Card className="flex flex-col gap-5 p-5 xl:sticky xl:top-6">
@@ -104,7 +106,12 @@ function PanelHabitacion({ h, onCerrar }: { h: HabitacionTablero; onCerrar: () =
               </Button>
             ))}
           </div>
-          {h.estado === 'OCUPADA' && <p className="text-xs text-tinta-suave">El check-out con cobro se hace desde la estancia (sprint S-06).</p>}
+          {h.estado === 'OCUPADA' && puede(sesion, 'estancia.checkout') && (
+            <Button variante="primario" onClick={() => setCajon('estancia')}>Ver cuenta y hacer check-out</Button>
+          )}
+          {['DESOCUPADA', 'RESERVADA', 'CONFIRMADA'].includes(h.estado) && puede(sesion, 'estancia.checkin') && (
+            <Button onClick={() => setCajon('checkin')}>Check-in directo (sin reserva)</Button>
+          )}
           {cambiar.error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{cambiar.error.message}</p>}
         </div>
       ) : (
@@ -127,6 +134,8 @@ function PanelHabitacion({ h, onCerrar }: { h: HabitacionTablero; onCerrar: () =
           ))}
         </ol>
       </div>
+      <CajonEstancia habitacionId={cajon === 'estancia' ? h.id : null} numero={h.numero} onCerrar={() => setCajon(null)} />
+      <CajonCheckinDirecto habitacion={cajon === 'checkin' && h.tipoId ? { id: h.id, numero: h.numero, tipoId: h.tipoId, capacidad: h.capacidad + 2 } : null} onCerrar={() => setCajon(null)} />
     </Card>
   );
 }
