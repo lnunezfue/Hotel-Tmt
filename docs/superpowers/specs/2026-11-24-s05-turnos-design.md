@@ -4,7 +4,7 @@
 |---|---|
 | Sprint | S-05 (F2) del DT-001, última parte pendiente |
 | Fecha | 2026-11-24 |
-| Estado | Aprobado por el usuario («sí» a la pantalla de turnos, con el patrón de canales) |
+| Estado | Implementado en la rama `s05-tablero-en-vivo` |
 | Requerimiento | RF-RES-08: definir turnos de 3, 6, 12 y 24 horas con su duración en horas y su descripción comercial |
 | Rama | `s05-tablero-en-vivo` (PR #3) |
 
