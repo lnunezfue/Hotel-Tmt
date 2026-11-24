@@ -19,8 +19,14 @@ jobs:
         options: >-
           --health-cmd="mysqladmin ping -uroot -proot" --health-interval=5s --health-retries=20
         ports: ["3306:3306"]
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd="redis-cli ping" --health-interval=5s --health-retries=20
+        ports: ["6379:6379"]
     env:
       DATABASE_URL: mysql://hotel:hotel_dev_pass@127.0.0.1:3306/hotel_dev
+      REDIS_URL: redis://127.0.0.1:6379
       JWT_SECRET: ci-secret
     steps:
       - uses: actions/checkout@v4

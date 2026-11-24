@@ -37,3 +37,18 @@ export function leerConfigAuth(env: NodeJS.ProcessEnv = process.env): ConfigAuth
     trustProxy: trustProxy(env),
   };
 }
+
+export interface ConfigRedis {
+  url: string;
+}
+
+/** Redis reparte los avisos del tablero entre réplicas (S-05) y alojará la cola de emisión (F3). */
+export function leerConfigRedis(env: NodeJS.ProcessEnv = process.env): ConfigRedis {
+  const url = (env.REDIS_URL ?? '').trim();
+  if (url === '') {
+    if (env.NODE_ENV === 'production') throw new Error('REDIS_URL es obligatoria en producción');
+    return { url: 'redis://localhost:6379' };
+  }
+  if (!/^rediss?:\/\//.test(url)) throw new Error('REDIS_URL debe empezar por redis:// o rediss://');
+  return { url };
+}

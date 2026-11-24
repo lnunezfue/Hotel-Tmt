@@ -21,5 +21,9 @@ export const ACCIONES_AUDITORIA = [
   'tipo_habitacion.crear',
   'tipo_habitacion.editar',
   'tarifa.crear',
+  'canal_venta.crear',
+  'canal_venta.editar',
+  'turno.crear',
+  'turno.editar',
 ] as const;
 export type AccionAuditoria = (typeof ACCIONES_AUDITORIA)[number];

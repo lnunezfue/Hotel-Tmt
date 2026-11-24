@@ -30,7 +30,12 @@ const EditarHabitacionSchema = conCambios(
     activo: z.boolean(),
   }),
 );
-const ClaveTarifaSchema = z.object({ tipoId: Id, canalId: Id, turnoId: Id });
+// Longitud, rango y decimales los valida el dominio (canal-venta.ts, turno.ts); aquí solo la forma.
+const TurnoSchema = z.object({ nombre: z.string().max(200), duracionHoras: z.number() });
+const EditarTurnoSchema = conCambios(z.object({ nombre: z.string().max(200), duracionHoras: z.number(), activo: z.boolean() }));
+const CanalSchema = z.object({ nombre: z.string().max(200), comisionPorcentaje: z.number(), esOta: z.boolean().default(false) });
+const EditarCanalSchema = conCambios(z.object({ nombre: z.string().max(200), comisionPorcentaje: z.number(), esOta: z.boolean(), activo: z.boolean() }));
+const ClaveTarifaSchema =z.object({ tipoId: Id, canalId: Id, turnoId: Id });
 const NuevaTarifaSchema = z.object({
   tipoId: z.number().int().positive(),
   canalId: z.number().int().positive(),
@@ -110,9 +115,51 @@ export class ConfiguracionController {
     return this.svc.canales(ctx(u));
   }
 
+  @RequierePermiso('habitacion.gestionar')
+  @Get('config/canales')
+  canalesConfig(@UsuarioActual() u: UsuarioSesion) {
+    return this.svc.canalesConfig(ctx(u));
+  }
+
+  /** La comisión es una condición comercial, como el precio: se edita con el permiso de tarifas (RF-RES-07). */
+  @RequierePermiso('tarifa.editar')
+  @Auditar('canal_venta.crear')
+  @Post('canales')
+  crearCanal(@UsuarioActual() u: UsuarioSesion, @Body(new ZodValidationPipe(CanalSchema)) body: z.infer<typeof CanalSchema>) {
+    return this.svc.crearCanal(ctx(u), body);
+  }
+
+  @RequierePermiso('tarifa.editar')
+  @Auditar('canal_venta.editar')
+  @Patch('canales/:id')
+  editarCanal(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseIntPipe) id: number, @Body(new ZodValidationPipe(EditarCanalSchema)) body: z.infer<typeof EditarCanalSchema>) {
+    return this.svc.editarCanal(ctx(u), id, body);
+  }
+
   @Get('turnos')
   turnos() {
     return this.svc.turnos();
+  }
+
+  @RequierePermiso('habitacion.gestionar')
+  @Get('config/turnos')
+  turnosConfig(@UsuarioActual() u: UsuarioSesion) {
+    return this.svc.turnosConfig(ctx(u));
+  }
+
+  /** Los turnos son comunes a todo el sistema y definen qué se vende: se editan con el permiso de tarifas (RF-RES-08). */
+  @RequierePermiso('tarifa.editar')
+  @Auditar('turno.crear')
+  @Post('turnos')
+  crearTurno(@Body(new ZodValidationPipe(TurnoSchema)) body: z.infer<typeof TurnoSchema>) {
+    return this.svc.crearTurno(body);
+  }
+
+  @RequierePermiso('tarifa.editar')
+  @Auditar('turno.editar')
+  @Patch('turnos/:id')
+  editarTurno(@Param('id', ParseIntPipe) id: number, @Body(new ZodValidationPipe(EditarTurnoSchema)) body: z.infer<typeof EditarTurnoSchema>) {
+    return this.svc.editarTurno(id, body);
   }
 
   @Get('tarifas')
