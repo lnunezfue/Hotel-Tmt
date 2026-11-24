@@ -10,6 +10,9 @@ import { esEstado, TransicionInvalidaError, validarTransicion } from '../../hosp
 import { hoyLima } from '../../hospedaje/domain/tarifa';
 import { rangoPorHoras, rangoPorNoches, ReglaReservaError, validarHuespedes } from '../../reservas/domain/reserva';
 import { aCentimos, aSoles, comision, desglosarIgv, LineaCuenta, montoEnLetras, ReglaCobroError, repartirPagos, totalesComprobante } from '../domain/cobro';
+import { normalizarLibro, normalizarMotivoTraslado, ReglaEstadiaError, salidaExtendida, turnosAdicionales, validarExtension } from '../domain/estadia';
+import { bloquearHabitaciones, exigirNoAlojados, exigirSinCruces } from '../../hospedaje/application/cruces';
+import { esFecha, inicioDiaLima, sumarDias } from '../../hospedaje/domain/tarifa';
 
 type Tx = Prisma.TransactionClient;
 
@@ -22,6 +25,8 @@ export interface CheckinDirecto {
   cantidad: number;
   procedencia?: string | null;
   placa?: string | null;
+  destino?: string | null;
+  motivoViaje?: string | null;
 }
 
 export interface Checkout {
@@ -31,7 +36,7 @@ export interface Checkout {
 }
 
 function traducir(e: unknown): never {
-  if (e instanceof ReglaReservaError || e instanceof ReglaCobroError) throw new BadRequestException(e.message);
+  if (e instanceof ReglaReservaError || e instanceof ReglaCobroError || e instanceof ReglaEstadiaError) throw new BadRequestException(e.message);
   if (e instanceof TransicionInvalidaError) throw new ConflictException(`La habitación no está lista: ${e.message}`);
   const texto = e instanceof Error ? e.message : '';
   const m = /(La habitación está ocupada[^"'\n]*|La factura requiere cliente con RUC|Serie inactiva|Serie inexistente)/.exec(texto);
@@ -97,28 +102,36 @@ export class EstanciasService {
     if (!canal) throw new BadRequestException('Canal no válido');
     const huespedes = [d.clienteId, ...(d.acompanantes ?? [])];
     if (new Set(huespedes).size !== huespedes.length) throw new BadRequestException('Hay huéspedes repetidos');
-    const clientes = await this.prisma.cliente.count({ where: { id: { in: huespedes }, empresa_id: c.empresaId } });
-    if (clientes !== huespedes.length) throw new BadRequestException('Hay huéspedes que no existen');
+    const clientes = await this.prisma.cliente.findMany({ where: { id: { in: huespedes }, empresa_id: c.empresaId }, include: { tipo_documento: true } });
+    if (clientes.length !== huespedes.length) throw new BadRequestException('Hay huéspedes que no existen');
+    this.exigirPersonas(clientes);
     const ahora = new Date();
     const hoy = hoyLima(ahora);
     let salida: Date;
+    let libro: ReturnType<typeof normalizarLibro>;
     try {
       if (!esEstado(hab.estado_habitacion.codigo)) throw new ReglaReservaError('Estado desconocido');
       validarTransicion(hab.estado_habitacion.codigo, 'OCUPADA');
       validarHuespedes(huespedes.length, 0, { adultos: hab.tipo_habitacion.capacidad_adultos + hab.tipo_habitacion.capacidad_ninos, ninos: 0 });
       salida = turno.duracion_horas === 24 ? rangoPorNoches(hoy, d.cantidad).salida : rangoPorHoras(hoy, '00:00', turno.duracion_horas, d.cantidad).salida;
       if (turno.duracion_horas !== 24) salida = new Date(ahora.getTime() + turno.duracion_horas * d.cantidad * 3_600_000);
+      libro = normalizarLibro(d);
     } catch (e) {
       traducir(e);
     }
     const tarifa = await this.config.precioVigente(c, { tipoId: hab.tipo_habitacion_id, canalId: canal.id, turnoId: turno.id }, hoy);
     try {
       const creada = await this.prisma.$transaction(async (tx) => {
+        // Habitación bloqueada: no choca con una reserva por llegar ni con otro check-in simultáneo (RF-RES-18).
+        await bloquearHabitaciones(tx, [hab.id]);
+        await exigirSinCruces(tx, [hab.id], ahora, salida, {}, ahora);
+        await exigirNoAlojados(tx, huespedes);
         const e = await tx.estancia.create({
           data: {
             sucursal_id: c.sucursalId, habitacion_id: hab.id, canal_venta_id: canal.id, comision_porcentaje: canal.comision_porcentaje, turno_id: turno.id,
             checkin_at: ahora, checkout_previsto: salida, cantidad_turnos: d.cantidad, precio_unitario: new Prisma.Decimal(tarifa.precio),
             procedencia: d.procedencia?.trim() || null, placa_vehiculo: d.placa?.trim().toUpperCase() || null, usuario_checkin_id: actor.sub,
+            destino: libro.destino, motivo_viaje: libro.motivoViaje,
             estancia_huesped: { create: huespedes.map((id, i) => ({ cliente_id: id, es_titular: i === 0 })) },
           },
         });
@@ -135,12 +148,14 @@ export class EstanciasService {
 
   async agregarHuesped(actor: UsuarioSesion, id: number, clienteId: number) {
     const e = await this.buscar(actor.sucursalId, id, true);
-    const cliente = await this.prisma.cliente.findFirst({ where: { id: clienteId, empresa_id: actor.empresaId } });
+    const cliente = await this.prisma.cliente.findFirst({ where: { id: clienteId, empresa_id: actor.empresaId }, include: { tipo_documento: true } });
     if (!cliente) throw new BadRequestException('El huésped no existe');
+    this.exigirPersonas([cliente]);
     if (e.estancia_huesped.some((h) => h.cliente_id === BigInt(clienteId))) throw new ConflictException('Ese huésped ya está registrado en la habitación');
     const cap = e.habitacion.tipo_habitacion.capacidad_adultos + e.habitacion.tipo_habitacion.capacidad_ninos;
     if (e.estancia_huesped.length + 1 > cap) throw new BadRequestException(`La habitación admite como máximo ${cap} personas`);
     await this.prisma.$transaction(async (tx) => {
+      await exigirNoAlojados(tx, [clienteId]);
       await tx.estancia_huesped.create({ data: { estancia_id: e.id, cliente_id: clienteId, es_titular: false } });
       await this.auditoria.registrar(tx, { accion: 'estancia.huesped', tabla: 'estancia', registroId: e.id, despues: { clienteId, nombre: nombreCliente(cliente) } });
     });
@@ -188,7 +203,8 @@ export class EstanciasService {
   async checkout(actor: UsuarioSesion, id: number, d: Checkout) {
     const e = await this.buscar(actor.sucursalId, id, true);
     const grupo = await this.grupo(e);
-    const cuenta = this.cuenta(grupo);
+    const ahora = new Date();
+    const cuenta = this.cuenta(grupo, ahora);
     const metodos = await this.prisma.metodo_pago.findMany({ where: { activo: true } });
     let reparto: ReturnType<typeof repartirPagos>;
     try {
@@ -217,7 +233,6 @@ export class EstanciasService {
     const umServicio = um.find((u) => u.codigo_sunat === 'ZZ')!.id;
     const umBien = um.find((u) => u.codigo_sunat === 'NIU')!.id;
     const totales = totalesComprobante(cuenta.lineas);
-    const ahora = new Date();
     const lima = new Date(ahora.getTime() - 5 * 3_600_000).toISOString();
 
     try {
@@ -264,7 +279,9 @@ export class EstanciasService {
           });
         }
         for (const g of grupo) {
-          await tx.estancia.update({ where: { id: g.id }, data: { estado: 'FINALIZADA', checkout_at: ahora, usuario_checkout_id: actor.sub } });
+          // Se guardan los turnos consumidos: los contratados más los de una salida tardía (RF-RES-12).
+          const extra = turnosAdicionales(g.checkout_previsto, ahora, g.turno.duracion_horas);
+          await tx.estancia.update({ where: { id: g.id }, data: { estado: 'FINALIZADA', checkout_at: ahora, usuario_checkout_id: actor.sub, cantidad_turnos: g.cantidad_turnos + extra } });
           await this.cambiarEstadoHabitacion(tx, g.habitacion_id, 'LIMPIEZA', actor.sub, `Check-out ${comprobante.serie}-${String(comprobante.numero).padStart(8, '0')}`);
         }
         if (cuenta.reserva) await tx.reserva.update({ where: { id: BigInt(cuenta.reserva.id) }, data: { estado: 'FINALIZADA' } });
@@ -283,7 +300,142 @@ export class EstanciasService {
     }
   }
 
+  /** Suma turnos a una estadía en curso, al mismo precio pactado, si la habitación sigue libre (RF-RES-13). */
+  async extender(actor: UsuarioSesion, id: number, turnos: number) {
+    try {
+      validarExtension(turnos);
+    } catch (err) {
+      traducir(err);
+    }
+    const e = await this.buscar(actor.sucursalId, id, true);
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await bloquearHabitaciones(tx, [e.habitacion_id]);
+        const actual = await tx.estancia.findUniqueOrThrow({ where: { id: e.id } });
+        if (actual.estado !== 'ACTIVA') throw new ConflictException('La estadía ya terminó');
+        const nueva = salidaExtendida(actual.checkout_previsto, e.turno.duracion_horas, turnos);
+        await exigirSinCruces(tx, [e.habitacion_id], actual.checkout_previsto, nueva, {
+          estanciaId: e.id,
+          ...(e.reserva_habitacion && { reservaId: e.reserva_habitacion.reserva.id }),
+        });
+        await tx.estancia.update({ where: { id: e.id }, data: { cantidad_turnos: actual.cantidad_turnos + turnos, checkout_previsto: nueva } });
+        // La habitación de la reserva acompaña la nueva salida para que el calendario y los cruces la vean.
+        if (actual.reserva_habitacion_id) await tx.reserva_habitacion.update({ where: { id: actual.reserva_habitacion_id }, data: { fecha_salida: nueva } });
+        await this.auditoria.registrar(tx, {
+          accion: 'estancia.extender',
+          tabla: 'estancia',
+          registroId: e.id,
+          antes: { cantidad: actual.cantidad_turnos, salida: actual.checkout_previsto },
+          despues: { cantidad: actual.cantidad_turnos + turnos, salida: nueva, turnosAgregados: turnos },
+        });
+      });
+    } catch (err) {
+      traducir(err);
+    }
+    await this.avisos.avisar(actor.sucursalId, 'estado');
+    return this.detalle(actor.sucursalId, e.id);
+  }
+
+  /**
+   * Traslada la estadía a otra habitación con su motivo (RF-RES-14). El precio pactado no cambia; la habitación
+   * que se deja pasa a limpieza y la nueva a ocupada.
+   */
+  async trasladar(actor: UsuarioSesion, id: number, d: { habitacionId: number; motivo: string }) {
+    const e = await this.buscar(actor.sucursalId, id, true);
+    let motivo: string;
+    try {
+      motivo = normalizarMotivoTraslado(d.motivo);
+    } catch (err) {
+      traducir(err);
+    }
+    if (d.habitacionId === e.habitacion_id) throw new BadRequestException('Elige una habitación distinta');
+    const destino = await this.prisma.habitacion.findFirst({
+      where: { id: d.habitacionId, sucursal_id: actor.sucursalId, activo: true },
+      include: { tipo_habitacion: true },
+    });
+    if (!destino) throw new BadRequestException('La habitación de destino no existe o está inactiva');
+    const cap = destino.tipo_habitacion.capacidad_adultos + destino.tipo_habitacion.capacidad_ninos;
+    if (e.estancia_huesped.length > cap) throw new BadRequestException(`La habitación ${destino.numero} admite como máximo ${cap} personas`);
+    const ahora = new Date();
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await bloquearHabitaciones(tx, [e.habitacion_id, destino.id]);
+        const actual = await tx.habitacion.findUniqueOrThrow({ where: { id: destino.id }, include: { estado_habitacion: true } });
+        if (!esEstado(actual.estado_habitacion.codigo)) throw new ReglaEstadiaError('Estado de habitación desconocido');
+        validarTransicion(actual.estado_habitacion.codigo, 'OCUPADA');
+        const fin = e.checkout_previsto > ahora ? e.checkout_previsto : new Date(ahora.getTime() + 60_000);
+        await exigirSinCruces(tx, [destino.id], ahora, fin, {}, ahora);
+        await tx.estancia.update({ where: { id: e.id }, data: { habitacion_id: destino.id } });
+        if (e.reserva_habitacion_id) await tx.reserva_habitacion.update({ where: { id: e.reserva_habitacion_id }, data: { habitacion_id: destino.id } });
+        await tx.estancia_traslado.create({
+          data: { estancia_id: e.id, habitacion_origen_id: e.habitacion_id, habitacion_destino_id: destino.id, motivo, usuario_id: actor.sub },
+        });
+        await this.cambiarEstadoHabitacion(tx, e.habitacion_id, 'LIMPIEZA', actor.sub, `Traslado a la ${destino.numero}: ${motivo}`);
+        await this.cambiarEstadoHabitacion(tx, destino.id, 'OCUPADA', actor.sub, `Traslado desde la ${e.habitacion.numero}: ${motivo}`);
+        await this.auditoria.registrar(tx, {
+          accion: 'estancia.traslado',
+          tabla: 'estancia',
+          registroId: e.id,
+          antes: { habitacion: e.habitacion.numero },
+          despues: { habitacion: destino.numero, motivo },
+        });
+      });
+    } catch (err) {
+      traducir(err);
+    }
+    await this.avisos.avisar(actor.sucursalId, 'estado');
+    return this.detalle(actor.sucursalId, e.id);
+  }
+
+  /** Libro de registro de huéspedes por fecha de ingreso (RF-RES-11), desde la vista `vw_libro_huespedes`. */
+  async libro(sucursalId: number, desde: string, hasta: string) {
+    if (!esFecha(desde) || !esFecha(hasta)) throw new BadRequestException('Fecha no válida; usa AAAA-MM-DD');
+    if (hasta < desde) throw new BadRequestException('La fecha final es anterior a la inicial');
+    if (sumarDias(desde, 31) <= hasta) throw new BadRequestException('El rango admite hasta 31 días');
+    const filas = await this.prisma.$queryRaw<
+      Array<{
+        estancia_id: bigint;
+        fecha_entrada: Date;
+        fecha_salida: Date | null;
+        habitacion: string;
+        huesped: string;
+        tipo_doc: string;
+        numero_documento: string;
+        nacionalidad: string;
+        fecha_nacimiento: Date | null;
+        sexo: string | null;
+        procedencia: string | null;
+        destino: string | null;
+        motivo_viaje: string | null;
+        es_titular: number | boolean;
+      }>
+    >`SELECT * FROM vw_libro_huespedes
+       WHERE sucursal_id = ${sucursalId} AND fecha_entrada >= ${inicioDiaLima(desde)} AND fecha_entrada < ${inicioDiaLima(sumarDias(hasta, 1))}
+       ORDER BY fecha_entrada, estancia_id, es_titular DESC`;
+    return filas.map((f) => ({
+      estanciaId: Number(f.estancia_id),
+      entrada: f.fecha_entrada,
+      salida: f.fecha_salida,
+      habitacion: f.habitacion,
+      huesped: f.huesped,
+      documento: `${f.tipo_doc} ${f.numero_documento}`,
+      nacionalidad: f.nacionalidad,
+      fechaNacimiento: f.fecha_nacimiento ? f.fecha_nacimiento.toISOString().slice(0, 10) : null,
+      sexo: f.sexo,
+      procedencia: f.procedencia,
+      destino: f.destino,
+      motivoViaje: f.motivo_viaje,
+      titular: Boolean(Number(f.es_titular)),
+    }));
+  }
+
   // ── Internos ──────────────────────────────────────────────────
+
+  /** Una empresa (RUC 20) puede reservar y recibir la factura, pero no alojarse. */
+  private exigirPersonas(clientes: Array<{ numero_documento: string; razon_social: string | null; nombre_completo: string | null; tipo_documento: { abreviatura: string } }>) {
+    const empresa = clientes.find((x) => x.tipo_documento.abreviatura === 'RUC' && x.numero_documento.startsWith('20'));
+    if (empresa) throw new BadRequestException(`${empresa.razon_social ?? empresa.nombre_completo} es una empresa: registra a la persona que se aloja`);
+  }
 
   private async buscar(sucursalId: number, id: bigint | number, soloActiva = false): Promise<FilaEstancia> {
     const e = await this.prisma.estancia.findFirst({ where: { id: BigInt(id), sucursal_id: sucursalId }, include: INCLUIR });
@@ -300,16 +452,24 @@ export class EstanciasService {
     return [e, ...otras];
   }
 
-  private cuenta(grupo: FilaEstancia[]) {
+  /**
+   * Cuenta de la estadía. Una estadía en curso que pasó su salida prevista más la tolerancia suma los turnos
+   * consumidos (RF-RES-12), con el mismo precio pactado.
+   */
+  private cuenta(grupo: FilaEstancia[], ahora: Date = new Date()) {
     const lineas: LineaCuenta[] = [];
     for (const g of grupo) {
       const horas = g.turno.duracion_horas;
+      const extra = g.estado === 'ACTIVA' ? turnosAdicionales(g.checkout_previsto, ahora, horas) : 0;
+      const n = g.cantidad_turnos + extra;
       lineas.push({
         tipo: 'HOSPEDAJE',
-        descripcion: `Hospedaje hab. ${g.habitacion.numero} (${g.habitacion.tipo_habitacion.nombre}) · ${horas === 24 ? `${g.cantidad_turnos} ${g.cantidad_turnos === 1 ? 'noche' : 'noches'}` : `${g.cantidad_turnos} × turno de ${horas} h`}`,
-        cantidad: g.cantidad_turnos,
+        descripcion:
+          `Hospedaje hab. ${g.habitacion.numero} (${g.habitacion.tipo_habitacion.nombre}) · ${horas === 24 ? `${n} ${n === 1 ? 'noche' : 'noches'}` : `${n} × turno de ${horas} h`}` +
+          (extra ? ` (incluye ${extra} por salida tardía)` : ''),
+        cantidad: n,
         precioUnitario: g.precio_unitario.toFixed(2),
-        total: g.precio_unitario.mul(g.cantidad_turnos).toFixed(2),
+        total: g.precio_unitario.mul(n).toFixed(2),
         estanciaId: String(g.id),
       });
       for (const c of g.estancia_cargo) {
@@ -354,6 +514,8 @@ export class EstanciasService {
       precio: e.precio_unitario.toFixed(2),
       canal: e.canal_venta.nombre,
       procedencia: e.procedencia,
+      destino: e.destino,
+      motivoViaje: e.motivo_viaje,
       placa: e.placa_vehiculo,
       reserva: e.reserva_habitacion?.reserva.codigo ?? null,
       huespedes: e.estancia_huesped.map((h) => ({ id: Number(h.cliente_id), titular: h.es_titular, nombre: nombreCliente(h.cliente), documento: `${h.cliente.tipo_documento.abreviatura} ${h.cliente.numero_documento}` })),

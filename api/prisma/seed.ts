@@ -42,8 +42,8 @@ async function main() {
   const rid = (n: string) => roles.find((r) => r.nombre === n)!.id;
   const asignacion: Record<string, string[]> = {
     ADMINISTRADOR: permisos.map((p) => p.codigo),
-    RECEPCIONISTA: ['reserva.ver', 'reserva.crear', 'reserva.cancelar', 'estancia.checkin', 'estancia.checkout', 'comprobante.emitir', 'descuento.aplicar', 'caja.abrir', 'caja.cerrar', 'habitacion.cambiar_estado'],
-    CAJERO: ['comprobante.emitir', 'caja.abrir', 'caja.cerrar'],
+    RECEPCIONISTA: ['reserva.ver', 'reserva.crear', 'reserva.cancelar', 'estancia.checkin', 'estancia.checkout', 'cliente.gestionar', 'comprobante.emitir', 'descuento.aplicar', 'caja.abrir', 'caja.cerrar', 'habitacion.cambiar_estado'],
+    CAJERO: ['cliente.gestionar', 'comprobante.emitir', 'caja.abrir', 'caja.cerrar'],
     ALMACEN: ['compra.registrar', 'reporte.ver'],
     CONTADOR: ['reporte.ver', 'comprobante.anular'],
     LIMPIEZA: ['habitacion.cambiar_estado'],

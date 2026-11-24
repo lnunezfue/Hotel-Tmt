@@ -8,6 +8,8 @@ import { ConfiguracionService } from '../../hospedaje/application/configuracion.
 import { CajaService } from '../../caja/application/caja.service';
 import { sumarDias } from '../../hospedaje/domain/tarifa';
 import { validarTransicion, esEstado, TransicionInvalidaError } from '../../hospedaje/domain/estado-habitacion';
+import { bloquearHabitaciones, exigirNoAlojados, exigirSinCruces } from '../../hospedaje/application/cruces';
+import { normalizarLibro, ReglaEstadiaError } from '../../estancias/domain/estadia';
 import {
   AccionReserva,
   aplicarAccion,
@@ -48,7 +50,7 @@ type Tx = Prisma.TransactionClient;
 
 /** El trigger de solape de la base responde SQLSTATE 45000: se traduce a 409 con su mismo mensaje. */
 function traducir(e: unknown): never {
-  if (e instanceof ReglaReservaError) throw new BadRequestException(e.message);
+  if (e instanceof ReglaReservaError || e instanceof ReglaEstadiaError) throw new BadRequestException(e.message);
   if (e instanceof TransicionInvalidaError) throw new ConflictException(`La habitación no está lista: ${e.message}`);
   const texto = e instanceof Error ? e.message : '';
   const m = /(La habitación ya está reservada[^"'\n]*|La habitación está ocupada[^"'\n]*)/.exec(texto);
@@ -69,6 +71,8 @@ const SELECCION = {
   observaciones: true,
   codigo_externo: true,
   motivo_cancelacion: true,
+  cancelada_at: true,
+  usuario_cancelacion: { select: { username: true } },
   comision_porcentaje: true,
   created_at: true,
   canal_venta: { select: { id: true, nombre: true, es_ota: true } },
@@ -213,6 +217,9 @@ export class ReservasService {
         const sesion = adelanto.gt(0) ? await this.caja.exigirSesion(tx, c.sucursalId) : null;
         // El correlativo se calcula con la sucursal bloqueada: dos altas simultáneas no repiten código.
         await tx.$queryRaw`SELECT id FROM sucursal WHERE id = ${c.sucursalId} FOR UPDATE`;
+        // Habitaciones bloqueadas: nadie más las toma mientras se revisa que no choquen con una estancia en curso.
+        await bloquearHabitaciones(tx, lineas.map((l) => l.hab.id));
+        await exigirSinCruces(tx, lineas.map((l) => l.hab.id), rango.entrada, rango.salida);
         const n = (await tx.reserva.count({ where: { sucursal_id: c.sucursalId } })) + 1;
         const estado: EstadoReserva = d.confirmar || adelanto.gt(0) ? 'CONFIRMADA' : 'PENDIENTE';
         const r = await tx.reserva.create({
@@ -259,14 +266,15 @@ export class ReservasService {
     } catch (e) {
       traducir(e);
     }
-    if (accion === 'cancelar' && !motivo?.trim()) throw new BadRequestException('Indica el motivo de la cancelación');
+    if ((accion === 'cancelar' || accion === 'no_show') && !motivo?.trim()) throw new BadRequestException('Indica el motivo');
     const habs = r.reserva_habitacion.map((x) => x.habitacion_id);
     const libera = nuevo === 'CANCELADA' || nuevo === 'NO_SHOW';
 
     const res = await this.prisma.$transaction(async (tx) => {
       const despues = await tx.reserva.update({
         where: { id },
-        data: { estado: nuevo, ...(accion === 'cancelar' && { motivo_cancelacion: motivo!.trim() }) },
+        // RF-RES-16: se conserva el motivo y el responsable de la cancelación o del no-show
+        data: { estado: nuevo, ...(libera && { motivo_cancelacion: motivo!.trim(), usuario_cancelacion_id: actor.sub, cancelada_at: new Date() }) },
         select: SELECCION,
       });
       // El tablero refleja la llegada de hoy: al confirmar pasa a CONFIRMADA; al liberar, vuelve a DESOCUPADA.
@@ -292,7 +300,13 @@ export class ReservasService {
   async checkin(
     actor: UsuarioSesion,
     id: number,
-    datos: { procedencia?: string | null; placa?: string | null; huespedes?: Array<{ habitacionId: number; titularId?: number; acompanantes?: number[] }> },
+    datos: {
+      procedencia?: string | null;
+      placa?: string | null;
+      destino?: string | null;
+      motivoViaje?: string | null;
+      huespedes?: Array<{ habitacionId: number; titularId?: number; acompanantes?: number[] }>;
+    },
   ) {
     const r = await this.prisma.reserva.findFirst({
       where: { id, sucursal_id: actor.sucursalId },
@@ -312,8 +326,17 @@ export class ReservasService {
       porHab.set(rh.habitacion_id, lista);
     }
     const todos = [...new Set([...porHab.values()].flat().map(String))];
-    const existen = await this.prisma.cliente.count({ where: { id: { in: todos.map(BigInt) }, empresa_id: actor.empresaId } });
-    if (existen !== todos.length) throw new BadRequestException('Hay huéspedes que no existen');
+    const clientes = await this.prisma.cliente.findMany({ where: { id: { in: todos.map(BigInt) }, empresa_id: actor.empresaId }, include: { tipo_documento: true } });
+    if (clientes.length !== todos.length) throw new BadRequestException('Hay huéspedes que no existen');
+    // Una empresa reserva, pero no se aloja: cada huésped se identifica con su documento personal.
+    const empresa = clientes.find((x) => x.tipo_documento.abreviatura === 'RUC' && x.numero_documento.startsWith('20'));
+    if (empresa) throw new BadRequestException(`${empresa.razon_social ?? empresa.nombre_completo} es una empresa: indica quién se aloja en la habitación`);
+    let libro: ReturnType<typeof normalizarLibro>;
+    try {
+      libro = normalizarLibro(datos);
+    } catch (e) {
+      traducir(e);
+    }
     try {
       aplicarAccion(r.estado, 'checkin', { entrada: r.fecha_entrada, salida: r.fecha_salida }, ahora);
       for (const rh of r.reserva_habitacion) {
@@ -328,12 +351,15 @@ export class ReservasService {
     try {
       const res = await this.prisma.$transaction(async (tx) => {
         const estancias: bigint[] = [];
+        await bloquearHabitaciones(tx, r.reserva_habitacion.map((rh) => rh.habitacion_id));
+        await exigirNoAlojados(tx, todos.map(BigInt));
         for (const rh of r.reserva_habitacion) {
           const e = await tx.estancia.create({
             data: {
               sucursal_id: actor.sucursalId, habitacion_id: rh.habitacion_id, reserva_habitacion_id: rh.id, canal_venta_id: r.canal_venta_id,
               comision_porcentaje: r.comision_porcentaje, turno_id: rh.turno_id, checkin_at: ahora, checkout_previsto: rh.fecha_salida, cantidad_turnos: rh.cantidad_turnos,
               precio_unitario: rh.precio_unitario, procedencia: datos.procedencia?.trim() || null, placa_vehiculo: datos.placa?.trim().toUpperCase() || null,
+              destino: libro.destino, motivo_viaje: libro.motivoViaje,
               usuario_checkin_id: actor.sub, estancia_huesped: { create: porHab.get(rh.habitacion_id)!.map((cid, i) => ({ cliente_id: cid, es_titular: i === 0 })) },
             },
           });
@@ -374,6 +400,8 @@ export class ReservasService {
       observaciones: f.observaciones,
       codigoExterno: f.codigo_externo,
       motivoCancelacion: f.motivo_cancelacion,
+      canceladaPor: f.usuario_cancelacion?.username ?? null,
+      canceladaEn: f.cancelada_at,
       creada: f.created_at,
       canal: { id: f.canal_venta.id, nombre: f.canal_venta.nombre, esOta: f.canal_venta.es_ota },
       cliente: {
