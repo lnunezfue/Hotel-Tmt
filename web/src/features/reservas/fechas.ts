@@ -36,3 +36,8 @@ export function diaCorto(fecha: string): { semana: string; dia: string; mes: str
 export function horaLima(iso: string): string {
   return new Date(iso).toLocaleString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
+
+/** Solo la hora (HH:MM) en Lima. */
+export function horaCorta(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false });
+}

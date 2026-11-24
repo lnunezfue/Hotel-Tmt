@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api, type Cliente, type Disponibilidad, type Reserva } from '../../lib/api';
 import { soles } from '../hospedaje/formato';
@@ -14,7 +14,7 @@ interface TipoDoc { id: number; abreviatura: string; descripcion: string }
 const json = (cuerpo: unknown) => ({ method: 'POST', body: JSON.stringify(cuerpo) });
 
 /** Búsqueda de huésped por documento o nombre, con alta rápida si no existe. */
-function ElegirHuesped({ valor, onCambio }: { valor: Cliente | null; onCambio: (c: Cliente | null) => void }) {
+export function ElegirHuesped({ valor, onCambio }: { valor: Cliente | null; onCambio: (c: Cliente | null) => void }) {
   const [q, setQ] = useState('');
   const [nuevo, setNuevo] = useState(false);
   const [diferida, setDiferida] = useState('');
@@ -109,23 +109,24 @@ export function PanelNuevaReserva({ inicial, onListo }: { inicial?: InicialReser
   const qc = useQueryClient();
   const canales = useQuery({ queryKey: ['reservas', 'canales'], queryFn: () => api<Canal[]>('/hospedaje/canales') });
   const turnos = useQuery({ queryKey: ['reservas', 'turnos'], queryFn: () => api<Turno[]>('/hospedaje/turnos') });
+  const metodos = useQuery({ queryKey: ['caja', 'metodos'], queryFn: () => api<Array<{ id: number; codigo: string; descripcion: string }>>('/caja/metodos-pago') });
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [llegada, setLlegada] = useState(inicial?.llegada ?? hoyLima());
   const [cantidad, setCantidad] = useState(inicial?.noches ?? 1);
   const [turnoId, setTurnoId] = useState<number | null>(null);
   const [hora, setHora] = useState('14:00');
   const [canalId, setCanalId] = useState<number | null>(null);
-  const [habitacionId, setHabitacionId] = useState<number | undefined>(inicial?.habitacionId);
-  const [adultos, setAdultos] = useState(1);
-  const [ninos, setNinos] = useState(0);
+  // Una o varias habitaciones (una familia o un grupo); cada una con sus personas (S-07)
+  const [filas, setFilas] = useState<Array<{ habitacionId?: number; adultos: number; ninos: number }>>([{ habitacionId: inicial?.habitacionId, adultos: 1, ninos: 0 }]);
   const [adelanto, setAdelanto] = useState('');
+  const [metodoAdelanto, setMetodoAdelanto] = useState<number | ''>('');
   const [confirmar, setConfirmar] = useState(false);
   const [codigoExterno, setCodigoExterno] = useState('');
   const [observaciones, setObservaciones] = useState('');
 
   const turno = turnos.data?.find((t) => t.id === turnoId) ?? turnos.data?.find((t) => t.duracion_horas === 24);
   const canalesActivos = canales.data?.filter((c) => c.activo !== false) ?? [];
-  const canal = canalesActivos.find((c) => c.id === canalId) ?? canalesActivos[0];
+  const canal = canalesActivos.find((c) => c.id === canalId) ?? canalesActivos.find((c) => c.nombre === 'Recepción') ?? canalesActivos[0];
   const esOta = canal?.esOta ?? canal?.es_ota ?? false;
   const porHoras = turno ? turno.duracion_horas !== 24 : false;
 
@@ -134,33 +135,53 @@ export function PanelNuevaReserva({ inicial, onListo }: { inicial?: InicialReser
     queryFn: () => api<Disponibilidad>(`/reservas/disponibilidad?${new URLSearchParams({ llegada, cantidad: String(cantidad), turnoId: String(turno!.id), ...(porHoras && { hora }) })}`),
     enabled: !!turno && cantidad >= 1,
   });
-  const hab = disp.data?.habitaciones.find((h) => h.id === habitacionId);
   const libres = useMemo(() => disp.data?.habitaciones.filter((h) => h.libre) ?? [], [disp.data]);
-
-  const precio = useQuery({
-    queryKey: ['reservas', 'precio', hab?.tipo.id, canal?.id, turno?.id, llegada],
-    queryFn: () => api<{ precio: string }>(`/hospedaje/tarifas/vigente?${new URLSearchParams({ tipoId: String(hab!.tipo.id), canalId: String(canal!.id), turnoId: String(turno!.id), fecha: llegada })}`),
-    enabled: !!hab && !!canal && !!turno,
-    retry: false,
+  const habDe = (id?: number) => disp.data?.habitaciones.find((h) => h.id === id);
+  const tipos = [...new Set(filas.map((f) => habDe(f.habitacionId)?.tipo.id).filter((t): t is number => !!t))];
+  const precios = useQueries({
+    queries: tipos.map((tipoId) => ({
+      queryKey: ['reservas', 'precio', tipoId, canal?.id, turno?.id, llegada],
+      queryFn: () => api<{ precio: string }>(`/hospedaje/tarifas/vigente?${new URLSearchParams({ tipoId: String(tipoId), canalId: String(canal!.id), turnoId: String(turno!.id), fecha: llegada })}`),
+      enabled: !!canal && !!turno,
+      retry: false,
+    })),
   });
-  const total = precio.data ? Number(precio.data.precio) * cantidad : null;
+  const precioDe = (tipoId?: number) => {
+    const i = tipos.indexOf(tipoId ?? -1);
+    return i >= 0 ? precios[i]?.data?.precio : undefined;
+  };
+  const sinTarifa = precios.some((p) => p.isError);
+  const subtotales = filas.map((f) => {
+    const p = precioDe(habDe(f.habitacionId)?.tipo.id);
+    return p ? Number(p) * cantidad : null;
+  });
+  const total = subtotales.every((x) => x !== null) && filas.every((f) => f.habitacionId) ? subtotales.reduce((a, b) => a! + b!, 0) : null;
 
   const crear = useMutation({
     mutationFn: () =>
       api<Reserva>('/reservas', json({
-        clienteId: cliente!.id, canalId: canal!.id, turnoId: turno!.id, habitacionId, llegada, cantidad, ...(porHoras && { hora }),
-        adultos, ninos, adelanto: adelanto ? Number(adelanto) : undefined, confirmar, codigoExterno: esOta ? codigoExterno : null, observaciones: observaciones || null,
+        clienteId: cliente!.id, canalId: canal!.id, turnoId: turno!.id, llegada, cantidad, ...(porHoras && { hora }),
+        habitaciones: filas.map((f) => ({ habitacionId: f.habitacionId, adultos: f.adultos, ninos: f.ninos })),
+        adelanto: adelanto ? Number(adelanto) : undefined, metodoPagoId: Number(adelanto) > 0 ? metodoAdelanto || undefined : undefined,
+        confirmar, codigoExterno: esOta ? codigoExterno : null, observaciones: observaciones || null,
       })),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['reservas'] });
       qc.invalidateQueries({ queryKey: ['plano'] });
       qc.invalidateQueries({ queryKey: ['tablero'] });
+      qc.invalidateQueries({ queryKey: ['caja'] });
       onListo(r);
     },
   });
 
-  const maxAdultos = hab?.tipo.adultos ?? 6;
-  const valido = cliente && hab?.libre && canal && turno && adultos >= 1 && adultos <= maxAdultos && total !== null;
+  const poner = (i: number, cambio: Partial<(typeof filas)[number]>) => setFilas(filas.map((f, j) => (j === i ? { ...f, ...cambio } : f)));
+  const usadas = filas.map((f) => f.habitacionId);
+  const filasValidas = filas.every((f) => {
+    const h = habDe(f.habitacionId);
+    return h?.libre && f.adultos >= 1 && f.adultos <= h.tipo.adultos && f.adultos + f.ninos <= h.tipo.adultos + h.tipo.ninos;
+  });
+  const faltaMetodo = Number(adelanto) > 0 && !metodoAdelanto;
+  const valido = cliente && filasValidas && canal && turno && total !== null && !faltaMetodo;
 
   return (
     <form className="flex flex-col gap-4" onSubmit={(e: FormEvent) => { e.preventDefault(); if (valido) crear.mutate(); }}>
@@ -186,44 +207,76 @@ export function PanelNuevaReserva({ inicial, onListo }: { inicial?: InicialReser
         )}
       </div>
 
-      <Campo etiqueta="Habitación" ayuda={disp.data ? `${libres.length} libres en esas fechas` : undefined}>
-        <Selector value={habitacionId ?? ''} onChange={(e) => setHabitacionId(Number(e.target.value) || undefined)}>
-          <option value="">Elige una habitación libre…</option>
-          {disp.data?.habitaciones.map((h) => (
-            <option key={h.id} value={h.id} disabled={!h.libre}>{h.numero} · {h.tipo.nombre} ({h.tipo.adultos} pers.){h.libre ? '' : ' — ocupada'}</option>
-          ))}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-baseline justify-between text-sm">
+          <span className="font-medium">{filas.length > 1 ? `Habitaciones (${filas.length})` : 'Habitación'}</span>
+          {disp.data && <span className="text-xs text-tinta-suave">{libres.length} libres en esas fechas</span>}
+        </div>
+        {filas.map((f, i) => {
+          const h = habDe(f.habitacionId);
+          return (
+            <div key={i} className="flex flex-col gap-2 rounded-lg border border-borde p-2">
+              <div className="flex gap-2">
+                <Selector value={f.habitacionId ?? ''} onChange={(e) => poner(i, { habitacionId: Number(e.target.value) || undefined })} aria-label={`Habitación ${i + 1}`}>
+                  <option value="">Elige una habitación libre…</option>
+                  {disp.data?.habitaciones.map((x) => (
+                    <option key={x.id} value={x.id} disabled={!x.libre || (usadas.includes(x.id) && x.id !== f.habitacionId)}>
+                      {x.numero} · {x.tipo.nombre} ({x.tipo.adultos} pers.){x.libre ? '' : ' — ocupada'}
+                    </option>
+                  ))}
+                </Selector>
+                {filas.length > 1 && <button type="button" className="px-1 text-tinta-suave hover:text-ocupada" onClick={() => setFilas(filas.filter((_, j) => j !== i))} aria-label="Quitar habitación">✕</button>}
+              </div>
+              <div className="grid grid-cols-3 items-end gap-2">
+                <Campo etiqueta="Adultos"><Entrada type="number" min={1} max={h?.tipo.adultos ?? 6} value={f.adultos} onChange={(e) => poner(i, { adultos: Number(e.target.value) })} /></Campo>
+                <Campo etiqueta="Niños"><Entrada type="number" min={0} max={h?.tipo.ninos ?? 6} value={f.ninos} onChange={(e) => poner(i, { ninos: Number(e.target.value) })} /></Campo>
+                <span className="pb-2 text-right text-sm tabular-nums">{subtotales[i] !== null ? soles(subtotales[i]!) : ''}</span>
+              </div>
+              {h && !h.libre && <Aviso>{h.numero}: {h.motivo}. Elige otra o cambia las fechas.</Aviso>}
+              {h && f.adultos > h.tipo.adultos && <Aviso>La {h.numero} admite como máximo {h.tipo.adultos} adultos.</Aviso>}
+              {h?.aviso && <Aviso tipo="info">{h.numero}: {h.aviso}.</Aviso>}
+            </div>
+          );
+        })}
+        {filas.length < 6 && <button type="button" className="self-start text-sm font-medium text-acento hover:underline" onClick={() => setFilas([...filas, { adultos: 1, ninos: 0 }])}>+ Agregar otra habitación (familia o grupo)</button>}
+      </div>
+
+      <Campo etiqueta="Canal">
+        <Selector value={canal?.id ?? ''} onChange={(e) => setCanalId(Number(e.target.value))}>
+          {canalesActivos.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </Selector>
       </Campo>
-      {hab && !hab.libre && <Aviso>{hab.numero}: {hab.motivo}. Elige otra o cambia las fechas.</Aviso>}
-      {hab?.aviso && <Aviso tipo="info">{hab.numero}: {hab.aviso}.</Aviso>}
-
-      <div className="grid grid-cols-3 gap-3">
-        <Campo etiqueta="Canal">
-          <Selector value={canal?.id ?? ''} onChange={(e) => setCanalId(Number(e.target.value))}>
-            {canalesActivos.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </Selector>
-        </Campo>
-        <Campo etiqueta="Adultos"><Entrada type="number" min={1} max={maxAdultos} value={adultos} onChange={(e) => setAdultos(Number(e.target.value))} /></Campo>
-        <Campo etiqueta="Niños"><Entrada type="number" min={0} max={hab?.tipo.ninos ?? 6} value={ninos} onChange={(e) => setNinos(Number(e.target.value))} /></Campo>
-      </div>
       {esOta && <Campo etiqueta="Código de la reserva en el canal"><Entrada value={codigoExterno} onChange={(e) => setCodigoExterno(e.target.value)} placeholder="Ej. BK-4410237" /></Campo>}
 
       <div className="rounded-lg bg-fondo p-3 text-sm">
-        {precio.data && total !== null ? (
+        {total !== null ? (
           <>
-            <div className="flex justify-between gap-3"><span>Tarifa vigente ({canal?.nombre} · {porHoras ? `${turno?.duracion_horas} h` : 'noche'})</span><b className="tabular-nums">{soles(precio.data.precio)}</b></div>
-            <div className="flex justify-between"><span>× {cantidad} {porHoras ? 'turnos' : cantidad === 1 ? 'noche' : 'noches'}</span><b className="text-base tabular-nums">{soles(total)}</b></div>
+            {filas.map((f, i) => {
+              const h = habDe(f.habitacionId)!;
+              return <div key={i} className="flex justify-between gap-3"><span>{h.numero} · {soles(precioDe(h.tipo.id)!)} × {cantidad} {porHoras ? 'turnos' : cantidad === 1 ? 'noche' : 'noches'}</span><span className="tabular-nums">{soles(subtotales[i]!)}</span></div>;
+            })}
+            <div className="mt-1 flex justify-between border-t border-borde pt-1"><span>Total ({canal?.nombre})</span><b className="text-base tabular-nums">{soles(total)}</b></div>
           </>
-        ) : precio.isError ? (
-          <span className="text-ocupada">No hay tarifa para esta habitación, canal y turno. Configúrala en Hotel y tarifas.</span>
+        ) : sinTarifa ? (
+          <span className="text-ocupada">No hay tarifa para alguna habitación con este canal y turno. Configúrala en Hotel y tarifas.</span>
         ) : (
-          <span className="text-tinta-suave">Elige la habitación para ver el precio.</span>
+          <span className="text-tinta-suave">Elige las habitaciones para ver el precio.</span>
         )}
       </div>
       <div className="grid grid-cols-2 items-end gap-3">
         <Campo etiqueta="Adelanto (opcional)"><Entrada type="number" min={0} step="0.01" value={adelanto} onChange={(e) => setAdelanto(e.target.value)} placeholder="0.00" /></Campo>
-        <label className="flex h-9 items-center gap-2 text-sm"><input type="checkbox" checked={confirmar || Number(adelanto) > 0} disabled={Number(adelanto) > 0} onChange={(e) => setConfirmar(e.target.checked)} /> Reserva confirmada</label>
+        {Number(adelanto) > 0 ? (
+          <Campo etiqueta="Pagó con">
+            <Selector value={metodoAdelanto} onChange={(e) => setMetodoAdelanto(Number(e.target.value))}>
+              <option value="">Elige…</option>
+              {metodos.data?.map((m) => <option key={m.id} value={m.id}>{m.descripcion}</option>)}
+            </Selector>
+          </Campo>
+        ) : (
+          <label className="flex h-9 items-center gap-2 text-sm"><input type="checkbox" checked={confirmar} onChange={(e) => setConfirmar(e.target.checked)} /> Reserva confirmada</label>
+        )}
       </div>
+      {Number(adelanto) > 0 && <p className="-mt-2 text-xs text-tinta-suave">El adelanto entra a la caja abierta y la reserva queda confirmada.</p>}
       <Campo etiqueta="Observaciones (opcional)"><Entrada value={observaciones} maxLength={500} onChange={(e) => setObservaciones(e.target.value)} placeholder="Llega tarde, cuna, cama extra…" /></Campo>
       {crear.error && <Aviso>{crear.error.message}</Aviso>}
       <Button variante="primario" type="submit" disabled={!valido || crear.isPending} className={clsx('h-10')}>
