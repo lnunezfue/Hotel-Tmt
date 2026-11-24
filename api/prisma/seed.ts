@@ -206,6 +206,26 @@ async function main() {
   ];
   for (const [key, est] of otros) await prisma.habitacion.update({ where: { id: habs[key] }, data: { estado_habitacion_id: eid(est) } });
 
+  // Productos para consumos de la estadía (S-07). El control de stock llega con inventario (F4).
+  const um = async (codigo: string) => (await prisma.unidad_medida.findFirstOrThrow({ where: { codigo_sunat: codigo } })).id;
+  const gravado = (await prisma.tipo_afectacion_igv.findFirstOrThrow({ where: { codigo_sunat: '10' } })).id;
+  const catFrigobar = await prisma.categoria_producto.create({ data: { empresa_id: empresa.id, nombre: 'Frigobar' } });
+  const catServicios = await prisma.categoria_producto.create({ data: { empresa_id: empresa.id, nombre: 'Servicios' } });
+  const productos: Array<[string, string, number, 'BIEN' | 'SERVICIO', number]> = [
+    ['AGUA625', 'Agua mineral 625 ml', 3, 'BIEN', catFrigobar.id],
+    ['GASEOSA500', 'Gaseosa 500 ml', 4, 'BIEN', catFrigobar.id],
+    ['CERVEZA', 'Cerveza 330 ml', 8, 'BIEN', catFrigobar.id],
+    ['SNACK', 'Snack (papas o galletas)', 3.5, 'BIEN', catFrigobar.id],
+    ['DESAYUNO', 'Desayuno continental', 15, 'SERVICIO', catServicios.id],
+    ['LAVANDERIA', 'Lavandería (por prenda)', 5, 'SERVICIO', catServicios.id],
+    ['COCHERA', 'Cochera (por noche)', 10, 'SERVICIO', catServicios.id],
+  ];
+  for (const [codigo, nombre, precio, tipo, cat] of productos) {
+    await prisma.producto.create({
+      data: { empresa_id: empresa.id, categoria_id: cat, codigo, nombre, tipo, unidad_medida_id: await um(tipo === 'BIEN' ? 'NIU' : 'ZZ'), tipo_afectacion_igv_id: gravado, precio_venta: precio, controla_stock: false },
+    });
+  }
+
   // Reservas de ejemplo para el calendario (S-06): llegadas de hoy y de los próximos días
   const hoy = fechaLima(new Date());
   const dia = (n: number) => { const d = new Date(`${hoy}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -235,7 +255,7 @@ async function main() {
     const precio = precioTarifa(tipoIdx(key), cn);
     await prisma.reserva.create({
       data: {
-        sucursal_id: centro.id, codigo: codigoReserva(i + 1), cliente_id: clientes[ci].id, canal_venta_id: canales[cn].id,
+        sucursal_id: centro.id, codigo: codigoReserva(i + 1), cliente_id: clientes[ci].id, canal_venta_id: canales[cn].id, comision_porcentaje: canales[cn].comision_porcentaje,
         codigo_externo: canales[cn].es_ota ? `BK-${4410200 + i * 37}` : null, fecha_entrada: r.entrada, fecha_salida: r.salida,
         adultos: 1, estado, moneda_id: pen.id, monto_total: precio * noches, monto_adelanto: estado === 'CONFIRMADA' ? precio : 0,
         usuario_id: creados.recepcion1,
