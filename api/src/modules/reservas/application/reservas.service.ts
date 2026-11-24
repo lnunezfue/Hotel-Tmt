@@ -156,7 +156,7 @@ export class ReservasService {
           tipo: { id: h.tipo_habitacion.id, nombre: h.tipo_habitacion.nombre, adultos: h.tipo_habitacion.capacidad_adultos, ninos: h.tipo_habitacion.capacidad_ninos },
           libre: !r && !ocupada,
           motivo: r ? `Reservada (${r.reserva.codigo} · ${r.reserva.cliente.nombre_completo ?? r.reserva.cliente.razon_social})` : ocupada ? 'Ocupada en esas fechas' : null,
-          aviso: h.estado_habitacion.codigo === 'MANTENIMIENTO' ? 'En mantenimiento ahora' : null,
+          aviso: h.estado_habitacion.codigo === 'MANTENIMIENTO' ? 'En mantenimiento ahora' : h.estado_habitacion.codigo === 'LIMPIEZA' ? 'En limpieza ahora: márcala lista antes del check-in' : null,
         };
       }),
     };

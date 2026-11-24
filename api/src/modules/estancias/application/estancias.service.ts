@@ -260,12 +260,12 @@ export class EstanciasService {
           await tx.comprobante_pago.create({ data: { comprobante_id: comprobante.id, metodo_pago_id: m.id, monto: new Prisma.Decimal(p.monto.toFixed(2)), referencia: p.referencia ?? null } });
           await this.caja.registrar(tx, {
             sesionId: sesion!.id, concepto: 'VENTA', metodoPagoId: m.id, monto: p.monto.toFixed(2), usuarioId: actor.sub,
-            reservaId: cuenta.reserva ? BigInt(cuenta.reserva.id) : null, comprobanteId: comprobante.id, descripcion: `${comprobante.serie}-${comprobante.numero} · Hab. ${grupo.map((g) => g.habitacion.numero).join(', ')}`,
+            reservaId: cuenta.reserva ? BigInt(cuenta.reserva.id) : null, comprobanteId: comprobante.id, descripcion: `${comprobante.serie}-${String(comprobante.numero).padStart(8, '0')} · Hab. ${grupo.map((g) => g.habitacion.numero).join(', ')}`,
           });
         }
         for (const g of grupo) {
           await tx.estancia.update({ where: { id: g.id }, data: { estado: 'FINALIZADA', checkout_at: ahora, usuario_checkout_id: actor.sub } });
-          await this.cambiarEstadoHabitacion(tx, g.habitacion_id, 'LIMPIEZA', actor.sub, `Check-out ${comprobante.serie}-${comprobante.numero}`);
+          await this.cambiarEstadoHabitacion(tx, g.habitacion_id, 'LIMPIEZA', actor.sub, `Check-out ${comprobante.serie}-${String(comprobante.numero).padStart(8, '0')}`);
         }
         if (cuenta.reserva) await tx.reserva.update({ where: { id: BigInt(cuenta.reserva.id) }, data: { estado: 'FINALIZADA' } });
         await this.auditoria.registrar(tx, {
