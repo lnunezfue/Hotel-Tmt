@@ -4,7 +4,7 @@
 |---|---|
 | Sprint | S-06 (F2) del DT-001, semanas 11–12 |
 | Fecha | 2026-11-24 |
-| Estado | En implementación en la rama `s06-reservas` (sale de `s05-tablero-en-vivo`, que aún no está en `main`) |
+| Estado | Implementado en la rama `s06-reservas` (sale de `s05-tablero-en-vivo`, que aún no está en `main`) |
 | Requerimientos | RF-RES-06 reservas · RF-RES-10 check-in y walk-in · RF-RES-11 libro de huéspedes · RF-RES-12 check-out · RF-RES-13 extensión · RF-RES-16 anular y no-show · RF-RES-17 clientes · RF-RES-18 sin solapes |
 | Resultado verificable (DT-001 §7.2) | Se completa el ciclo de hospedaje de principio a fin |
 
@@ -150,13 +150,18 @@ Montos como texto con dos decimales. Fechas y horas en ISO (UTC), mostradas en h
 - **Reservas** (reemplaza la maqueta), con dos pestañas:
   - *Calendario*: habitaciones × 14 días, con navegación por semanas y *Hoy*. Barras por reserva (pendiente, confirmada) y por estancia (en curso), con el titular. Clic en una barra abre el detalle: confirmar, anular, no-show y check-in de cada habitación. *+ Nueva reserva* abre el panel: titular (buscar o crear), canal, entrada (fecha y hora, 14:00 por defecto), turno, cantidad, adultos, niños, código externo si es OTA, y las habitaciones disponibles con su precio. El total se calcula a la vista.
   - *Libro de huéspedes*: rango de fechas y tabla con las columnas de la vista.
-- **Tablero:** el panel de la habitación agrega *Check-in* (walk-in o la llegada de hoy) si está desocupada, reservada o confirmada. Si está ocupada, muestra los huéspedes, *Extender* y *Check-out* con la liquidación a la vista. La tarjeta muestra «Llega hh:mm · titular». El estado OCUPADA ya no se deja cambiar a mano a LIMPIEZA si hay una estancia activa: eso es el check-out. *(decisión: evita habitaciones libres con estancias abiertas)*
+- **Tablero:** el panel de la habitación agrega *Check-in* (walk-in o la llegada de hoy) si está desocupada, reservada o confirmada. Si está ocupada, muestra los huéspedes, *Extender* y *Check-out* con la liquidación a la vista. La tarjeta muestra «Llega hh:mm · titular». A mano ya no se marca OCUPADA (se ocupa con el check-in) ni se cambia el estado de una habitación con estancia activa (se libera con el check-out). *(decisión: evita habitaciones libres con estancias abiertas y ocupadas sin huésped registrado)*
 
 ## Pruebas
 
 - **Unitarias de dominio:** documento por tipo (incluido el dígito verificador del RUC), máquina de estados de la reserva, salida por turno, turnos consumidos (antes, dentro de la tolerancia, después, varias veces el turno), cruce de rangos, código correlativo.
 - **Integración** (MySQL y Redis reales): cliente con documento repetido 409 y cambio de documento con historia 409; reserva de dos habitaciones con precio y comisión congelados; habitación ya reservada 409; dos reservas simultáneas de la misma habitación (solo una gana); confirmar, anular con motivo y no-show antes de la hora 409; check-in desde reserva (habitación OCUPADA, reserva EN_CURSO); walk-in en habitación en limpieza 409; capacidad excedida 400; huésped ya alojado 409; extensión que choca con una reserva 409; check-out con salida tardía cobra un turno más; la habitación pasa a LIMPIEZA, la reserva a FINALIZADA y una reserva nueva en el rango que quedó libre se acepta; aviso al tablero; permisos 403; auditoría.
 - **Cliente:** reglas del formulario (documento, total) y build.
+
+## Notas de implementación
+
+- Las horas se guardan sin fracciones: la entrada de una reserva se trunca al minuto y el check-in y el check-out al segundo. Las columnas `DATETIME(0)` redondean los milisegundos, y un rango redondeado hacia arriba se cruzaría con el siguiente que empieza justo donde termina.
+- Una estancia activa con la salida prevista vencida sigue ocupando la habitación hasta ahora: no se puede tomar la habitación para un rango que empiece antes del momento actual.
 
 ## Orden de construcción
 

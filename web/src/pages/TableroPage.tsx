@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { api, type Estado, type HabitacionTablero, type Tablero } from '../lib/api';
+import { api, type Estado, type HabitacionTablero, type Reserva, type Tablero } from '../lib/api';
 import { accionHacia, ESTADOS, ESTILO_ESTADO, tiempoRestante } from '../features/hospedaje/estados';
 import { useTableroEnVivo } from '../features/hospedaje/useTableroEnVivo';
 import { puede, useSesion } from '../features/auth/sesion';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { Aviso, PanelLateral } from '../components/ui/form';
+import { PanelCheckin, PanelEstancia, type OrigenCheckin } from '../components/hospedaje/estancias';
+import { fechaHoraLima, horaLima } from '../features/hospedaje/reservas';
+import { soles } from '../features/hospedaje/formato';
 
 const hora = (iso: string) => new Date(iso).toLocaleString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -27,6 +31,12 @@ function TarjetaHabitacion({ h, onClick, seleccionada }: { h: HabitacionTablero;
         {e.etiqueta}
       </span>
       <span className="text-xs text-tinta-suave">{h.tipo} · {h.capacidad} pers.</span>
+      {!h.estancia && h.llegada && (
+        <div className="mt-auto flex flex-col gap-0.5">
+          <span className="truncate text-sm font-medium">{h.llegada.titular}</span>
+          <span className="text-xs font-semibold text-reservada">Llega hoy {horaLima(h.llegada.entrada)}</span>
+        </div>
+      )}
       {h.estancia && (
         <div className="mt-auto flex flex-col gap-0.5">
           <span className="truncate text-sm font-medium">{h.estancia.huesped ?? 'Huésped'}</span>
@@ -62,6 +72,28 @@ function PanelHabitacion({ h, onCerrar }: { h: HabitacionTablero; onCerrar: () =
   });
   const e = ESTILO_ESTADO[h.estado];
   const puedeCambiar = puede(sesion, 'habitacion.cambiar_estado');
+  const admiteCheckin = h.estado === 'DESOCUPADA' || h.estado === 'RESERVADA' || h.estado === 'CONFIRMADA';
+  const [checkin, setCheckin] = useState<'reserva' | 'walkin' | null>(null);
+  const [listo, setListo] = useState<string | null>(null);
+  const reserva = useQuery({
+    queryKey: ['reserva', h.llegada?.reservaId],
+    queryFn: () => api<Reserva>(`/hospedaje/reservas/${h.llegada!.reservaId}`),
+    enabled: checkin === 'reserva' && Boolean(h.llegada),
+  });
+  const rh = reserva.data?.habitaciones.find((x) => x.id === h.llegada?.reservaHabitacionId);
+  const origen: OrigenCheckin | null =
+    checkin === 'walkin'
+      ? { tipo: 'walkin', habitacion: { id: h.id, numero: h.numero, tipo: h.tipo, capacidad: h.capacidad } }
+      : checkin === 'reserva' && reserva.data && rh
+        ? {
+            tipo: 'reserva',
+            reservaHabitacionId: rh.id,
+            codigo: reserva.data.codigo,
+            titularId: reserva.data.titular.id,
+            habitacion: { numero: rh.numero, tipo: rh.tipo, capacidad: rh.capacidad },
+            detalle: `${rh.cantidadTurnos} × ${rh.turno.nombre} · ${reserva.data.canal.nombre}`,
+          }
+        : null;
 
   return (
     <Card className="flex flex-col gap-5 p-5 xl:sticky xl:top-6">
@@ -78,11 +110,27 @@ function PanelHabitacion({ h, onCerrar }: { h: HabitacionTablero; onCerrar: () =
         <span className={clsx('h-2.5 w-2.5 rounded-full', e.punto)} /> {e.etiqueta}
       </div>
 
+      {listo && <Aviso tipo="ok">{listo}</Aviso>}
       {h.estancia && (
-        <div className="flex flex-col gap-1 rounded-lg border border-borde p-3 text-sm">
-          <span className="font-semibold">{h.estancia.huesped}</span>
-          <span className="text-tinta-suave">Ingreso: {hora(h.estancia.checkin)}</span>
-          <span className="text-tinta-suave">Salida prevista: {hora(h.estancia.salidaPrevista)}</span>
+        <PanelEstancia
+          estanciaId={h.estancia.id}
+          onSalida={(l) => setListo(`Check-out registrado: ${l.consumidos} turno(s) × ${soles(l.precioUnitario)} = ${soles(l.importe)}. La habitación pasó a limpieza; el cobro se hará desde Ventas (fase F3).`)}
+        />
+      )}
+
+      {!h.estancia && admiteCheckin && puede(sesion, 'estancia.checkin') && (
+        <div className="flex flex-col gap-2">
+          <span className="text-xs tracking-widest text-tinta-suave uppercase">Check-in</span>
+          {h.llegada && (
+            <div className="rounded-lg border border-reservada/40 bg-reservada/8 px-3 py-2 text-sm">
+              <div className="font-semibold">{h.llegada.titular}</div>
+              <div className="text-xs text-tinta-suave">Reserva {h.llegada.codigo} · llega {fechaHoraLima(h.llegada.entrada)}</div>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {h.llegada && <Button variante="primario" onClick={() => setCheckin('reserva')}>Check-in de la reserva</Button>}
+            <Button variante={h.llegada ? 'secundario' : 'primario'} onClick={() => setCheckin('walkin')}>Check-in sin reserva</Button>
+          </div>
         </div>
       )}
 
@@ -104,7 +152,7 @@ function PanelHabitacion({ h, onCerrar }: { h: HabitacionTablero; onCerrar: () =
               </Button>
             ))}
           </div>
-          {h.estado === 'OCUPADA' && <p className="text-xs text-tinta-suave">El check-out con cobro se hace desde la estancia (sprint S-06).</p>}
+          {h.siguientes.length === 0 && <p className="text-xs text-tinta-suave">{h.estancia ? 'Con una estancia en curso, la habitación se libera con el check-out.' : 'Sin cambios disponibles.'}</p>}
           {cambiar.error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{cambiar.error.message}</p>}
         </div>
       ) : (
@@ -127,6 +175,13 @@ function PanelHabitacion({ h, onCerrar }: { h: HabitacionTablero; onCerrar: () =
           ))}
         </ol>
       </div>
+      <PanelLateral titulo={`Check-in · habitación ${h.numero}`} abierto={checkin !== null} onCerrar={() => setCheckin(null)}>
+        {origen ? (
+          <PanelCheckin origen={origen} onListo={(est) => { setCheckin(null); setListo(`Check-in registrado: ${est.huespedes[0]?.nombre ?? ''}.`); }} />
+        ) : (
+          <p className="text-sm text-tinta-suave">{reserva.error ? reserva.error.message : 'Cargando reserva…'}</p>
+        )}
+      </PanelLateral>
     </Card>
   );
 }
