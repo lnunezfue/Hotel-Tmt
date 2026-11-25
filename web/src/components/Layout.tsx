@@ -79,11 +79,12 @@ export function Layout() {
           {(puede(sesion, 'estancia.checkin') || puede(sesion, 'reporte.ver')) && <Enlace to="/libro-huespedes" icono={iconos.libro}>Libro de huéspedes</Enlace>}
           {puede(sesion, 'caja.abrir') && <Enlace to="/caja" icono={iconos.caja}>Caja</Enlace>}
           <Enlace to="/ventas" icono={iconos.ventas} proximo="F3">Ventas y comprobantes</Enlace>
-          {(puede(sesion, 'usuario.ver') || puede(sesion, 'habitacion.gestionar')) && (
+          {(puede(sesion, 'usuario.ver') || puede(sesion, 'habitacion.gestionar') || puede(sesion, 'config.empresa')) && (
             <span className="hidden px-3 pt-3 pb-1 text-[11px] tracking-widest text-white/45 uppercase lg:block">Configuración</span>
           )}
           {puede(sesion, 'habitacion.gestionar') && <Enlace to="/configuracion/hotel" icono={iconos.hotel}>Hotel y tarifas</Enlace>}
           {puede(sesion, 'usuario.ver') && <Enlace to="/usuarios" icono={iconos.usuarios}>Usuarios y roles</Enlace>}
+          {puede(sesion, 'config.empresa') && <Enlace to="/configuracion/series" icono={iconos.ventas}>Series de comprobantes</Enlace>}
         </nav>
         <div className="mt-auto hidden flex-col gap-3 border-t border-white/10 pt-4 text-sm lg:flex">
           {sucursales && sucursales.length > 0 && (

@@ -89,11 +89,12 @@ web/
 | S-06 Reservas y check-in | Calendario de 14 días por habitación, llegadas y salidas de hoy, reserva con búsqueda o alta de huésped (DNI, RUC con dígito verificador, CE, pasaporte), habitación libre y precio de la tarifa vigente; el sistema impide fechas que se cruzan. Confirmar, cancelar con motivo, «no se presentó» y check-in que crea la estancia y ocupa la habitación. También se reserva haciendo clic en una habitación libre del plano, filtrando por comodidades | **Completo** |
 | S-07 Estadía, cobro y caja | Reservas de varias habitaciones con adelanto (entra a caja) y comisión del canal fijada al reservar; check-in con acompañantes por habitación; check-in directo sin reserva (por noche o por horas); consumos del frigobar y servicios; check-out con cuenta (hospedaje + consumos − adelanto), pago dividido con vuelto en efectivo, boleta, factura o nota interna con IGV y ticket imprimible, habitaciones a limpieza. Caja: apertura, gastos y retiros, cierre con arqueo (faltante o sobrante) | **Completo** (el envío a SUNAT es F3) |
 | S-06/S-07 Complementos de la estadía | Extensión por turnos al precio pactado y traslado a otra habitación con motivo (la que se deja pasa a limpieza). La cuenta cobra los turnos consumidos si se sale pasados 30 min de la salida prevista. Destino y motivo del viaje en el check-in y pantalla *Libro de huéspedes*. Cancelar y «no se presentó» guardan motivo y responsable. Pantalla *Clientes* con ficha editable (el documento no cambia si ya tiene historia) y permiso `cliente.gestionar` para caja. Reservas y walk-in se cruzan contra estadías y reservas con la habitación bloqueada; un huésped no se aloja dos veces y una empresa no se aloja. Turnos de cualquier duración | **Completo** (spec `2026-11-25-estadia-complementos-design.md`) |
-| F3 Facturación | Puerto del proveedor y adaptador simulado | **Diseño listo** |
+| S-07 Series, totales y descuento global | Pantalla *Series de comprobantes*: series por sucursal con el prefijo de SUNAT (F, B, I; F/B en notas), número inicial para continuar otro sistema, activar o desactivar sin dejar un tipo de venta sin serie. Series asignadas a usuarios: cada caja numera con la suya; quien no tiene una usa una compartida. Check-out con descuento global en soles o % (motivo y permiso `descuento.aplicar`), restado de la base y del IGV sin tocar las líneas; boleta a nombre de otra persona y boleta de más de S/ 700 solo con comprador identificado. Estructura del comprobante para el proveedor (`GET /comprobantes/:id/estructura`) verificada. Correlativo probado con 20 emisiones simultáneas sin saltos | **Completo** (spec `2026-11-25-s07-comprobantes-design.md`) |
+| F3 Facturación (S-08 en adelante) | Puerto del proveedor y adaptador simulado; envío a SUNAT, notas de crédito y débito, resumen diario y baja | **Pendiente** |
 
 Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 18; RNF-12, 13, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
 
-Pruebas: 195 unitarias de API, 104 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 60 del cliente.
+Pruebas: 207 unitarias de API, 114 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 60 del cliente.
 
 **Demostración web** (sin instalar nada, publicada en https://lnunezfue.github.io/Hotel-Tmt/ desde la rama `gh-pages`): `pnpm --filter web build:demo` genera en `web/dist-demo` el cliente con una API simulada en el navegador, cargada con una foto del seed. Entra con `admin` o `recepcion1` (`Hotel2026!`); los cambios quedan solo en ese navegador y *Reiniciar demo* vuelve al inicio. El build normal no la incluye. Trae un **recorrido guiado** de 7 pasos con el día completo del hotel: abrir caja → reservar para una familia → check-in → consumo → check-out con cobro → limpieza → cierre de caja.
 
@@ -105,6 +106,12 @@ Pruebas: 195 unitarias de API, 104 de integración contra MySQL y Redis reales (
 4. **Reservar**: fecha de mañana, filtrar por aire acondicionado, clic en una libre → buscar huésped o registrarlo → el precio sale de la tarifa → registrar.
 5. **Reservas**: la reserva aparece en el calendario; abrir una de las que *llegan hoy* → *Hacer check-in* → la habitación pasa a OCUPADA en el tablero y en el plano.
 6. Intentar reservar la misma habitación en fechas que se cruzan: el sistema lo impide.
+
+### Qué mostrar del S-07
+
+1. **Series de comprobantes** (como `admin`): *+ Nueva serie* B002 → *Editar* → asignarla a `recepcion1`. Desde ahí `recepcion1` emite sus boletas con B002 y los demás siguen con B001.
+2. **Check-out** de una habitación ocupada: se ve con qué número saldrá («Se emitirá como B001-…»). Marcar *Descuento global*, S/ 20 con motivo: el saldo baja y el ticket muestra el descuento aparte, con la base y el IGV recalculados.
+3. Intentar una serie `F001` como boleta o un descuento mayor que el saldo de una reserva con adelanto: el sistema lo impide.
 
 ### Qué mostrar de los complementos
 
@@ -134,6 +141,6 @@ Pruebas: 195 unitarias de API, 104 de integración contra MySQL y Redis reales (
 
 1. Revisar con recepción la regla D10 del S-06: una reserva hecha antes para hoy no pinta la habitación de reservada hasta que alguien la toque.
 2. `build:demo` usa `VITE_DEMO=1 …`, que no funciona en la consola de Windows; en Windows se corre desde Git Bash.
-3. Envío de boletas y facturas a SUNAT por el PSE, anulaciones y notas de crédito (F3).
-4. Series por usuario cuando existan series operativas (S-08).
+3. S-08: adaptador del proveedor, cola y trabajador, envío al ambiente beta y CDR, usando `GET /comprobantes/:id/estructura` como entrada.
+4. Notas de crédito y débito, resumen diario y comunicación de baja (S-09).
 5. Pendiente de gerencia para F3: elegir proveedor (NubeFacT o FactuSmart) y volumen mensual de comprobantes (A-01, A-03).

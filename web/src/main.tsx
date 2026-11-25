@@ -11,6 +11,7 @@ import { PlanoPage } from './pages/PlanoPage';
 import { CajaPage } from './pages/CajaPage';
 import { ClientesPage } from './pages/ClientesPage';
 import { LibroHuespedesPage } from './pages/LibroHuespedesPage';
+import { SeriesPage } from './pages/SeriesPage';
 import { UsuariosPage } from './pages/UsuariosPage';
 import { ConfiguracionHotelPage } from './pages/ConfiguracionHotelPage';
 import { CambiarClavePage } from './pages/CambiarClavePage';
@@ -57,6 +58,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="reservas" element={<Protegida permiso="reserva.ver"><ReservasPage /></Protegida>} />
             <Route path="clientes" element={<Protegida permiso={['reserva.ver', 'cliente.gestionar']}><ClientesPage /></Protegida>} />
             <Route path="libro-huespedes" element={<Protegida permiso={['estancia.checkin', 'reporte.ver']}><LibroHuespedesPage /></Protegida>} />
+            <Route path="configuracion/series" element={<Protegida permiso="config.empresa"><SeriesPage /></Protegida>} />
             <Route path="usuarios" element={<Protegida permiso="usuario.ver"><UsuariosPage /></Protegida>} />
             <Route path="configuracion/hotel" element={<Protegida permiso="habitacion.gestionar"><ConfiguracionHotelPage /></Protegida>} />
             <Route path="mi-clave" element={<CambiarClavePage />} />
