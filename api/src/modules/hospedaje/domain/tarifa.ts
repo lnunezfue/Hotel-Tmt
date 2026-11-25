@@ -76,3 +76,6 @@ export function planificarTarifa(existentes: Vigencia[], desde: string, hoy: str
   const hasta = sumarDias(desde, -1);
   return { cerrar: activas.filter((t) => cubre(t, desde)).map((t) => ({ id: t.id, hasta })) };
 }
+
+/** Instante en que empieza un día de Lima (`YYYY-MM-DD`, UTC−5 todo el año). */
+export const inicioDiaLima = (fecha: string): Date => new Date(`${fecha}T00:00:00-05:00`);

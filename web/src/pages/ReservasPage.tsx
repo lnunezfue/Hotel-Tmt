@@ -8,9 +8,10 @@ import { soles } from '../features/hospedaje/formato';
 import { diaCorto, fechaDe, horaLima, hoyLima, posicionEnDias, sumarDias } from '../features/reservas/fechas';
 import { ElegirHuesped, PanelNuevaReserva, type InicialReserva } from '../features/reservas/PanelNuevaReserva';
 import { CajonEstancia } from '../features/estancias/Cajones';
+import { esEmpresa, MOTIVOS_VIAJE } from '../features/estancias/libro';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Aviso, Campo, Entrada, PanelLateral, Pildora } from '../components/ui/form';
+import { Aviso, Campo, Entrada, PanelLateral, Pildora, Selector } from '../components/ui/form';
 
 const DIAS = 14;
 const ANCHO_HAB = 112;
@@ -28,8 +29,12 @@ function DetalleReserva({ r, onListo }: { r: Reserva; onListo: (msg: string) => 
   const qc = useQueryClient();
   const { data: sesion } = useSesion();
   const [motivo, setMotivo] = useState('');
-  const [cancelando, setCancelando] = useState(false);
+  const [baja, setBaja] = useState<'cancelar' | 'no-show' | null>(null);
   const [procedencia, setProcedencia] = useState('');
+  const [destino, setDestino] = useState('');
+  const [motivoViaje, setMotivoViaje] = useState<string>('Turismo');
+  // Si reservó una empresa, en cada habitación se registra quién se aloja (una empresa no se aloja).
+  const [titulares, setTitulares] = useState<Record<number, Cliente>>({});
   const [acomp, setAcomp] = useState<Record<number, Cliente[]>>({});
   const [eligiendo, setEligiendo] = useState<number | null>(null);
   const [cajon, setCajon] = useState<{ id: number; numero: string } | null>(null);
@@ -45,6 +50,8 @@ function DetalleReserva({ r, onListo }: { r: Reserva; onListo: (msg: string) => 
   });
   const abierta = r.estado === 'PENDIENTE' || r.estado === 'CONFIRMADA';
   const llegaHoyOAntes = fechaDe(r.entrada) <= hoyLima();
+  const reservoEmpresa = esEmpresa(r.cliente.documento);
+  const faltanTitulares = reservoEmpresa && r.habitaciones.some((hab) => !titulares[hab.id]);
   const h = r.habitaciones[0];
 
   return (
@@ -77,7 +84,12 @@ function DetalleReserva({ r, onListo }: { r: Reserva; onListo: (msg: string) => 
       )}
       <CajonEstancia habitacionId={cajon?.id ?? null} numero={cajon?.numero} onCerrar={() => setCajon(null)} />
       {r.observaciones && <p className="rounded-lg bg-acento-suave/50 p-2 text-sm">{r.observaciones}</p>}
-      {r.motivoCancelacion && <p className="text-sm text-tinta-suave">Motivo: {r.motivoCancelacion}</p>}
+      {r.motivoCancelacion && (
+        <p className="text-sm text-tinta-suave">
+          Motivo: {r.motivoCancelacion}
+          {r.canceladaPor && ` · ${r.canceladaPor}${r.canceladaEn ? `, ${horaLima(r.canceladaEn)}` : ''}`}
+        </p>
+      )}
       {accion.error && <Aviso>{accion.error.message}</Aviso>}
 
       {abierta && (
@@ -88,7 +100,18 @@ function DetalleReserva({ r, onListo }: { r: Reserva; onListo: (msg: string) => 
               {r.habitaciones.map((hab) => (
                 <div key={hab.id} className="flex flex-col gap-1 rounded-md bg-white p-2 text-sm">
                   <b>Habitación {hab.numero} · {hab.tipo}</b>
-                  <span className="text-xs text-tinta-suave">Titular: {r.cliente.nombre}</span>
+                  {reservoEmpresa ? (
+                    titulares[hab.id] ? (
+                      <span className="flex justify-between text-xs">Titular: {titulares[hab.id].nombre}<button className="text-tinta-suave" onClick={() => { const t = { ...titulares }; delete t[hab.id]; setTitulares(t); }}>Cambiar</button></span>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-ocupada">Reservó {r.cliente.nombre}: indica quién se aloja</span>
+                        <ElegirHuesped valor={null} onCambio={(c) => { if (c) setTitulares({ ...titulares, [hab.id]: c }); }} />
+                      </div>
+                    )
+                  ) : (
+                    <span className="text-xs text-tinta-suave">Titular: {r.cliente.nombre}</span>
+                  )}
                   {(acomp[hab.id] ?? []).map((a) => (
                     <span key={a.id} className="flex justify-between text-xs">+ {a.nombre}<button className="text-tinta-suave" onClick={() => setAcomp({ ...acomp, [hab.id]: acomp[hab.id].filter((x) => x.id !== a.id) })}>Quitar</button></span>
                   ))}
@@ -99,11 +122,30 @@ function DetalleReserva({ r, onListo }: { r: Reserva; onListo: (msg: string) => 
                   )}
                 </div>
               ))}
-              <Campo etiqueta="Procedencia (opcional)"><Entrada value={procedencia} onChange={(e) => setProcedencia(e.target.value)} placeholder="Ciudad o país de donde viene" /></Campo>
+              <div className="grid grid-cols-2 gap-2">
+                <Campo etiqueta="Procedencia"><Entrada value={procedencia} onChange={(e) => setProcedencia(e.target.value)} placeholder="Ciudad o país" /></Campo>
+                <Campo etiqueta="Destino (opcional)"><Entrada value={destino} onChange={(e) => setDestino(e.target.value)} placeholder="A dónde sigue" /></Campo>
+                <Campo etiqueta="Motivo del viaje" className="col-span-2">
+                  <Selector value={motivoViaje} onChange={(e) => setMotivoViaje(e.target.value)}>
+                    {MOTIVOS_VIAJE.map((m) => <option key={m}>{m}</option>)}
+                  </Selector>
+                </Campo>
+              </div>
+              <span className="text-xs text-tinta-suave">Procedencia, destino y motivo van al libro de registro de huéspedes.</span>
               <Button
                 variante="primario"
-                disabled={accion.isPending}
-                onClick={() => accion.mutate({ ruta: 'checkin', cuerpo: { procedencia: procedencia || null, huespedes: r.habitaciones.map((hab) => ({ habitacionId: hab.id, acompanantes: (acomp[hab.id] ?? []).map((a) => a.id) })) } })}
+                disabled={accion.isPending || procedencia.trim().length < 2 || faltanTitulares}
+                onClick={() =>
+                  accion.mutate({
+                    ruta: 'checkin',
+                    cuerpo: {
+                      procedencia,
+                      destino: destino || null,
+                      motivoViaje,
+                      huespedes: r.habitaciones.map((hab) => ({ habitacionId: hab.id, titularId: titulares[hab.id]?.id, acompanantes: (acomp[hab.id] ?? []).map((a) => a.id) })),
+                    },
+                  })
+                }
               >
                 Hacer check-in{r.habitaciones.length > 1 ? ` de ${r.habitaciones.length} habitaciones` : ''}
               </Button>
@@ -112,17 +154,22 @@ function DetalleReserva({ r, onListo }: { r: Reserva; onListo: (msg: string) => 
           {r.estado === 'PENDIENTE' && puede(sesion, 'reserva.crear') && <Button disabled={accion.isPending} onClick={() => accion.mutate({ ruta: 'confirmar' })}>Confirmar reserva</Button>}
           {puede(sesion, 'reserva.cancelar') && (
             <>
-              {llegaHoyOAntes && <Button disabled={accion.isPending} onClick={() => accion.mutate({ ruta: 'no-show' })}>No se presentó</Button>}
-              {cancelando ? (
+              {baja ? (
                 <div className="flex flex-col gap-2">
-                  <Entrada value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo de la cancelación" autoFocus />
+                  <Entrada value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder={baja === 'cancelar' ? 'Motivo de la cancelación' : 'Qué pasó (ej. no llegó ni avisó)'} autoFocus />
+                  <span className="text-xs text-tinta-suave">Queda registrado con tu usuario.</span>
                   <div className="flex gap-2">
-                    <Button className="text-ocupada" disabled={motivo.trim().length < 3 || accion.isPending} onClick={() => accion.mutate({ ruta: 'cancelar', cuerpo: { motivo } })}>Cancelar reserva</Button>
-                    <Button variante="fantasma" onClick={() => setCancelando(false)}>Volver</Button>
+                    <Button className="text-ocupada" disabled={motivo.trim().length < 3 || accion.isPending} onClick={() => accion.mutate({ ruta: baja, cuerpo: { motivo } })}>
+                      {baja === 'cancelar' ? 'Cancelar reserva' : 'Marcar «no se presentó»'}
+                    </Button>
+                    <Button variante="fantasma" onClick={() => setBaja(null)}>Volver</Button>
                   </div>
                 </div>
               ) : (
-                <Button variante="fantasma" className="text-ocupada" onClick={() => setCancelando(true)}>Cancelar reserva…</Button>
+                <>
+                  {llegaHoyOAntes && <Button disabled={accion.isPending} onClick={() => { setMotivo(''); setBaja('no-show'); }}>No se presentó…</Button>}
+                  <Button variante="fantasma" className="text-ocupada" onClick={() => { setMotivo(''); setBaja('cancelar'); }}>Cancelar reserva…</Button>
+                </>
               )}
             </>
           )}

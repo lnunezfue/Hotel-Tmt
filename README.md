@@ -76,7 +76,7 @@ web/
   src/lib/api/        Cliente HTTP tipado y tipos compartidos
 ```
 
-## Avance (semana 4 · al 24 de noviembre)
+## Avance (semana 4 · al 25 de noviembre)
 
 | Sprint (DT-001) | Alcance | Estado |
 |---|---|---|
@@ -84,15 +84,16 @@ web/
 | S-02 Seguridad | Login con JWT en cookie httpOnly y Argon2id, bloqueo tras 3 intentos, guard de permisos por rol. Sesiones revocables: token de acceso de 15 min y token de renovación rotativo (sesión máxima de 12 h); un secreto de renovación desconocido se rechaza sin revocar nada, y reusar el token anterior pasados 30 s revoca la sesión. Cierre por inactividad configurable por empresa (15 a 480 min, 30 por defecto) con aviso de 60 s sincronizado entre pestañas. Bitácora de auditoría inmutable (triggers) con códigos `modulo.accion`, que registra sesión y alta de habitaciones. Límite de 10 por minuto por IP en login y renovación | **Completo** |
 | S-03 Usuarios y roles | Alta con contraseña temporal (obligatorio cambiarla al primer ingreso), edición de datos, rol y sucursales con principal, activar/desactivar, desbloquear, restablecer contraseña y cerrar sesiones. Desactivar o cambiar rol/sucursales cierra las sesiones del usuario. Roles nuevos y matriz de permisos editable (ADMINISTRADOR protegido). Cambio de la propia contraseña. Todo auditado | **Completo** (series por usuario pasan a S-08 y certificado digital a S-09) |
 | S-04 Configuración del hotel | Pantalla *Hotel y tarifas*: habitaciones (alta, edición, desactivar si no está ocupada), pisos, tipos de habitación y tarifas por tipo × canal × turno con vigencia. Un precio nuevo se programa con fecha y cierra el anterior el día previo; historial por celda. API de precio vigente lista para reservas | **Completo** |
-| S-05 Tablero en vivo y canales | Tablero por piso con colores, cambio de estado con reglas y historial, alertas de salida. Los cambios de estado, habitaciones, pisos y tipos llegan a los demás tableros de la sucursal sin recargar (Server-Sent Events, repartidos entre réplicas con Redis), con indicador *En vivo* y consulta de respaldo cada 60 s. Pestaña *Canales*: alta, edición y desactivación de canales de venta con su comisión (permiso `tarifa.editar`; no se desactiva el último activo) | **Implementado** (falta la prueba manual con dos navegadores; la administración de turnos queda pendiente) |
+| S-05 Tablero en vivo, canales y turnos | Tablero por piso con colores, cambio de estado con reglas y historial, alertas de salida. Los cambios de estado, habitaciones, pisos y tipos llegan a los demás tableros de la sucursal sin recargar (Server-Sent Events, repartidos entre réplicas con Redis), con indicador *En vivo* y consulta de respaldo cada 60 s. Pestaña *Canales*: alta, edición y desactivación de canales de venta con su comisión (permiso `tarifa.editar`; no se desactiva el último activo). Pestaña *Turnos*: alta, edición y desactivación de turnos; la duración no se cambia si el turno ya tiene tarifas o estancias | **Completo** (probado a mano con dos sesiones y con Redis apagado) |
 | S-06 Plano del hotel y comodidades | Pantalla *Plano del hotel*: fachada del edificio con un piso por banda y ventanas del color de cada estado; plano de cada piso con las habitaciones dibujadas desde arriba (camas según el tipo, baño, puerta hacia el pasillo, ventana) y sus íconos de comodidades. Modo *Diseñar*: agregar un piso con vista previa, agregar habitaciones, pasillos, escaleras, ascensor, recepción y áreas comunes, arrastrar y redimensionar con validación de choques. Comodidades por habitación (aire acondicionado, wifi, TV, jacuzzi…, 12 de partida y se pueden crear más) o para todas las de un tipo | **Completo** (pedido de gerencia del 23/11) |
 | S-06 Reservas y check-in | Calendario de 14 días por habitación, llegadas y salidas de hoy, reserva con búsqueda o alta de huésped (DNI, RUC con dígito verificador, CE, pasaporte), habitación libre y precio de la tarifa vigente; el sistema impide fechas que se cruzan. Confirmar, cancelar con motivo, «no se presentó» y check-in que crea la estancia y ocupa la habitación. También se reserva haciendo clic en una habitación libre del plano, filtrando por comodidades | **Completo** |
 | S-07 Estadía, cobro y caja | Reservas de varias habitaciones con adelanto (entra a caja) y comisión del canal fijada al reservar; check-in con acompañantes por habitación; check-in directo sin reserva (por noche o por horas); consumos del frigobar y servicios; check-out con cuenta (hospedaje + consumos − adelanto), pago dividido con vuelto en efectivo, boleta, factura o nota interna con IGV y ticket imprimible, habitaciones a limpieza. Caja: apertura, gastos y retiros, cierre con arqueo (faltante o sobrante) | **Completo** (el envío a SUNAT es F3) |
+| S-06/S-07 Complementos de la estadía | Extensión por turnos al precio pactado y traslado a otra habitación con motivo (la que se deja pasa a limpieza). La cuenta cobra los turnos consumidos si se sale pasados 30 min de la salida prevista. Destino y motivo del viaje en el check-in y pantalla *Libro de huéspedes*. Cancelar y «no se presentó» guardan motivo y responsable. Pantalla *Clientes* con ficha editable (el documento no cambia si ya tiene historia) y permiso `cliente.gestionar` para caja. Reservas y walk-in se cruzan contra estadías y reservas con la habitación bloqueada; un huésped no se aloja dos veces y una empresa no se aloja. Turnos de cualquier duración | **Completo** (spec `2026-11-25-estadia-complementos-design.md`) |
 | F3 Facturación | Puerto del proveedor y adaptador simulado | **Diseño listo** |
 
-Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 12, 15 y 18; RNF-12, 13, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
+Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 18; RNF-12, 13, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
 
-Pruebas: 173 unitarias de API, 80 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 58 del cliente.
+Pruebas: 195 unitarias de API, 104 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 60 del cliente.
 
 **Demostración web** (sin instalar nada, publicada en https://lnunezfue.github.io/Hotel-Tmt/ desde la rama `gh-pages`): `pnpm --filter web build:demo` genera en `web/dist-demo` el cliente con una API simulada en el navegador, cargada con una foto del seed. Entra con `admin` o `recepcion1` (`Hotel2026!`); los cambios quedan solo en ese navegador y *Reiniciar demo* vuelve al inicio. El build normal no la incluye. Trae un **recorrido guiado** de 7 pasos con el día completo del hotel: abrir caja → reservar para una familia → check-in → consumo → check-out con cobro → limpieza → cierre de caja.
 
@@ -104,6 +105,13 @@ Pruebas: 173 unitarias de API, 80 de integración contra MySQL y Redis reales (`
 4. **Reservar**: fecha de mañana, filtrar por aire acondicionado, clic en una libre → buscar huésped o registrarlo → el precio sale de la tarifa → registrar.
 5. **Reservas**: la reserva aparece en el calendario; abrir una de las que *llegan hoy* → *Hacer check-in* → la habitación pasa a OCUPADA en el tablero y en el plano.
 6. Intentar reservar la misma habitación en fechas que se cruzan: el sistema lo impide.
+
+### Qué mostrar de los complementos
+
+1. **Tablero** → una habitación ocupada → *Ver cuenta*: *Extender estadía* un turno (sube la salida y la cuenta) y *Cambiar de habitación* con un motivo: la anterior queda en limpieza.
+2. **Reservas** → una llegada de hoy → el check-in pide procedencia, destino y motivo del viaje; después se ve en **Libro de huéspedes**.
+3. *No se presentó…* pide el motivo y deja registrado quién lo marcó.
+4. **Clientes**: buscar, editar la ficha; intentar cambiar el DNI de alguien que ya se alojó (el sistema lo impide).
 
 ### Qué mostrar de la semana 2
 
@@ -124,8 +132,8 @@ Pruebas: 173 unitarias de API, 80 de integración contra MySQL y Redis reales (`
 
 ## Próximos pasos
 
-1. Probar el tablero en vivo con dos navegadores (S-05).
-2. Administración de turnos, hoy de solo lectura (S-05).
+1. Revisar con recepción la regla D10 del S-06: una reserva hecha antes para hoy no pinta la habitación de reservada hasta que alguien la toque.
+2. `build:demo` usa `VITE_DEMO=1 …`, que no funciona en la consola de Windows; en Windows se corre desde Git Bash.
 3. Envío de boletas y facturas a SUNAT por el PSE, anulaciones y notas de crédito (F3).
 4. Series por usuario cuando existan series operativas (S-08).
 5. Pendiente de gerencia para F3: elegir proveedor (NubeFacT o FactuSmart) y volumen mensual de comprobantes (A-01, A-03).

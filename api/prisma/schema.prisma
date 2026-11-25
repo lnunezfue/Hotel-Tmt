@@ -13,6 +13,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model amenidad {
+  id                  Int                   @id @default(autoincrement()) @db.UnsignedSmallInt
+  empresa_id          Int                   @db.UnsignedInt
+  codigo              String                @db.VarChar(30)
+  nombre              String                @db.VarChar(60)
+  icono               String                @db.VarChar(30)
+  orden               Int                   @default(0) @db.UnsignedTinyInt
+  activo              Boolean               @default(true) @db.TinyInt
+  empresa             empresa               @relation(fields: [empresa_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_amenidad_empresa")
+  habitacion_amenidad habitacion_amenidad[]
+
+  @@unique([empresa_id, codigo], map: "uk_amenidad")
+}
+
 model auditoria {
   id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   usuario_id    Int?      @db.UnsignedInt
@@ -442,7 +456,6 @@ model estancia {
   habitacion_id         Int                   @db.UnsignedInt
   reserva_habitacion_id BigInt?               @db.UnsignedBigInt
   canal_venta_id        Int                   @db.UnsignedSmallInt
-  /// Comisión del canal al momento del check-in (S-07)
   comision_porcentaje   Decimal               @default(0.00) @db.Decimal(5, 2)
   turno_id              Int                   @db.UnsignedTinyInt
   checkin_at            DateTime              @db.DateTime(0)
@@ -469,8 +482,9 @@ model estancia {
   usuario_checkout      usuario?              @relation("estancia_usuario_checkout_id", fields: [usuario_checkout_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_est_uco")
   comprobante           comprobante[]
   comprobante_detalle   comprobante_detalle[]
-  estancia_huesped      estancia_huesped[]
   estancia_cargo        estancia_cargo[]
+  estancia_huesped      estancia_huesped[]
+  estancia_traslado     estancia_traslado[]
 
   @@index([usuario_checkin_id], map: "fk_est_uci")
   @@index([usuario_checkout_id], map: "fk_est_uco")
@@ -480,6 +494,26 @@ model estancia {
   @@index([reserva_habitacion_id], map: "ix_est_rh")
   @@index([sucursal_id, checkin_at], map: "ix_est_suc_checkin")
   @@index([turno_id], map: "ix_est_turno")
+}
+
+model estancia_cargo {
+  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  estancia_id     BigInt    @db.UnsignedBigInt
+  producto_id     Int?      @db.UnsignedInt
+  descripcion     String    @db.VarChar(200)
+  cantidad        Decimal   @default(1.00) @db.Decimal(10, 2)
+  precio_unitario Decimal   @db.Decimal(14, 2)
+  total           Decimal?  @db.Decimal(14, 2) /// columna generada por la BD (solo lectura)
+  anulado         Boolean   @default(false) @db.TinyInt
+  usuario_id      Int       @db.UnsignedInt
+  created_at      DateTime  @default(now()) @db.Timestamp(0)
+  estancia        estancia  @relation(fields: [estancia_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ec_estancia")
+  producto        producto? @relation(fields: [producto_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ec_producto")
+  usuario         usuario   @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ec_usuario")
+
+  @@index([estancia_id], map: "ix_ec_estancia")
+  @@index([producto_id], map: "ix_ec_producto")
+  @@index([usuario_id], map: "ix_ec_usuario")
 }
 
 model estancia_huesped {
@@ -493,35 +527,66 @@ model estancia_huesped {
   @@index([cliente_id], map: "ix_eh_cliente")
 }
 
+model estancia_traslado {
+  id                    BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
+  estancia_id           BigInt     @db.UnsignedBigInt
+  habitacion_origen_id  Int        @db.UnsignedInt
+  habitacion_destino_id Int        @db.UnsignedInt
+  motivo                String     @db.VarChar(200)
+  usuario_id            Int        @db.UnsignedInt
+  fecha_hora            DateTime   @default(now()) @db.DateTime(0)
+  habitacion_destino    habitacion @relation("estancia_traslado_habitacion_destino_id", fields: [habitacion_destino_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_et_destino")
+  estancia              estancia   @relation(fields: [estancia_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_et_estancia")
+  habitacion_origen     habitacion @relation("estancia_traslado_habitacion_origen_id", fields: [habitacion_origen_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_et_origen")
+  usuario               usuario    @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_et_usuario")
+
+  @@index([habitacion_destino_id], map: "ix_et_destino")
+  @@index([estancia_id], map: "ix_et_estancia")
+  @@index([habitacion_origen_id], map: "ix_et_origen")
+  @@index([usuario_id], map: "ix_et_usuario")
+}
+
 model habitacion {
-  id                          Int                           @id @default(autoincrement()) @db.UnsignedInt
-  sucursal_id                 Int                           @db.UnsignedInt
-  piso_id                     Int                           @db.UnsignedInt
-  tipo_habitacion_id          Int                           @db.UnsignedInt
-  estado_habitacion_id        Int                           @db.UnsignedTinyInt
-  numero                      String                        @db.VarChar(10)
-  descripcion                 String?                       @db.VarChar(300)
-  plano_x                     Int?                          @db.UnsignedTinyInt
-  plano_y                     Int?                          @db.UnsignedTinyInt
-  plano_ancho                 Int                           @default(3) @db.UnsignedTinyInt
-  plano_alto                  Int                           @default(2) @db.UnsignedTinyInt
-  activo                      Boolean                       @default(true) @db.TinyInt
-  created_at                  DateTime                      @default(now()) @db.Timestamp(0)
-  updated_at                  DateTime                      @default(now()) @db.Timestamp(0)
-  estado_habitacion           estado_habitacion             @relation(fields: [estado_habitacion_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_hab_estado")
-  piso                        piso                          @relation(fields: [piso_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_hab_piso")
-  sucursal                    sucursal                      @relation(fields: [sucursal_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_hab_sucursal")
-  tipo_habitacion             tipo_habitacion               @relation(fields: [tipo_habitacion_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_hab_tipo")
-  estancia                    estancia[]
-  habitacion_estado_historial habitacion_estado_historial[]
-  reserva_habitacion          reserva_habitacion[]
-  habitacion_amenidad         habitacion_amenidad[]
+  id                                      Int                           @id @default(autoincrement()) @db.UnsignedInt
+  sucursal_id                             Int                           @db.UnsignedInt
+  piso_id                                 Int                           @db.UnsignedInt
+  tipo_habitacion_id                      Int                           @db.UnsignedInt
+  estado_habitacion_id                    Int                           @db.UnsignedTinyInt
+  numero                                  String                        @db.VarChar(10)
+  descripcion                             String?                       @db.VarChar(300)
+  plano_x                                 Int?                          @db.UnsignedTinyInt
+  plano_y                                 Int?                          @db.UnsignedTinyInt
+  plano_ancho                             Int                           @default(3) @db.UnsignedTinyInt
+  plano_alto                              Int                           @default(2) @db.UnsignedTinyInt
+  activo                                  Boolean                       @default(true) @db.TinyInt
+  created_at                              DateTime                      @default(now()) @db.Timestamp(0)
+  updated_at                              DateTime                      @default(now()) @db.Timestamp(0)
+  estado_habitacion                       estado_habitacion             @relation(fields: [estado_habitacion_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_hab_estado")
+  piso                                    piso                          @relation(fields: [piso_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_hab_piso")
+  sucursal                                sucursal                      @relation(fields: [sucursal_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_hab_sucursal")
+  tipo_habitacion                         tipo_habitacion               @relation(fields: [tipo_habitacion_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_hab_tipo")
+  estancia                                estancia[]
+  estancia_traslado_habitacion_destino_id estancia_traslado[]           @relation("estancia_traslado_habitacion_destino_id")
+  estancia_traslado_habitacion_origen_id  estancia_traslado[]           @relation("estancia_traslado_habitacion_origen_id")
+  habitacion_amenidad                     habitacion_amenidad[]
+  habitacion_estado_historial             habitacion_estado_historial[]
+  reserva_habitacion                      reserva_habitacion[]
 
   @@unique([sucursal_id, numero], map: "uk_habitacion_num")
   @@index([estado_habitacion_id], map: "fk_hab_estado")
   @@index([sucursal_id, estado_habitacion_id], map: "ix_hab_estado")
   @@index([piso_id], map: "ix_hab_piso")
   @@index([tipo_habitacion_id], map: "ix_hab_tipo")
+}
+
+model habitacion_amenidad {
+  habitacion_id Int        @db.UnsignedInt
+  amenidad_id   Int        @db.UnsignedSmallInt
+  amenidad      amenidad   @relation(fields: [amenidad_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ha_amenidad")
+  habitacion    habitacion @relation(fields: [habitacion_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ha_habitacion")
+
+  @@id([habitacion_id, amenidad_id])
+  @@index([amenidad_id], map: "ix_ha_amenidad")
 }
 
 model habitacion_estado_historial {
@@ -660,18 +725,32 @@ model permiso {
 }
 
 model piso {
-  id          Int          @id @default(autoincrement()) @db.UnsignedInt
-  sucursal_id Int          @db.UnsignedInt
-  numero      Int          @db.SmallInt
-  nombre      String       @db.VarChar(50)
-  plano_columnas Int          @default(12) @db.UnsignedTinyInt
-  plano_filas    Int          @default(6) @db.UnsignedTinyInt
-  activo      Boolean      @default(true) @db.TinyInt
-  sucursal    sucursal     @relation(fields: [sucursal_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_piso_sucursal")
-  habitacion  habitacion[]
+  id             Int              @id @default(autoincrement()) @db.UnsignedInt
+  sucursal_id    Int              @db.UnsignedInt
+  numero         Int              @db.SmallInt
+  nombre         String           @db.VarChar(50)
+  plano_columnas Int              @default(12) @db.UnsignedTinyInt
+  plano_filas    Int              @default(6) @db.UnsignedTinyInt
+  activo         Boolean          @default(true) @db.TinyInt
+  sucursal       sucursal         @relation(fields: [sucursal_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_piso_sucursal")
+  habitacion     habitacion[]
   plano_elemento plano_elemento[]
 
   @@unique([sucursal_id, numero], map: "uk_piso")
+}
+
+model plano_elemento {
+  id       Int                 @id @default(autoincrement()) @db.UnsignedInt
+  piso_id  Int                 @db.UnsignedInt
+  tipo     plano_elemento_tipo
+  etiqueta String?             @db.VarChar(40)
+  x        Int                 @db.UnsignedTinyInt
+  y        Int                 @db.UnsignedTinyInt
+  ancho    Int                 @default(1) @db.UnsignedTinyInt
+  alto     Int                 @default(1) @db.UnsignedTinyInt
+  piso     piso                @relation(fields: [piso_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pe_piso")
+
+  @@index([piso_id], map: "ix_pe_piso")
 }
 
 model producto {
@@ -698,9 +777,9 @@ model producto {
   unidad_medida          unidad_medida           @relation(fields: [unidad_medida_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_producto_um")
   compra_detalle         compra_detalle[]
   comprobante_detalle    comprobante_detalle[]
+  estancia_cargo         estancia_cargo[]
   movimiento_inventario  movimiento_inventario[]
   producto_stock         producto_stock[]
-  estancia_cargo         estancia_cargo[]
 
   @@unique([empresa_id, codigo], map: "uk_producto_codigo")
   @@index([tipo_afectacion_igv_id], map: "ix_producto_afec")
@@ -743,35 +822,37 @@ model proveedor {
 }
 
 model reserva {
-  id                 BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
-  sucursal_id        Int                  @db.UnsignedInt
-  codigo             String               @db.VarChar(20)
-  cliente_id         BigInt               @db.UnsignedBigInt
-  canal_venta_id     Int                  @db.UnsignedSmallInt
-  /// Comisión del canal al momento de reservar (S-07)
-  comision_porcentaje Decimal              @default(0.00) @db.Decimal(5, 2)
-  codigo_externo     String?              @db.VarChar(50)
-  fecha_entrada      DateTime             @db.DateTime(0)
-  fecha_salida       DateTime             @db.DateTime(0)
-  adultos            Int                  @default(1) @db.UnsignedTinyInt
-  ninos              Int                  @default(0) @db.UnsignedTinyInt
-  estado             reserva_estado       @default(PENDIENTE)
-  moneda_id          Int                  @db.UnsignedTinyInt
-  monto_total        Decimal              @default(0.00) @db.Decimal(14, 2)
-  monto_adelanto     Decimal              @default(0.00) @db.Decimal(14, 2)
-  observaciones      String?              @db.VarChar(500)
-  motivo_cancelacion String?              @db.VarChar(250)
-  usuario_id         Int                  @db.UnsignedInt
-  created_at         DateTime             @default(now()) @db.Timestamp(0)
-  updated_at         DateTime             @default(now()) @db.Timestamp(0)
-  canal_venta        canal_venta          @relation(fields: [canal_venta_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_canal")
-  cliente            cliente              @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_cliente")
-  moneda             moneda               @relation(fields: [moneda_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_moneda")
-  sucursal           sucursal             @relation(fields: [sucursal_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_sucursal")
-  usuario            usuario              @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_usuario")
-  caja_movimiento    caja_movimiento[]
-  comprobante        comprobante[]
-  reserva_habitacion reserva_habitacion[]
+  id                     BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  sucursal_id            Int                  @db.UnsignedInt
+  codigo                 String               @db.VarChar(20)
+  cliente_id             BigInt               @db.UnsignedBigInt
+  canal_venta_id         Int                  @db.UnsignedSmallInt
+  comision_porcentaje    Decimal              @default(0.00) @db.Decimal(5, 2)
+  codigo_externo         String?              @db.VarChar(50)
+  fecha_entrada          DateTime             @db.DateTime(0)
+  fecha_salida           DateTime             @db.DateTime(0)
+  adultos                Int                  @default(1) @db.UnsignedTinyInt
+  ninos                  Int                  @default(0) @db.UnsignedTinyInt
+  estado                 reserva_estado       @default(PENDIENTE)
+  moneda_id              Int                  @db.UnsignedTinyInt
+  monto_total            Decimal              @default(0.00) @db.Decimal(14, 2)
+  monto_adelanto         Decimal              @default(0.00) @db.Decimal(14, 2)
+  observaciones          String?              @db.VarChar(500)
+  motivo_cancelacion     String?              @db.VarChar(250)
+  usuario_cancelacion_id Int?                 @db.UnsignedInt
+  cancelada_at           DateTime?            @db.DateTime(0)
+  usuario_id             Int                  @db.UnsignedInt
+  created_at             DateTime             @default(now()) @db.Timestamp(0)
+  updated_at             DateTime             @default(now()) @db.Timestamp(0)
+  canal_venta            canal_venta          @relation(fields: [canal_venta_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_canal")
+  cliente                cliente              @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_cliente")
+  moneda                 moneda               @relation(fields: [moneda_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_moneda")
+  sucursal               sucursal             @relation(fields: [sucursal_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_sucursal")
+  usuario_cancelacion    usuario?             @relation("reserva_usuario_cancelacion_id", fields: [usuario_cancelacion_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_ucan")
+  usuario                usuario              @relation("reserva_usuario_id", fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reserva_usuario")
+  caja_movimiento        caja_movimiento[]
+  comprobante            comprobante[]
+  reserva_habitacion     reserva_habitacion[]
 
   @@unique([sucursal_id, codigo], map: "uk_reserva_codigo")
   @@index([moneda_id], map: "fk_reserva_moneda")
@@ -781,6 +862,7 @@ model reserva {
   @@index([sucursal_id, estado], map: "ix_reserva_estado")
   @@index([canal_venta_id, codigo_externo], map: "ix_reserva_ext")
   @@index([sucursal_id, fecha_entrada, fecha_salida], map: "ix_reserva_fechas")
+  @@index([usuario_cancelacion_id], map: "ix_reserva_ucan")
 }
 
 model reserva_habitacion {
@@ -1044,38 +1126,39 @@ model unidad_medida {
 }
 
 model usuario {
-  id                           Int                           @id @default(autoincrement()) @db.UnsignedInt
-  empresa_id                   Int                           @db.UnsignedInt
-  rol_id                       Int                           @db.UnsignedSmallInt
-  username                     String                        @db.VarChar(50)
-  password_hash                String                        @db.VarChar(255)
-  nombres                      String                        @db.VarChar(100)
-  apellidos                    String                        @db.VarChar(100)
-  email                        String?                       @db.VarChar(120)
-  ultimo_acceso                DateTime?                     @db.DateTime(0)
-  intentos_fallidos            Int                           @default(0) @db.UnsignedTinyInt
-  /// 1 = contraseña temporal asignada por un administrador; debe cambiarla al ingresar
-  debe_cambiar_clave           Boolean                       @default(false) @db.TinyInt
-  activo                       Boolean                       @default(true) @db.TinyInt
-  created_at                   DateTime                      @default(now()) @db.Timestamp(0)
-  updated_at                   DateTime                      @default(now()) @db.Timestamp(0)
-  empresa                      empresa                       @relation(fields: [empresa_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_usuario_empresa")
-  rol                          rol                           @relation(fields: [rol_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_usuario_rol")
-  auditoria                    auditoria[]
-  caja_movimiento              caja_movimiento[]
-  caja_sesion                  caja_sesion[]
-  compra                       compra[]
-  comprobante                  comprobante[]
-  estancia_usuario_checkin_id  estancia[]                    @relation("estancia_usuario_checkin_id")
-  estancia_usuario_checkout_id estancia[]                    @relation("estancia_usuario_checkout_id")
-  habitacion_estado_historial  habitacion_estado_historial[]
-  lote_sunat                   lote_sunat[]
-  movimiento_inventario        movimiento_inventario[]
-  reserva                      reserva[]
-  sesion_usuario               sesion_usuario[]
-  usuario_serie                usuario_serie[]
-  usuario_sucursal             usuario_sucursal[]
-  estancia_cargo               estancia_cargo[]
+  id                             Int                           @id @default(autoincrement()) @db.UnsignedInt
+  empresa_id                     Int                           @db.UnsignedInt
+  rol_id                         Int                           @db.UnsignedSmallInt
+  username                       String                        @db.VarChar(50)
+  password_hash                  String                        @db.VarChar(255)
+  nombres                        String                        @db.VarChar(100)
+  apellidos                      String                        @db.VarChar(100)
+  email                          String?                       @db.VarChar(120)
+  ultimo_acceso                  DateTime?                     @db.DateTime(0)
+  intentos_fallidos              Int                           @default(0) @db.UnsignedTinyInt
+  debe_cambiar_clave             Boolean                       @default(false) @db.TinyInt
+  activo                         Boolean                       @default(true) @db.TinyInt
+  created_at                     DateTime                      @default(now()) @db.Timestamp(0)
+  updated_at                     DateTime                      @default(now()) @db.Timestamp(0)
+  empresa                        empresa                       @relation(fields: [empresa_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_usuario_empresa")
+  rol                            rol                           @relation(fields: [rol_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_usuario_rol")
+  auditoria                      auditoria[]
+  caja_movimiento                caja_movimiento[]
+  caja_sesion                    caja_sesion[]
+  compra                         compra[]
+  comprobante                    comprobante[]
+  estancia_usuario_checkin_id    estancia[]                    @relation("estancia_usuario_checkin_id")
+  estancia_usuario_checkout_id   estancia[]                    @relation("estancia_usuario_checkout_id")
+  estancia_cargo                 estancia_cargo[]
+  estancia_traslado              estancia_traslado[]
+  habitacion_estado_historial    habitacion_estado_historial[]
+  lote_sunat                     lote_sunat[]
+  movimiento_inventario          movimiento_inventario[]
+  reserva_usuario_cancelacion_id reserva[]                     @relation("reserva_usuario_cancelacion_id")
+  reserva_usuario_id             reserva[]                     @relation("reserva_usuario_id")
+  sesion_usuario                 sesion_usuario[]
+  usuario_serie                  usuario_serie[]
+  usuario_sucursal               usuario_sucursal[]
 
   @@unique([empresa_id, username], map: "uk_usuario_username")
   @@index([rol_id], map: "ix_usuario_rol")
@@ -1167,6 +1250,15 @@ enum lote_sunat_estado {
   RECHAZADO
 }
 
+enum plano_elemento_tipo {
+  PASILLO
+  ESCALERA
+  ASCENSOR
+  RECEPCION
+  AREA_COMUN
+  BANO_COMUN
+}
+
 enum producto_tipo {
   BIEN
   SERVICIO
@@ -1215,77 +1307,4 @@ enum tipo_afectacion_igv_grupo {
   INAFECTO
   EXPORTACION
   GRATUITO
-}
-
-/// Comodidades que puede tener una habitación (S-06)
-model amenidad {
-  id                  Int                   @id @default(autoincrement()) @db.UnsignedSmallInt
-  empresa_id          Int                   @db.UnsignedInt
-  codigo              String                @db.VarChar(30)
-  nombre              String                @db.VarChar(60)
-  /// Clave del dibujo en el cliente (aire, wifi, tv...)
-  icono               String                @db.VarChar(30)
-  orden               Int                   @default(0) @db.UnsignedTinyInt
-  activo              Boolean               @default(true) @db.TinyInt
-  empresa             empresa               @relation(fields: [empresa_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_amenidad_empresa")
-  habitacion_amenidad habitacion_amenidad[]
-
-  @@unique([empresa_id, codigo], map: "uk_amenidad")
-}
-
-model habitacion_amenidad {
-  habitacion_id Int        @db.UnsignedInt
-  amenidad_id   Int        @db.UnsignedSmallInt
-  amenidad      amenidad   @relation(fields: [amenidad_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ha_amenidad")
-  habitacion    habitacion @relation(fields: [habitacion_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ha_habitacion")
-
-  @@id([habitacion_id, amenidad_id])
-  @@index([amenidad_id], map: "ix_ha_amenidad")
-}
-
-/// Pasillos, escaleras y áreas comunes dibujados en el plano del piso (S-06)
-model plano_elemento {
-  id       Int                 @id @default(autoincrement()) @db.UnsignedInt
-  piso_id  Int                 @db.UnsignedInt
-  tipo     plano_elemento_tipo
-  etiqueta String?             @db.VarChar(40)
-  x        Int                 @db.UnsignedTinyInt
-  y        Int                 @db.UnsignedTinyInt
-  ancho    Int                 @default(1) @db.UnsignedTinyInt
-  alto     Int                 @default(1) @db.UnsignedTinyInt
-  piso     piso                @relation(fields: [piso_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pe_piso")
-
-  @@index([piso_id], map: "ix_pe_piso")
-}
-
-enum plano_elemento_tipo {
-  PASILLO
-  ESCALERA
-  ASCENSOR
-  RECEPCION
-  AREA_COMUN
-  BANO_COMUN
-}
-
-/// Cargos de una estadía que se facturan al salir (S-07)
-model estancia_cargo {
-  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  estancia_id     BigInt    @db.UnsignedBigInt
-  /// NULL = cargo libre (p. ej. hora extra)
-  producto_id     Int?      @db.UnsignedInt
-  descripcion     String    @db.VarChar(200)
-  cantidad        Decimal   @default(1.00) @db.Decimal(10, 2)
-  /// Con IGV
-  precio_unitario Decimal   @db.Decimal(14, 2)
-  total           Decimal?  @db.Decimal(14, 2) /// columna generada por la BD (solo lectura)
-  anulado         Boolean   @default(false) @db.TinyInt
-  usuario_id      Int       @db.UnsignedInt
-  created_at      DateTime  @default(now()) @db.Timestamp(0)
-  estancia        estancia  @relation(fields: [estancia_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ec_estancia")
-  producto        producto? @relation(fields: [producto_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ec_producto")
-  usuario         usuario   @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ec_usuario")
-
-  @@index([estancia_id], map: "ix_ec_estancia")
-  @@index([producto_id], map: "ix_ec_producto")
-  @@index([usuario_id], map: "ix_ec_usuario")
 }

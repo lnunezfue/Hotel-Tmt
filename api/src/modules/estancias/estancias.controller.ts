@@ -13,7 +13,11 @@ const Id = z.number().int().positive();
 const CheckinSchema = z.object({
   habitacionId: Id, clienteId: Id, acompanantes: z.array(Id).max(10).default([]), canalId: Id, turnoId: Id,
   cantidad: z.number().int().min(1).max(60), procedencia: z.string().max(100).nullable().optional(), placa: z.string().max(10).nullable().optional(),
+  destino: z.string().max(200).nullable().optional(), motivoViaje: z.string().max(40).nullable().optional(),
 });
+const ExtensionSchema = z.object({ turnos: z.number() });
+const TrasladoSchema = z.object({ habitacionId: Id, motivo: z.string().max(400) });
+const LibroSchema = z.object({ desde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), hasta: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
 const HuespedSchema = z.object({ clienteId: Id });
 const CargoSchema = z
   .object({ productoId: Id.optional(), descripcion: z.string().trim().max(200).optional(), cantidad: z.number().positive().max(999), precio: z.number().min(0).max(99_999).optional() })
@@ -62,6 +66,28 @@ export class EstanciasController {
   @HttpCode(200)
   huesped(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseIntPipe) id: number, @Body(new ZodValidationPipe(HuespedSchema)) body: z.infer<typeof HuespedSchema>) {
     return this.svc.agregarHuesped(u, id, body.clienteId);
+  }
+
+  @RequierePermiso('estancia.checkin')
+  @Auditar('estancia.extender')
+  @Post('estancias/:id/extension')
+  @HttpCode(200)
+  extender(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseIntPipe) id: number, @Body(new ZodValidationPipe(ExtensionSchema)) body: z.infer<typeof ExtensionSchema>) {
+    return this.svc.extender(u, id, body.turnos);
+  }
+
+  @RequierePermiso('estancia.checkin')
+  @Auditar('estancia.traslado')
+  @Post('estancias/:id/traslado')
+  @HttpCode(200)
+  trasladar(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseIntPipe) id: number, @Body(new ZodValidationPipe(TrasladoSchema)) body: z.infer<typeof TrasladoSchema>) {
+    return this.svc.trasladar(u, id, body);
+  }
+
+  @RequierePermiso('estancia.checkin', 'reporte.ver')
+  @Get('libro-huespedes')
+  libro(@UsuarioActual() u: UsuarioSesion, @Query(new ZodValidationPipe(LibroSchema)) q: z.infer<typeof LibroSchema>) {
+    return this.svc.libro(u.sucursalId, q.desde, q.hasta);
   }
 
   @RequierePermiso('estancia.checkout')

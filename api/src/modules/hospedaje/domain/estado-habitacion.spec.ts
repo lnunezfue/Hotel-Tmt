@@ -32,8 +32,11 @@ describe('Turnos y salida prevista', () => {
     expect(calcularSalidaPrevista(checkin, horas, cantidad).toISOString()).toBe(new Date(esperado).toISOString());
   });
 
-  it('rechaza turnos que no existen', () => {
-    expect(() => calcularSalidaPrevista(checkin, 5, 1)).toThrow('Turno no válido');
+  it('acepta cualquier turno entero de 1 a 24 h y rechaza los demás', () => {
+    expect(calcularSalidaPrevista(checkin, 5, 1).toISOString()).toBe(new Date('2026-11-04T19:00:00-05:00').toISOString());
+    expect(() => calcularSalidaPrevista(checkin, 0, 1)).toThrow('Turno no válido');
+    expect(() => calcularSalidaPrevista(checkin, 25, 1)).toThrow('Turno no válido');
+    expect(() => calcularSalidaPrevista(checkin, 2.5, 1)).toThrow('Turno no válido');
   });
 
   it('marca la estancia vencida o por vencer', () => {

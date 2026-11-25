@@ -37,7 +37,7 @@ export function rangoPorNoches(llegada: string, noches: number): { entrada: Date
   return { entrada, salida };
 }
 
-/** Reserva por horas (turnos de 3, 6 o 12 h): desde la hora indicada. */
+/** Reserva por horas (cualquier turno que no sea de 24 h): desde la hora indicada. */
 export function rangoPorHoras(llegada: string, hora: string, horasTurno: number, turnos: number): { entrada: Date; salida: Date } {
   const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hora);
   if (!m) throw new ReglaReservaError('Hora de llegada no válida; usa HH:MM');

@@ -16,6 +16,7 @@ import {
   Vigencia,
 } from '../domain/tarifa';
 import { normalizarNombreCanal, ReglaCanalError, validarComision } from '../domain/canal-venta';
+import { normalizarNombreTurno, ReglaTurnoError, validarDuracionTurno } from '../domain/turno';
 
 export interface ContextoSucursal {
   empresaId: number;
@@ -34,8 +35,12 @@ function comoCanal(f: { id: number; nombre: string; comision_porcentaje: Prisma.
   return { id: f.id, nombre: f.nombre, comisionPorcentaje: f.comision_porcentaje.toFixed(2), esOta: f.es_ota, activo: f.activo };
 }
 
+function comoTurno(t: { id: number; nombre: string; duracion_horas: number; activo: boolean }) {
+  return { id: t.id, nombre: t.nombre, duracionHoras: t.duracion_horas, activo: t.activo };
+}
+
 function traducir(e: unknown, duplicado: string): never {
-  if (e instanceof ReglaTarifaError || e instanceof ReglaCanalError) throw new BadRequestException(e.message);
+  if (e instanceof ReglaTarifaError || e instanceof ReglaCanalError || e instanceof ReglaTurnoError) throw new BadRequestException(e.message);
   if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw new ConflictException(duplicado);
   throw e;
 }
@@ -307,6 +312,86 @@ export class ConfiguracionService {
       select: { id: true, nombre: true, es_ota: true, comision_porcentaje: true },
       orderBy: { id: 'asc' },
     });
+  }
+
+  /** Todos los turnos, con las tarifas vigentes o programadas de la sucursal y si ya se usaron en algo. */
+  async turnosConfig(c: ContextoSucursal) {
+    const hoy = fechaADb(hoyLima());
+    const [filas, conTarifas] = await Promise.all([
+      this.prisma.turno.findMany({
+        include: {
+          _count: {
+            select: {
+              tarifa: { where: { sucursal_id: c.sucursalId, activo: true, OR: [{ vigente_hasta: null }, { vigente_hasta: { gte: hoy } }] } },
+              reserva_habitacion: true,
+              estancia: true,
+            },
+          },
+        },
+        orderBy: { duracion_horas: 'desc' },
+      }),
+      this.prisma.tarifa.groupBy({ by: ['turno_id'], _count: { _all: true } }),
+    ]);
+    const usadosEnTarifas = new Set(conTarifas.map((g) => g.turno_id));
+    return filas.map((t) => ({
+      ...comoTurno(t),
+      tarifas: t._count.tarifa,
+      usado: usadosEnTarifas.has(t.id) || t._count.reserva_habitacion > 0 || t._count.estancia > 0,
+    }));
+  }
+
+  async crearTurno(d: { nombre: string; duracionHoras: number }) {
+    try {
+      const nombre = normalizarNombreTurno(d.nombre);
+      validarDuracionTurno(d.duracionHoras);
+      return await this.prisma.$transaction(async (tx) => {
+        const turno = await tx.turno.create({ data: { nombre, duracion_horas: d.duracionHoras } });
+        await this.auditoria.registrar(tx, { accion: 'turno.crear', tabla: 'turno', registroId: turno.id, despues: turno });
+        return comoTurno(turno);
+      });
+    } catch (e) {
+      traducir(e, `Ya existe un turno de ${d.duracionHoras} horas`);
+    }
+  }
+
+  async editarTurno(id: number, d: { nombre?: string; duracionHoras?: number; activo?: boolean }) {
+    const antes = await this.prisma.turno.findUnique({ where: { id } });
+    if (!antes) throw new NotFoundException('El turno no existe');
+    try {
+      const nombre = d.nombre === undefined ? undefined : normalizarNombreTurno(d.nombre);
+      const cambiaDuracion = d.duracionHoras !== undefined && d.duracionHoras !== antes.duracion_horas;
+      if (cambiaDuracion) {
+        validarDuracionTurno(d.duracionHoras!);
+        // Sus precios y cobros se calcularon con esa duración: cambiarla los falsearía sin que nadie lo note.
+        const [tarifas, reservas, estancias] = await Promise.all([
+          this.prisma.tarifa.count({ where: { turno_id: id } }),
+          this.prisma.reserva_habitacion.count({ where: { turno_id: id } }),
+          this.prisma.estancia.count({ where: { turno_id: id } }),
+        ]);
+        if (tarifas + reservas + estancias > 0) {
+          throw new ConflictException('Este turno ya tiene tarifas o estancias: su duración no se cambia. Crea un turno nuevo y desactiva este.');
+        }
+      }
+      return await this.prisma.$transaction(async (tx) => {
+        if (d.activo === false && antes.activo) {
+          // Bloquea los turnos activos: dos desactivaciones simultáneas no pueden dejar el sistema sin ninguno.
+          const activos = await tx.$queryRaw<Array<{ id: number }>>`SELECT id FROM turno WHERE activo = 1 FOR UPDATE`;
+          if (activos.length <= 1) throw new ConflictException('Es el único turno activo; activa otro antes de desactivarlo');
+        }
+        const despues = await tx.turno.update({
+          where: { id },
+          data: {
+            ...(nombre !== undefined && { nombre }),
+            ...(cambiaDuracion && { duracion_horas: d.duracionHoras }),
+            ...(d.activo !== undefined && { activo: d.activo }),
+          },
+        });
+        await this.auditoria.registrar(tx, { accion: 'turno.editar', tabla: 'turno', registroId: id, antes, despues });
+        return comoTurno(despues);
+      });
+    } catch (e) {
+      traducir(e, `Ya existe un turno de ${d.duracionHoras} horas`);
+    }
   }
 
   turnos() {

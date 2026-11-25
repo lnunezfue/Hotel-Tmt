@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import { RequierePermiso } from '../auth/permisos.decorator';
@@ -24,15 +24,27 @@ const CancelarSchema = z.object({ motivo: z.string().trim().min(3).max(250) });
 const CheckinSchema = z.object({
   procedencia: z.string().max(100).nullable().optional(),
   placa: z.string().max(10).nullable().optional(),
+  destino: z.string().max(200).nullable().optional(),
+  motivoViaje: z.string().max(40).nullable().optional(),
   huespedes: z.array(z.object({ habitacionId: Id, titularId: Id.optional(), acompanantes: z.array(Id).max(10).default([]) })).max(10).optional(),
 });
 const BuscarSchema = z.object({ q: z.string().max(100).default('') });
+const ListarClientesSchema = z.object({ q: z.string().max(100).default(''), incluirInactivos: z.enum(['true', 'false']).optional() });
 const ClienteSchema = z.object({
   tipoDocumentoId: z.number().int().positive(), numeroDocumento: z.string().min(1).max(15),
   nombres: z.string().max(100).nullable().optional(), apellidos: z.string().max(100).nullable().optional(),
   razonSocial: z.string().max(200).nullable().optional(), pais: z.string().length(2).optional(),
   telefono: z.string().max(20).nullable().optional(), email: z.string().email().max(120).nullable().optional().or(z.literal('').transform(() => null)),
 });
+const EditarClienteSchema = ClienteSchema.extend({
+  direccion: z.string().max(250).nullable().optional(),
+  fechaNacimiento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  sexo: z.enum(['M', 'F', 'X']).nullable().optional(),
+  observaciones: z.string().max(500).nullable().optional(),
+  activo: z.boolean(),
+})
+  .partial()
+  .refine((o) => Object.keys(o).length > 0, 'No hay cambios');
 
 /** Reservas y huéspedes de la sucursal del token (spec S-06 §5). */
 @ApiTags('reservas')
@@ -88,8 +100,8 @@ export class ReservasController {
   @Auditar('reserva.no_show')
   @Post('reservas/:id/no-show')
   @HttpCode(200)
-  noShow(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseIntPipe) id: number) {
-    return this.reservas.cambiarEstado(u, id, 'no_show');
+  noShow(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseIntPipe) id: number, @Body(new ZodValidationPipe(CancelarSchema)) body: z.infer<typeof CancelarSchema>) {
+    return this.reservas.cambiarEstado(u, id, 'no_show', body.motivo);
   }
 
   @RequierePermiso('estancia.checkin')
@@ -100,7 +112,7 @@ export class ReservasController {
     return this.reservas.checkin(u, id, body);
   }
 
-  @RequierePermiso('reserva.ver')
+  @RequierePermiso('reserva.ver', 'cliente.gestionar')
   @Get('clientes')
   buscarClientes(@UsuarioActual() u: UsuarioSesion, @Query(new ZodValidationPipe(BuscarSchema)) q: z.infer<typeof BuscarSchema>) {
     return this.clientes.buscar(u.empresaId, q.q);
@@ -111,7 +123,27 @@ export class ReservasController {
     return this.clientes.tiposDocumento();
   }
 
-  @RequierePermiso('reserva.crear')
+  /** Cartera de clientes (RF-RES-17): la lista de la pantalla Clientes, con desactivados si se piden. */
+  @RequierePermiso('reserva.ver', 'cliente.gestionar')
+  @Get('clientes/cartera')
+  cartera(@UsuarioActual() u: UsuarioSesion, @Query(new ZodValidationPipe(ListarClientesSchema)) q: z.infer<typeof ListarClientesSchema>) {
+    return this.clientes.cartera(u.empresaId, q.q, q.incluirInactivos === 'true');
+  }
+
+  @RequierePermiso('reserva.ver', 'cliente.gestionar')
+  @Get('clientes/:id')
+  cliente(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseIntPipe) id: number) {
+    return this.clientes.detalle(u.empresaId, id);
+  }
+
+  @RequierePermiso('reserva.crear', 'cliente.gestionar')
+  @Auditar('cliente.editar')
+  @Patch('clientes/:id')
+  editarCliente(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseIntPipe) id: number, @Body(new ZodValidationPipe(EditarClienteSchema)) body: z.infer<typeof EditarClienteSchema>) {
+    return this.clientes.editar(u.empresaId, id, body);
+  }
+
+  @RequierePermiso('reserva.crear', 'cliente.gestionar')
   @Auditar('cliente.crear')
   @Post('clientes')
   crearCliente(@UsuarioActual() u: UsuarioSesion, @Body(new ZodValidationPipe(ClienteSchema)) body: z.infer<typeof ClienteSchema>) {

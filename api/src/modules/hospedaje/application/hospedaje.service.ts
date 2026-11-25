@@ -36,7 +36,8 @@ export class HospedajeService {
           estado: codigo,
           estadoDescripcion: h.estado_habitacion.descripcion,
           color: h.estado_habitacion.color_hex,
-          siguientes: transicionesPermitidas(codigo),
+          // OCUPADA entra con el check-in y sale con el check-out o el traslado: no se ofrece a mano.
+          siguientes: est ? [] : transicionesPermitidas(codigo).filter((x) => x !== 'OCUPADA'),
           estancia: est
             ? {
                 id: Number(est.id),
@@ -56,6 +57,10 @@ export class HospedajeService {
     if (!esEstado(nuevo)) throw new BadRequestException(`Estado desconocido: ${nuevo}`);
     const hab = await this.repo.buscar(sucursalId, habitacionId);
     if (!hab) throw new NotFoundException('La habitación no existe en tu sucursal');
+    if (nuevo === 'OCUPADA') throw new ConflictException('La habitación se ocupa con el check-in');
+    if (await this.prisma.estancia.count({ where: { habitacion_id: habitacionId, estado: 'ACTIVA' } })) {
+      throw new ConflictException('La habitación tiene una estadía en curso: se libera con el check-out o el traslado');
+    }
     try {
       validarTransicion(hab.estado_habitacion.codigo as EstadoHabitacion, nuevo);
     } catch (e) {

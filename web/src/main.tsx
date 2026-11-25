@@ -9,6 +9,8 @@ import { TableroPage } from './pages/TableroPage';
 import { ReservasPage } from './pages/ReservasPage';
 import { PlanoPage } from './pages/PlanoPage';
 import { CajaPage } from './pages/CajaPage';
+import { ClientesPage } from './pages/ClientesPage';
+import { LibroHuespedesPage } from './pages/LibroHuespedesPage';
 import { UsuariosPage } from './pages/UsuariosPage';
 import { ConfiguracionHotelPage } from './pages/ConfiguracionHotelPage';
 import { CambiarClavePage } from './pages/CambiarClavePage';
@@ -33,12 +35,12 @@ alCerrarSesion((motivo) => {
 });
 
 /** Rutas protegidas según la sesión y el permiso del rol (la API vuelve a verificar cada acción). */
-function Protegida({ children, permiso }: { children: ReactNode; permiso?: string }) {
+function Protegida({ children, permiso }: { children: ReactNode; permiso?: string | string[] }) {
   const { data: sesion, isLoading } = useSesion();
   if (isLoading) return <div className="p-8 text-tinta-suave">Cargando…</div>;
   if (!sesion) return <Navigate to="/login" replace />;
   if (sesion.debeCambiarClave) return <CambiarClavePage obligatoria />;
-  if (permiso && !puede(sesion, permiso)) return <Navigate to="/" replace />;
+  if (permiso && ![permiso].flat().some((p) => puede(sesion, p))) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -53,6 +55,8 @@ createRoot(document.getElementById('root')!).render(
             <Route path="plano" element={<PlanoPage />} />
             <Route path="caja" element={<Protegida permiso="caja.abrir"><CajaPage /></Protegida>} />
             <Route path="reservas" element={<Protegida permiso="reserva.ver"><ReservasPage /></Protegida>} />
+            <Route path="clientes" element={<Protegida permiso={['reserva.ver', 'cliente.gestionar']}><ClientesPage /></Protegida>} />
+            <Route path="libro-huespedes" element={<Protegida permiso={['estancia.checkin', 'reporte.ver']}><LibroHuespedesPage /></Protegida>} />
             <Route path="usuarios" element={<Protegida permiso="usuario.ver"><UsuariosPage /></Protegida>} />
             <Route path="configuracion/hotel" element={<Protegida permiso="habitacion.gestionar"><ConfiguracionHotelPage /></Protegida>} />
             <Route path="mi-clave" element={<CambiarClavePage />} />
