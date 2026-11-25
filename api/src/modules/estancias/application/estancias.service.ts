@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { UsuarioSesion } from '../../../common/usuario-actual.decorator';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -9,7 +9,21 @@ import { ConfiguracionService } from '../../hospedaje/application/configuracion.
 import { esEstado, TransicionInvalidaError, validarTransicion } from '../../hospedaje/domain/estado-habitacion';
 import { hoyLima } from '../../hospedaje/domain/tarifa';
 import { rangoPorHoras, rangoPorNoches, ReglaReservaError, validarHuespedes } from '../../reservas/domain/reserva';
-import { aCentimos, aSoles, comision, desglosarIgv, LineaCuenta, montoEnLetras, ReglaCobroError, repartirPagos, totalesComprobante } from '../domain/cobro';
+import {
+  aCentimos,
+  aSoles,
+  calcularDescuento,
+  comision,
+  DescuentoPedido,
+  desglosarIgv,
+  LineaCuenta,
+  montoEnLetras,
+  ReglaCobroError,
+  repartirPagos,
+  totalesComprobante,
+  validarReceptorBoleta,
+} from '../domain/cobro';
+import { SeriesService } from '../../facturacion/application/series.service';
 import { normalizarLibro, normalizarMotivoTraslado, ReglaEstadiaError, salidaExtendida, turnosAdicionales, validarExtension } from '../domain/estadia';
 import { bloquearHabitaciones, exigirNoAlojados, exigirSinCruces } from '../../hospedaje/application/cruces';
 import { esFecha, inicioDiaLima, sumarDias } from '../../hospedaje/domain/tarifa';
@@ -31,7 +45,12 @@ export interface CheckinDirecto {
 
 export interface Checkout {
   tipoComprobante: 'BOLETA' | 'FACTURA' | 'INTERNO';
+  /** Receptor: una empresa con RUC para factura, o cualquier persona para boleta; por defecto, el titular. */
   clienteId?: number;
+  /** Serie a usar entre las que el usuario puede (S-07 D4); por defecto la que corresponde. */
+  serieId?: number;
+  /** Descuento global (RF-FAC-08); exige el permiso descuento.aplicar. */
+  descuento?: DescuentoPedido;
   pagos: Array<{ metodoPagoId: number; monto: number; referencia?: string | null }>;
 }
 
@@ -69,6 +88,7 @@ export class EstanciasService {
     private readonly avisos: AvisosTablero,
     private readonly config: ConfiguracionService,
     private readonly caja: CajaService,
+    private readonly series: SeriesService,
   ) {}
 
   productos(empresaId: number) {
@@ -206,9 +226,13 @@ export class EstanciasService {
     const ahora = new Date();
     const cuenta = this.cuenta(grupo, ahora);
     const metodos = await this.prisma.metodo_pago.findMany({ where: { activo: true } });
+    if (d.descuento && !actor.permisos.includes('descuento.aplicar')) throw new ForbiddenException('Tu rol no tiene el permiso «descuento.aplicar»');
     let reparto: ReturnType<typeof repartirPagos>;
+    let descuento: ReturnType<typeof calcularDescuento> | null = null;
     try {
-      reparto = repartirPagos(aCentimos(cuenta.saldo), d.pagos.map((p) => {
+      // El descuento global baja el total y el saldo; el adelanto ya cobrado no cambia (S-07 D6–D7)
+      if (d.descuento) descuento = calcularDescuento(aCentimos(cuenta.total), aCentimos(cuenta.adelanto), d.descuento);
+      reparto = repartirPagos(aCentimos(cuenta.saldo) - (descuento?.conIgv ?? 0), d.pagos.map((p) => {
         const m = metodos.find((x) => x.id === p.metodoPagoId);
         if (!m) throw new ReglaCobroError('Método de pago no válido');
         return { metodo: m.codigo, esEfectivo: m.es_efectivo, monto: p.monto, referencia: p.referencia ?? null };
@@ -220,11 +244,15 @@ export class EstanciasService {
     const cliente = await this.prisma.cliente.findFirst({ where: { id: titularId, empresa_id: actor.empresaId }, include: { tipo_documento: true } });
     if (!cliente) throw new BadRequestException('El cliente del comprobante no existe');
     if (d.tipoComprobante === 'FACTURA' && cliente.tipo_documento.abreviatura !== 'RUC') throw new BadRequestException('La factura requiere un cliente con RUC');
+    const totales = totalesComprobante(cuenta.lineas, descuento ? { base: descuento.base, igv: descuento.igv } : undefined);
+    if (d.tipoComprobante === 'BOLETA') {
+      try {
+        validarReceptorBoleta(aCentimos(totales.total), cliente.tipo_documento.codigo_sunat);
+      } catch (err) {
+        traducir(err);
+      }
+    }
     const tipo = await this.prisma.tipo_comprobante.findUniqueOrThrow({ where: { codigo: d.tipoComprobante } });
-    const serie =
-      (await this.prisma.serie.findFirst({ where: { sucursal_id: actor.sucursalId, tipo_comprobante_id: tipo.id, activo: true, usuario_serie: { some: { usuario_id: actor.sub } } } })) ??
-      (await this.prisma.serie.findFirst({ where: { sucursal_id: actor.sucursalId, tipo_comprobante_id: tipo.id, activo: true }, orderBy: { id: 'asc' } }));
-    if (!serie) throw new ConflictException(`La sucursal no tiene una serie activa para ${d.tipoComprobante.toLowerCase()}`);
     const [pen, um, afecto] = await Promise.all([
       this.prisma.moneda.findUniqueOrThrow({ where: { codigo_iso: 'PEN' } }),
       this.prisma.unidad_medida.findMany({ where: { codigo_sunat: { in: ['ZZ', 'NIU'] } } }),
@@ -232,13 +260,13 @@ export class EstanciasService {
     ]);
     const umServicio = um.find((u) => u.codigo_sunat === 'ZZ')!.id;
     const umBien = um.find((u) => u.codigo_sunat === 'NIU')!.id;
-    const totales = totalesComprobante(cuenta.lineas);
     const lima = new Date(ahora.getTime() - 5 * 3_600_000).toISOString();
 
     try {
       const comp = await this.prisma.$transaction(async (tx) => {
         const sesion = reparto.registrados.length ? await this.caja.exigirSesion(tx, actor.sucursalId) : await this.caja.sesionAbierta(tx, actor.sucursalId);
-        // Correlativo con bloqueo de fila (sp_siguiente_correlativo) dentro de la misma transacción
+        // La serie del usuario o una libre (RF-FAC-02); el correlativo con bloqueo de fila dentro de la misma transacción
+        const serie = await this.series.paraEmitir(actor.sucursalId, actor.sub, d.tipoComprobante, d.serieId, tx);
         await tx.$executeRaw`CALL sp_siguiente_correlativo(${serie.id}, @numero)`;
         const [{ numero }] = await tx.$queryRaw<Array<{ numero: number | bigint }>>`SELECT @numero AS numero`;
         const comprobante = await tx.comprobante.create({
@@ -249,6 +277,7 @@ export class EstanciasService {
             cliente_nombre: nombreCliente(cliente), cliente_direccion: cliente.direccion ?? null, moneda_id: pen.id,
             estancia_id: grupo[0].id, reserva_id: cuenta.reserva ? BigInt(cuenta.reserva.id) : null, caja_sesion_id: sesion?.id ?? null,
             total_gravada: new Prisma.Decimal(totales.gravada), total_igv: new Prisma.Decimal(totales.igv), total: new Prisma.Decimal(totales.total),
+            descuento_global: new Prisma.Decimal(totales.descuentoBase), descuento_igv: new Prisma.Decimal(totales.descuentoIgv), descuento_motivo: descuento?.motivo ?? null,
             monto_letras: montoEnLetras(totales.total), usuario_id: actor.sub,
             comprobante_detalle: {
               create: cuenta.lineas.map((l, i) => {
@@ -289,12 +318,18 @@ export class EstanciasService {
           accion: 'estancia.checkout',
           tabla: 'comprobante',
           registroId: comprobante.id,
-          despues: { comprobante: `${comprobante.serie}-${comprobante.numero}`, total: totales.total, habitaciones: grupo.map((g) => g.habitacion.numero), pagos: reparto.registrados, vuelto: aSoles(reparto.vuelto) },
+          despues: { comprobante: `${comprobante.serie}-${comprobante.numero}`, total: totales.total, descuento: descuento ? { conIgv: aSoles(descuento.conIgv), motivo: descuento.motivo } : null, habitaciones: grupo.map((g) => g.habitacion.numero), pagos: reparto.registrados, vuelto: aSoles(reparto.vuelto) },
         });
         return comprobante;
       });
       await this.avisos.avisar(actor.sucursalId, 'estado');
-      return { comprobanteId: Number(comp.id), comprobante: `${comp.serie}-${String(comp.numero).padStart(8, '0')}`, total: totales.total, vuelto: aSoles(reparto.vuelto) };
+      return {
+        comprobanteId: Number(comp.id),
+        comprobante: `${comp.serie}-${String(comp.numero).padStart(8, '0')}`,
+        total: totales.total,
+        descuento: descuento ? aSoles(descuento.conIgv) : '0.00',
+        vuelto: aSoles(reparto.vuelto),
+      };
     } catch (err) {
       traducir(err);
     }

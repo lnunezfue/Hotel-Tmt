@@ -29,8 +29,14 @@ export function desglosarIgv(totalCentimos: number): { valorVenta: number; igv: 
   return { valorVenta, igv: totalCentimos - valorVenta, total: totalCentimos };
 }
 
-/** Totales del comprobante: suma de bases y de IGV por línea (cuadra exactamente con el total). */
-export function totalesComprobante(lineas: Array<{ total: string }>): { gravada: string; igv: string; total: string } {
+/**
+ * Totales del comprobante: suma de bases y de IGV por línea (cuadra exactamente con el total). Un descuento global
+ * (S-07 D6) se resta de la base y del IGV sin tocar las líneas.
+ */
+export function totalesComprobante(
+  lineas: Array<{ total: string }>,
+  descuento?: { base: number; igv: number },
+): { gravada: string; igv: string; total: string; descuentoBase: string; descuentoIgv: string } {
   let gravada = 0;
   let igv = 0;
   let total = 0;
@@ -40,7 +46,52 @@ export function totalesComprobante(lineas: Array<{ total: string }>): { gravada:
     igv += d.igv;
     total += d.total;
   }
-  return { gravada: aSoles(gravada), igv: aSoles(igv), total: aSoles(total) };
+  const db = descuento?.base ?? 0;
+  const di = descuento?.igv ?? 0;
+  return { gravada: aSoles(gravada - db), igv: aSoles(igv - di), total: aSoles(total - db - di), descuentoBase: aSoles(db), descuentoIgv: aSoles(di) };
+}
+
+export interface DescuentoPedido {
+  tipo: 'MONTO' | 'PORCENTAJE';
+  valor: number;
+  motivo: string;
+}
+
+/**
+ * Descuento global sobre el total con IGV (RF-FAC-08, catálogo 53 código 02: afecta la base imponible). Se separa en
+ * base e IGV. No puede dejar el total por debajo de lo ya pagado como adelanto (S-07 D7).
+ */
+export function calcularDescuento(totalCentimos: number, adelantoCentimos: number, d: DescuentoPedido): { conIgv: number; base: number; igv: number; motivo: string } {
+  const motivo = d.motivo.trim().replace(/\s+/g, ' ');
+  if (motivo.length < 5 || motivo.length > 250) throw new ReglaCobroError('El motivo del descuento debe tener entre 5 y 250 caracteres');
+  if (!Number.isFinite(d.valor) || d.valor <= 0) throw new ReglaCobroError('El descuento debe ser mayor que cero');
+  let conIgv: number;
+  if (d.tipo === 'PORCENTAJE') {
+    if (d.valor > 100) throw new ReglaCobroError('El porcentaje de descuento no puede pasar de 100');
+    conIgv = Math.round((totalCentimos * d.valor) / 100);
+  } else {
+    conIgv = aCentimos(d.valor);
+    if (Math.abs(conIgv - d.valor * 100) > 1e-6) throw new ReglaCobroError('El descuento admite como máximo dos decimales');
+  }
+  if (conIgv > totalCentimos - adelantoCentimos) {
+    throw new ReglaCobroError(
+      adelantoCentimos > 0
+        ? `El descuento no puede pasar de S/ ${aSoles(totalCentimos - adelantoCentimos)}: el adelanto ya cobrado no se devuelve con un descuento`
+        : 'El descuento no puede superar el total',
+    );
+  }
+  const base = Math.round(conIgv / (1 + TASA_IGV));
+  return { conIgv, base, igv: conIgv - base, motivo };
+}
+
+/** Importe desde el que la boleta exige identificar al comprador (SUNAT: más de S/ 700). */
+export const UMBRAL_BOLETA_IDENTIFICADA = 70_000;
+
+/** RF-FAC-04: una boleta de más de S/ 700 no se emite a un receptor sin documento (Cat. 06 código 0). */
+export function validarReceptorBoleta(totalCentimos: number, tipoDocSunat: string): void {
+  if (totalCentimos > UMBRAL_BOLETA_IDENTIFICADA && tipoDocSunat === '0') {
+    throw new ReglaCobroError('Una boleta de más de S/ 700 exige el DNI, carnet o pasaporte del comprador');
+  }
 }
 
 export interface Pago {

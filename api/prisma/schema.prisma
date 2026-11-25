@@ -263,6 +263,8 @@ model comprobante {
   total_inafecta                         Decimal                  @default(0.00) @db.Decimal(14, 2)
   total_gratuita                         Decimal                  @default(0.00) @db.Decimal(14, 2)
   descuento_global                       Decimal                  @default(0.00) @db.Decimal(14, 2)
+  descuento_igv                          Decimal                  @default(0.00) @db.Decimal(14, 2)
+  descuento_motivo                       String?                  @db.VarChar(250)
   total_igv                              Decimal                  @default(0.00) @db.Decimal(14, 2)
   total_icbper                           Decimal                  @default(0.00) @db.Decimal(14, 2)
   total                                  Decimal                  @default(0.00) @db.Decimal(14, 2)
