@@ -14,6 +14,9 @@ const hora = (iso: string) => new Date(iso).toLocaleString('es-PE', { day: '2-di
 function TarjetaHabitacion({ h, onClick, seleccionada }: { h: HabitacionTablero; onClick: () => void; seleccionada: boolean }) {
   const e = ESTILO_ESTADO[h.estado];
   const alerta = h.estancia?.alerta;
+  // Limpieza: se cuenta desde el último cambio de estado; el tablero se relee cada minuto o con cada aviso
+  const enLimpieza = h.limpieza && h.estadoDesde ? Math.max(0, Math.floor((Date.now() - Date.parse(h.estadoDesde)) / 60_000)) : null;
+  const limpiezaDemorada = enLimpieza !== null && enLimpieza > (h.limpieza?.esperados ?? 30);
   return (
     <button
       onClick={onClick}
@@ -35,6 +38,14 @@ function TarjetaHabitacion({ h, onClick, seleccionada }: { h: HabitacionTablero;
             {tiempoRestante(new Date(h.estancia.salidaPrevista), new Date())}
           </span>
         </div>
+      )}
+      {enLimpieza !== null && (
+        <span className={clsx('mt-auto text-xs', limpiezaDemorada ? 'font-semibold text-ocupada' : 'text-tinta-suave')}>
+          Limpiando hace {enLimpieza} min{limpiezaDemorada ? ` (más de ${h.limpieza!.esperados})` : ` de ${h.limpieza!.esperados}`}
+        </span>
+      )}
+      {limpiezaDemorada && !alerta && (
+        <span className="absolute -top-2 -right-2 rounded-full bg-ocupada px-2 py-0.5 text-[10px] font-bold text-white">LIMPIEZA DEMORADA</span>
       )}
       {alerta && (
         <span className={clsx('absolute -top-2 -right-2 rounded-full px-2 py-0.5 text-[10px] font-bold text-white', alerta === 'VENCIDA' ? 'bg-ocupada' : 'bg-limpieza')}>
@@ -107,7 +118,7 @@ function PanelHabitacion({ h, onCerrar }: { h: HabitacionTablero; onCerrar: () =
             ))}
           </div>
           {h.estado === 'OCUPADA' && puede(sesion, 'estancia.checkout') && (
-            <Button variante="primario" onClick={() => setCajon('estancia')}>Ver cuenta y hacer check-out</Button>
+            <Button variante="primario" onClick={() => setCajon('estancia')}>Ver estadía: cobro y check-out</Button>
           )}
           {['DESOCUPADA', 'RESERVADA', 'CONFIRMADA'].includes(h.estado) && puede(sesion, 'estancia.checkin') && (
             <Button onClick={() => setCajon('checkin')}>Check-in directo (sin reserva)</Button>
@@ -155,6 +166,7 @@ export function TableroPage() {
   const total = todas.length;
   const ocupadas = data?.resumen.OCUPADA ?? 0;
   const alertas = todas.filter((h) => h.estancia?.alerta).length;
+  const limpiezasDemoradas = todas.filter((h) => h.limpieza && h.estadoDesde && (Date.now() - Date.parse(h.estadoDesde)) / 60_000 > h.limpieza.esperados).length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -176,7 +188,7 @@ export function TableroPage() {
         <Card className="p-4"><div className="text-2xl font-bold tabular-nums">{total}</div><div className="text-xs text-tinta-suave">Habitaciones</div></Card>
         <Card className="p-4"><div className="text-2xl font-bold tabular-nums">{total ? Math.round((ocupadas / total) * 100) : 0}%</div><div className="text-xs text-tinta-suave">Ocupación ahora ({ocupadas} ocupadas)</div></Card>
         <Card className="p-4"><div className="text-2xl font-bold tabular-nums">{data?.resumen.DESOCUPADA ?? 0}</div><div className="text-xs text-tinta-suave">Disponibles para vender</div></Card>
-        <Card className={clsx('p-4', alertas > 0 && 'border-ocupada/50 bg-ocupada/5')}><div className={clsx('text-2xl font-bold tabular-nums', alertas > 0 && 'text-ocupada')}>{alertas}</div><div className="text-xs text-tinta-suave">Salidas vencidas o por vencer</div></Card>
+        <Card className={clsx('p-4', alertas > 0 && 'border-ocupada/50 bg-ocupada/5')}><div className={clsx('text-2xl font-bold tabular-nums', alertas > 0 && 'text-ocupada')}>{alertas}</div><div className="text-xs text-tinta-suave">Salidas vencidas o por vencer{limpiezasDemoradas > 0 && <span className="font-semibold text-ocupada"> · {limpiezasDemoradas} {limpiezasDemoradas === 1 ? 'limpieza demorada' : 'limpiezas demoradas'}</span>}</div></Card>
       </div>
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por estado">
