@@ -8,6 +8,7 @@ import { fechaCorta, soles } from '../features/hospedaje/formato';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Aviso, Campo, Entrada, PanelLateral, Pestanas, Pildora, Selector } from '../components/ui/form';
+import { PestanaOperacion } from '../features/hospedaje/PestanaOperacion';
 
 interface Piso { id: number; numero: number; nombre: string; activo: boolean; habitaciones: number }
 interface Tipo { id: number; nombre: string; descripcion: string | null; capacidadAdultos: number; capacidadNinos: number; activo: boolean; habitaciones: number }
@@ -545,7 +546,7 @@ function PestanaTarifas() {
   );
 }
 
-type Pestana = 'habitaciones' | 'pisos' | 'tipos' | 'canales' | 'turnos' | 'tarifas';
+type Pestana = 'habitaciones' | 'pisos' | 'tipos' | 'canales' | 'turnos' | 'tarifas' | 'operacion';
 
 export function ConfiguracionHotelPage() {
   const [pestana, setPestana] = useState<Pestana>('habitaciones');
@@ -557,7 +558,7 @@ export function ConfiguracionHotelPage() {
         <p className="text-sm text-tinta-suave">Configuración de la sucursal activa. Cada cambio queda en la bitácora de auditoría.</p>
       </header>
       <Pestanas<Pestana>
-        opciones={[{ id: 'habitaciones', texto: 'Habitaciones' }, { id: 'pisos', texto: 'Pisos' }, { id: 'tipos', texto: 'Tipos' }, { id: 'canales', texto: 'Canales' }, { id: 'turnos', texto: 'Turnos' }, { id: 'tarifas', texto: 'Tarifas' }]}
+        opciones={[{ id: 'habitaciones', texto: 'Habitaciones' }, { id: 'pisos', texto: 'Pisos' }, { id: 'tipos', texto: 'Tipos' }, { id: 'canales', texto: 'Canales' }, { id: 'turnos', texto: 'Turnos' }, { id: 'tarifas', texto: 'Tarifas' }, { id: 'operacion', texto: 'Operación' }]}
         valor={pestana}
         onCambio={setPestana}
       />
@@ -567,6 +568,7 @@ export function ConfiguracionHotelPage() {
       {pestana === 'canales' && <PestanaCanales />}
       {pestana === 'turnos' && <PestanaTurnos />}
       {pestana === 'tarifas' && <PestanaTarifas />}
+      {pestana === 'operacion' && <PestanaOperacion />}
     </div>
   );
 }
