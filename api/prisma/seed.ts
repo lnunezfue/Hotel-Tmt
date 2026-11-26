@@ -156,18 +156,18 @@ async function main() {
   type Elemento = { tipo: 'PASILLO' | 'ESCALERA' | 'RECEPCION' | 'AREA_COMUN' | 'BANO_COMUN'; etiqueta?: string; x: number; y: number; ancho: number; alto: number };
   const real: Array<{ numero: number; nombre: string; columnas: number; filas: number; elementos: Elemento[]; habitaciones: Array<[string, number, number]> }> = [
     {
-      numero: 1, nombre: '1er nivel', columnas: 20, filas: 8,
+      numero: 1, nombre: '1er nivel', columnas: 17, filas: 8,
       elementos: [
-        { tipo: 'AREA_COMUN', etiqueta: 'Garaje', x: 0, y: 0, ancho: 4, alto: 4 },
-        { tipo: 'RECEPCION', etiqueta: 'Recepción · hall', x: 0, y: 4, ancho: 3, alto: 4 },
-        { tipo: 'ESCALERA', x: 3, y: 4, ancho: 1, alto: 4 },
-        { tipo: 'AREA_COMUN', etiqueta: 'Sala · comedor · cocineta', x: 4, y: 0, ancho: 5, alto: 8 },
-        { tipo: 'PASILLO', x: 9, y: 3, ancho: 9, alto: 2 },
-        { tipo: 'BANO_COMUN', etiqueta: 'SS.HH.', x: 12, y: 5, ancho: 3, alto: 3 },
-        { tipo: 'AREA_COMUN', etiqueta: 'Patio', x: 18, y: 0, ancho: 2, alto: 5 },
-        { tipo: 'BANO_COMUN', etiqueta: 'SS.HH.', x: 18, y: 5, ancho: 2, alto: 3 },
+        { tipo: 'AREA_COMUN', etiqueta: 'Garaje', x: 0, y: 0, ancho: 3, alto: 4 },
+        { tipo: 'RECEPCION', etiqueta: 'Recepción · hall', x: 0, y: 4, ancho: 2, alto: 4 },
+        { tipo: 'ESCALERA', x: 2, y: 4, ancho: 1, alto: 4 },
+        { tipo: 'AREA_COMUN', etiqueta: 'Sala · comedor · cocineta', x: 3, y: 0, ancho: 3, alto: 8 },
+        { tipo: 'PASILLO', x: 6, y: 3, ancho: 9, alto: 2 },
+        { tipo: 'BANO_COMUN', etiqueta: 'SS.HH.', x: 9, y: 5, ancho: 3, alto: 3 },
+        { tipo: 'AREA_COMUN', etiqueta: 'Patio', x: 15, y: 0, ancho: 2, alto: 5 },
+        { tipo: 'BANO_COMUN', etiqueta: 'SS.HH.', x: 15, y: 5, ancho: 2, alto: 3 },
       ],
-      habitaciones: [['101', 9, 0], ['102', 12, 0], ['103', 15, 0], ['104', 9, 5], ['105', 15, 5]],
+      habitaciones: [['101', 6, 0], ['102', 9, 0], ['103', 12, 0], ['104', 6, 5], ['105', 12, 5]],
     },
     {
       numero: 2, nombre: '2do nivel', columnas: 19, filas: 8,
@@ -213,6 +213,7 @@ async function main() {
     { tipo: pas.id, doc: 'CL8834521', nombres: 'Valentina', apellidos: 'Soto', pais: 'CL' },
     { tipo: dni.id, doc: '70123456', nombres: 'Lucía', apellidos: 'Gutiérrez Paz', pais: 'PE' },
     { tipo: pas.id, doc: 'BO552310', nombres: 'Diego', apellidos: 'Arce', pais: 'BO' },
+    { tipo: dni.id, doc: '46781234', nombres: 'Rosa', apellidos: 'Flores Vega', pais: 'PE' },
   ];
   const clientes = [];
   for (const c of huespedes) {
@@ -226,8 +227,8 @@ async function main() {
     [`${centro.id}-104`, 1, 4, 1, 3.6, 'CULQI'], // por vencer
     [`${centro.id}-203`, 2, 3, 1, 3.7, 'EFECTIVO'], // vencida
     [`${centro.id}-205`, 3, 6, 1, 1, 'CULQI'],
-    [`${centro.id}-207`, 0, 24, 1, 2, 'EFECTIVO'], // noche completa: sale a las 9:00
-    [`${alto.id}-102`, 0, 12, 1, 3, null], // el hostal cobra al salir
+    [`${centro.id}-207`, 4, 24, 1, 2, 'EFECTIVO'], // noche completa: sale a las 9:00
+    [`${alto.id}-102`, 3, 12, 1, 3, null], // el hostal cobra al salir
   ];
   const pagadas: Array<{ estanciaId: bigint; habitacion: string; tipo: string; horas: number; cantidad: number; precio: number; metodo: 'EFECTIVO' | 'CULQI'; cliente: (typeof clientes)[number]; fecha: Date }> = [];
   for (const [key, ci, horas, cant, desde, metodo] of ocupadas) {
@@ -292,9 +293,9 @@ async function main() {
   // Reservas sin adelanto (el hotel no cobra al reservar y no todas se usan): una de hoy que no llegó
   // (para marcar «no se presentó»), una para dentro de un rato y noches de los próximos días.
   const ejemplos: Array<{ hab: string; ci: number; cn: number; entrada: Date; horas: number; cant: number; estado: 'PENDIENTE' | 'CONFIRMADA'; hoy?: boolean }> = [
-    { hab: '202', ci: 4, cn: 2, entrada: new Date(ahora - h(1.5)), horas: 4, cant: 1, estado: 'PENDIENTE', hoy: true }, // no llegó
-    { hab: '206', ci: 5, cn: 2, entrada: new Date(ahora + h(2)), horas: 4, cant: 1, estado: 'CONFIRMADA', hoy: true },
-    { hab: '208', ci: 6, cn: 0, entrada: rangoPorNoches(dia(1), 1).entrada, horas: 24, cant: 1, estado: 'PENDIENTE' },
+    { hab: '202', ci: 5, cn: 2, entrada: new Date(ahora - h(1.5)), horas: 4, cant: 1, estado: 'PENDIENTE', hoy: true }, // no llegó
+    { hab: '206', ci: 6, cn: 2, entrada: new Date(ahora + h(2)), horas: 4, cant: 1, estado: 'CONFIRMADA', hoy: true },
+    { hab: '208', ci: 7, cn: 0, entrada: rangoPorNoches(dia(1), 1).entrada, horas: 24, cant: 1, estado: 'PENDIENTE' },
     { hab: '101', ci: 1, cn: 1, entrada: rangoPorNoches(dia(2), 1).entrada, horas: 24, cant: 2, estado: 'CONFIRMADA' },
     { hab: '204', ci: 2, cn: 2, entrada: rangoPorNoches(dia(3), 1).entrada, horas: 3, cant: 1, estado: 'PENDIENTE' },
   ];
