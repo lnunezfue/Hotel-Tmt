@@ -334,10 +334,11 @@ export class EstanciasService {
         }
         for (const p of reparto.registrados) {
           const m = metodos.find((x) => x.codigo === p.metodo)!;
-          await tx.comprobante_pago.create({ data: { comprobante_id: comprobante.id, metodo_pago_id: m.id, monto: new Prisma.Decimal(p.monto.toFixed(2)), referencia: p.referencia ?? null } });
+          // El movimiento de caja apunta al pago del comprobante (fk_cm_cpago), no al comprobante
+          const pago = await tx.comprobante_pago.create({ data: { comprobante_id: comprobante.id, metodo_pago_id: m.id, monto: new Prisma.Decimal(p.monto.toFixed(2)), referencia: p.referencia ?? null } });
           await this.caja.registrar(tx, {
             sesionId: sesion!.id, concepto: 'VENTA', metodoPagoId: m.id, monto: p.monto.toFixed(2), usuarioId: actor.sub,
-            reservaId: cuenta.reserva ? BigInt(cuenta.reserva.id) : null, comprobanteId: comprobante.id, descripcion: `${comprobante.serie}-${String(comprobante.numero).padStart(8, '0')} · Hab. ${grupo.map((g) => g.habitacion.numero).join(', ')}`,
+            reservaId: cuenta.reserva ? BigInt(cuenta.reserva.id) : null, comprobantePagoId: pago.id, descripcion: `${comprobante.serie}-${String(comprobante.numero).padStart(8, '0')} · Hab. ${grupo.map((g) => g.habitacion.numero).join(', ')}`,
           });
         }
         if (cerrar) await this.finalizar(tx, actor, grupo, cuenta, ahora, `Check-out ${comprobante.serie}-${String(comprobante.numero).padStart(8, '0')}`);

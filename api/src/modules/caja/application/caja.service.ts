@@ -34,13 +34,13 @@ export class CajaService {
 
   async registrar(
     tx: Tx,
-    d: { sesionId: bigint; concepto: ConceptoCaja; metodoPagoId: number; monto: Prisma.Decimal | string | number; usuarioId: number; reservaId?: bigint | null; comprobanteId?: bigint | null; descripcion?: string | null },
+    d: { sesionId: bigint; concepto: ConceptoCaja; metodoPagoId: number; monto: Prisma.Decimal | string | number; usuarioId: number; reservaId?: bigint | null; comprobantePagoId?: bigint | null; descripcion?: string | null },
   ) {
     const concepto = await tx.concepto_movimiento.findUniqueOrThrow({ where: { ambito_codigo: { ambito: 'CAJA', codigo: d.concepto } } });
     return tx.caja_movimiento.create({
       data: {
         caja_sesion_id: d.sesionId, concepto_movimiento_id: concepto.id, metodo_pago_id: d.metodoPagoId, monto: new Prisma.Decimal(d.monto),
-        usuario_id: d.usuarioId, reserva_id: d.reservaId ?? null, comprobante_pago_id: d.comprobanteId ?? null, descripcion: d.descripcion ?? null,
+        usuario_id: d.usuarioId, reserva_id: d.reservaId ?? null, comprobante_pago_id: d.comprobantePagoId ?? null, descripcion: d.descripcion ?? null,
       },
     });
   }
