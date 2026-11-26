@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import { RequierePermiso } from '../auth/permisos.decorator';
@@ -6,6 +6,7 @@ import { Auditar } from '../auditoria/auditar.decorator';
 import { UsuarioActual, UsuarioSesion } from '../../common/usuario-actual.decorator';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { ConfiguracionService, ContextoSucursal } from './application/configuracion.service';
+import { OperacionService } from './application/operacion.service';
 
 const Id = z.coerce.number().int().positive();
 const Fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Usa AAAA-MM-DD');
@@ -43,6 +44,16 @@ const NuevaTarifaSchema = z.object({
   precio: z.number(),
   desde: Fecha.optional(),
 });
+const Hora = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Usa HH:MM');
+// Las reglas (cruces, topes) las valida el dominio (operacion.ts); aquí solo la forma.
+const OperacionSchema = z.object({
+  cobroAlIngreso: z.boolean(),
+  vendeConsumos: z.boolean(),
+  minutosLimpieza: z.number().int(),
+  horaSalidaNoche: Hora,
+  turnoSugeridoId: z.number().int().positive().nullable(),
+  franjas: z.array(z.object({ nombre: z.string().max(60), desde: Hora, hasta: Hora, salidaMaxima: Hora, diasDespues: z.number().int() })).max(8),
+});
 const FechaQuery = z.object({ fecha: Fecha.optional() });
 
 const ctx = (u: UsuarioSesion): ContextoSucursal => ({ empresaId: u.empresaId, sucursalId: u.sucursalId });
@@ -51,7 +62,23 @@ const ctx = (u: UsuarioSesion): ContextoSucursal => ({ empresaId: u.empresaId, s
 @ApiTags('hospedaje · configuración')
 @Controller('hospedaje')
 export class ConfiguracionController {
-  constructor(private readonly svc: ConfiguracionService) {}
+  constructor(
+    private readonly svc: ConfiguracionService,
+    private readonly operacion: OperacionService,
+  ) {}
+
+  /** Lo lee cualquier usuario de la sucursal: recepción necesita saber si cobra al ingreso y las horas de salida. */
+  @Get('operacion')
+  verOperacion(@UsuarioActual() u: UsuarioSesion) {
+    return this.operacion.obtener(u.sucursalId);
+  }
+
+  @RequierePermiso('operacion.configurar')
+  @Auditar('operacion.configurar')
+  @Put('operacion')
+  guardarOperacion(@UsuarioActual() u: UsuarioSesion, @Body(new ZodValidationPipe(OperacionSchema)) body: z.infer<typeof OperacionSchema>) {
+    return this.operacion.guardar(u.sucursalId, body);
+  }
 
   @RequierePermiso('habitacion.gestionar')
   @Get('config/habitaciones')

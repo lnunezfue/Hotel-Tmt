@@ -38,6 +38,7 @@ export const ACCIONES_AUDITORIA = [
   'estancia.huesped',
   'estancia.cargo',
   'estancia.cargo_anulado',
+  'estancia.cobro',
   'comprobante.emitir',
   'serie.crear',
   'serie.editar',
@@ -49,5 +50,6 @@ export const ACCIONES_AUDITORIA = [
   'canal_venta.editar',
   'turno.crear',
   'turno.editar',
+  'operacion.configurar',
 ] as const;
 export type AccionAuditoria = (typeof ACCIONES_AUDITORIA)[number];
