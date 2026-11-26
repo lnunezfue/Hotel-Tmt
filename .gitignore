@@ -7,3 +7,6 @@ coverage/
 .DS_Store
 storage/
 .demo-lista
+
+# Caché de compilación de TypeScript (tsc -b en build:demo)
+*.tsbuildinfo
