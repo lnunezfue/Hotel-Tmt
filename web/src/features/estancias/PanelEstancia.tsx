@@ -5,6 +5,7 @@ import { api, type Cliente, type Estancia, type MetodoPago, type Producto, type 
 import { puede, useSesion } from '../auth/sesion';
 import { soles } from '../hospedaje/formato';
 import { horaLima } from '../reservas/fechas';
+import { useOperacion } from '../hospedaje/operacion';
 import { ElegirHuesped } from '../reservas/PanelNuevaReserva';
 import { Button } from '../../components/ui/Button';
 import { Aviso, Entrada, Selector } from '../../components/ui/form';
@@ -33,6 +34,12 @@ export function TablaCuenta({ e }: { e: Estancia }) {
         </div>
       ))}
       <div className="mt-1 flex justify-between border-t border-borde pt-1 font-semibold"><span>Total</span><span className="tabular-nums">{soles(c.total)}</span></div>
+      {cent(c.cobrado) > 0 && (
+        <div className="flex justify-between text-tinta-suave">
+          <span>Pagado ({c.comprobantes.map((x) => x.numero).join(', ')})</span>
+          <span className="tabular-nums">− {soles(c.cobrado)}</span>
+        </div>
+      )}
       {cent(c.adelanto) > 0 && <div className="flex justify-between text-tinta-suave"><span>Adelanto ({c.reserva?.codigo})</span><span className="tabular-nums">− {soles(c.adelanto)}</span></div>}
       <div className="flex justify-between text-base font-bold text-acento"><span>Saldo por cobrar</span><span className="tabular-nums">{soles(c.saldo)}</span></div>
       {cent(c.comision.monto) > 0 && <div className="text-xs text-tinta-suave">Comisión del canal {Number(c.comision.porcentaje)} %: {soles(c.comision.monto)} (no se cobra al huésped; queda para el reporte de ventas)</div>}
@@ -44,7 +51,33 @@ export function TablaCuenta({ e }: { e: Estancia }) {
 
 interface FilaPago { metodoPagoId: number; monto: string; referencia: string }
 
-export function PanelCheckout({ e, onListo, onVolver }: { e: Estancia; onListo: (r: ResultadoCheckout) => void; onVolver: () => void }) {
+/** Check-out de una cuenta ya pagada (pago adelantado): no se emite nada, la habitación pasa a limpieza. */
+function CheckoutPagado({ e, onListo, onVolver }: { e: Estancia; onListo: (r: ResultadoCheckout) => void; onVolver: () => void }) {
+  const refrescar = useRefrescarHotel();
+  const salir = useMutation({
+    mutationFn: () => api<ResultadoCheckout>(`/estancias/${e.id}/checkout`, json('POST', {})),
+    onSuccess: (r) => { refrescar(); onListo(r); },
+  });
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Check-out de la {e.habitacion.numero}</h3>
+        <button className="text-sm text-tinta-suave hover:text-tinta" onClick={onVolver}>Volver</button>
+      </div>
+      <TablaCuenta e={e} />
+      <Aviso tipo="ok">La cuenta está pagada{e.cuenta.comprobantes.length ? ` (${e.cuenta.comprobantes.map((c) => c.numero).join(', ')})` : ''}. No se emite otro comprobante.</Aviso>
+      {salir.error && <Aviso>{salir.error.message}</Aviso>}
+      <Button variante="primario" className="h-11" disabled={salir.isPending} onClick={() => salir.mutate()}>{salir.isPending ? 'Cerrando…' : 'Hacer check-out'}</Button>
+      <p className="text-xs text-tinta-suave">La habitación pasa a limpieza y el tablero empieza a contar el tiempo.</p>
+    </div>
+  );
+}
+
+/**
+ * Cobro de lo pendiente: con `cerrar` es el check-out con cobro (S-07); sin él, el pago adelantado o el de una
+ * extensión, y la estadía sigue en curso (operación real).
+ */
+export function PanelCheckout({ e, onListo, onVolver, cerrar = true }: { e: Estancia; onListo: (r: ResultadoCheckout) => void; onVolver: () => void; cerrar?: boolean }) {
   const refrescar = useRefrescarHotel();
   const { data: sesion } = useSesion();
   const metodos = useQuery({ queryKey: ['caja', 'metodos'], queryFn: () => api<MetodoPago[]>('/caja/metodos-pago') });
@@ -56,7 +89,7 @@ export function PanelCheckout({ e, onListo, onVolver }: { e: Estancia; onListo: 
   // Descuento global (RF-FAC-08): en soles o %, con motivo; lo valida la API
   const [conDescuento, setConDescuento] = useState(false);
   const [desc, setDesc] = useState<{ tipo: 'MONTO' | 'PORCENTAJE'; valor: string; motivo: string }>({ tipo: 'MONTO', valor: '', motivo: '' });
-  const total = cent(e.cuenta.total);
+  const total = cent(e.cuenta.porCobrar);
   const descCent = !conDescuento || !(Number(desc.valor) > 0) ? 0 : desc.tipo === 'MONTO' ? cent(desc.valor) : Math.round((total * Number(desc.valor)) / 100);
   const descError = !conDescuento ? null : !(Number(desc.valor) > 0) ? 'Indica el descuento' : descCent > total - cent(e.cuenta.adelanto) ? 'El descuento no puede bajar el total por debajo del adelanto' : desc.motivo.trim().length < 5 ? 'Escribe el motivo (5 caracteres o más)' : null;
   const serie = useQuery({ queryKey: ['serie-para-emitir', tipo], queryFn: () => api<SerieParaEmitir>(`/facturacion/series/para-emitir?tipo=${tipo}`), retry: false });
@@ -74,7 +107,7 @@ export function PanelCheckout({ e, onListo, onVolver }: { e: Estancia; onListo: 
 
   const cobrar = useMutation({
     mutationFn: () =>
-      api<ResultadoCheckout>(`/estancias/${e.id}/checkout`, json('POST', {
+      api<ResultadoCheckout>(`/estancias/${e.id}/${cerrar ? 'checkout' : 'cobro'}`, json('POST', {
         tipoComprobante: tipo,
         clienteId: tipo === 'FACTURA' ? empresa?.id : tipo === 'BOLETA' && aOtro ? otraPersona?.id : undefined,
         descuento: conDescuento ? { tipo: desc.tipo, valor: Number(desc.valor), motivo: desc.motivo } : undefined,
@@ -84,14 +117,21 @@ export function PanelCheckout({ e, onListo, onVolver }: { e: Estancia; onListo: 
   });
   const poner = (i: number, cambio: Partial<FilaPago>) => setPagos(filas.map((p, j) => (j === i ? { ...p, ...cambio } : p)));
   const habitaciones = e.grupo.map((g) => g.habitacion).join(' y ');
+  if (cerrar && e.cuenta.pendientes.length === 0) return <CheckoutPagado e={e} onListo={onListo} onVolver={onVolver} />;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold">Check-out {e.grupo.length > 1 ? `de las habitaciones ${habitaciones}` : `de la ${e.habitacion.numero}`}</h3>
+        <h3 className="font-semibold">{cerrar ? 'Check-out' : 'Cobrar'} {e.grupo.length > 1 ? `de las habitaciones ${habitaciones}` : `de la ${e.habitacion.numero}`}</h3>
         <button className="text-sm text-tinta-suave hover:text-tinta" onClick={onVolver}>Volver</button>
       </div>
       <TablaCuenta e={e} />
+      {e.cuenta.comprobantes.length > 0 && (
+        <div className="flex flex-col gap-1 rounded-lg bg-fondo p-2 text-xs">
+          <span className="font-medium">Este comprobante lleva solo lo pendiente:</span>
+          {e.cuenta.pendientes.map((l, i) => <span key={i} className="flex justify-between"><span>{l.descripcion}</span><span className="tabular-nums">{soles(l.total)}</span></span>)}
+        </div>
+      )}
 
       <div className="flex flex-col gap-1 text-sm">
         <span className="font-medium">Comprobante</span>
@@ -180,9 +220,13 @@ export function PanelCheckout({ e, onListo, onVolver }: { e: Estancia; onListo: 
       {error && saldo > 0 && <Aviso>{error}</Aviso>}
       {cobrar.error && <Aviso>{cobrar.error.message}</Aviso>}
       <Button variante="primario" className="h-11" disabled={(saldo > 0 && !!error) || cobrar.isPending || !!descError || !serie.data || (tipo === 'FACTURA' && !empresa?.documento.startsWith('RUC')) || (tipo === 'BOLETA' && aOtro && !otraPersona)} onClick={() => cobrar.mutate()}>
-        {cobrar.isPending ? 'Cobrando…' : `Cobrar ${soles(saldoTexto)} y hacer check-out`}
+        {cobrar.isPending ? 'Cobrando…' : cerrar ? `Cobrar ${soles(saldoTexto)} y hacer check-out` : `Cobrar ${soles(saldoTexto)}`}
       </Button>
-      <p className="text-xs text-tinta-suave">Al confirmar se emite el comprobante, el pago entra a la caja y {e.grupo.length > 1 ? 'las habitaciones pasan' : 'la habitación pasa'} a limpieza.</p>
+      <p className="text-xs text-tinta-suave">
+        {cerrar
+          ? `Al confirmar se emite el comprobante, el pago entra a la caja y ${e.grupo.length > 1 ? 'las habitaciones pasan' : 'la habitación pasa'} a limpieza.`
+          : 'Al confirmar se emite el comprobante y el pago entra a la caja. La estadía sigue en curso: al salir, el check-out ya no cobra.'}
+      </p>
     </div>
   );
 }
@@ -267,7 +311,8 @@ export function PanelEstancia({ estanciaId, habitacionId, onComprobante }: { est
     if (q.data && !fija) setFija(q.data.id);
   }, [q.data, fija]);
   const productos = useQuery({ queryKey: ['productos'], queryFn: () => api<Producto[]>('/productos') });
-  const [modo, setModo] = useState<'ver' | 'checkout'>('ver');
+  const [modo, setModo] = useState<'ver' | 'checkout' | 'cobro'>('ver');
+  const op = useOperacion().data;
   const [agregando, setAgregando] = useState(false);
   const [acompanante, setAcompanante] = useState<Cliente | null>(null);
   const [cantidad, setCantidad] = useState(1);
@@ -282,7 +327,12 @@ export function PanelEstancia({ estanciaId, habitacionId, onComprobante }: { est
   if (q.isLoading) return <p className="text-sm text-tinta-suave">Cargando la estadía…</p>;
   if (q.error || !e) return <Aviso>{q.error?.message ?? 'Sin estadía'}</Aviso>;
   if (modo === 'checkout') return <PanelCheckout e={e} onVolver={() => setModo('ver')} onListo={onComprobante} />;
+  if (modo === 'cobro') return <PanelCheckout e={e} cerrar={false} onVolver={() => setModo('ver')} onListo={onComprobante} />;
   const puedeCobrar = puede(sesion, 'estancia.checkout');
+  const pendiente = e.cuenta.pendientes.length > 0;
+  // El hotel cobra por adelantado: si aún no pagó nada, recepción lo ve primero (operación real)
+  const sinPagoAdelantado = !!op?.cobroAlIngreso && pendiente && cent(e.cuenta.cobrado) === 0 && cent(e.cuenta.adelanto) === 0;
+  const muestraConsumos = op?.vendeConsumos !== false || e.cargos.length > 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -292,6 +342,7 @@ export function PanelEstancia({ estanciaId, habitacionId, onComprobante }: { est
         <div className="col-span-2 text-xs text-tinta-suave"><b className="text-tinta">Habitación {e.habitacion.numero}</b> · {e.cantidad} × {e.horasTurno === 24 ? 'noche' : `turno de ${e.horasTurno} h`} a {soles(e.precio)} · {e.canal}{e.reserva ? ` · reserva ${e.reserva}` : ' · sin reserva'}{e.procedencia ? ` · viene de ${e.procedencia}` : ''}{e.destino ? ` · sigue a ${e.destino}` : ''}{e.motivoViaje ? ` · ${e.motivoViaje.toLowerCase()}` : ''}</div>
       </div>
 
+      {sinPagoAdelantado && <Aviso>Falta el pago adelantado de esta estadía ({soles(e.cuenta.saldo)}).</Aviso>}
       {puede(sesion, 'estancia.checkin') && <ExtenderOTrasladar e={e} onCambio={refrescar} />}
 
       <div className="flex flex-col gap-2">
@@ -311,7 +362,7 @@ export function PanelEstancia({ estanciaId, habitacionId, onComprobante }: { est
         )}
       </div>
 
-      <div className="flex flex-col gap-2">
+      {muestraConsumos && <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <span className="text-xs tracking-widest text-tinta-suave uppercase">Consumos y cargos</span>
           {puedeCobrar && !agregando && <button className="text-sm font-medium text-acento hover:underline" onClick={() => setAgregando(true)}>+ Agregar</button>}
@@ -346,12 +397,19 @@ export function PanelEstancia({ estanciaId, habitacionId, onComprobante }: { est
             <button className="self-start text-xs text-tinta-suave" onClick={() => setAgregando(false)}>Listo</button>
           </div>
         )}
-      </div>
+      </div>}
       {cambio.error && <Aviso>{cambio.error.message}</Aviso>}
 
       <TablaCuenta e={e} />
       {e.grupo.length > 1 && <Aviso tipo="info">Esta reserva tiene {e.grupo.length} habitaciones ({e.grupo.map((g) => g.habitacion).join(', ')}): se cobran juntas en un solo comprobante.</Aviso>}
-      {puedeCobrar && <Button variante="primario" className="h-11" onClick={() => setModo('checkout')}>Check-out y cobrar {soles(e.cuenta.saldo)}</Button>}
+      {pendiente && op?.cobroAlIngreso && (puedeCobrar || puede(sesion, 'estancia.checkin')) && (
+        <Button variante="primario" className="h-11" onClick={() => setModo('cobro')}>Cobrar {soles(e.cuenta.saldo)}{cent(e.cuenta.cobrado) === 0 ? ' (pago adelantado)' : ''}</Button>
+      )}
+      {puedeCobrar && (
+        <Button variante={pendiente && op?.cobroAlIngreso ? 'secundario' : 'primario'} className="h-11" onClick={() => setModo('checkout')}>
+          {pendiente ? `Check-out y cobrar ${soles(e.cuenta.saldo)}` : 'Check-out · la cuenta está pagada'}
+        </Button>
+      )}
     </div>
   );
 }
