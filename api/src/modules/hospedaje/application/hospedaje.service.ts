@@ -4,6 +4,8 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { AuditoriaService } from '../../auditoria/application/auditoria.service';
 import { HabitacionRepository } from '../infrastructure/habitacion.repository';
 import { AvisosTablero } from './avisos-tablero.service';
+import { OperacionService } from './operacion.service';
+import { estadoLimpieza } from '../domain/operacion';
 import { alertaSalida, esEstado, EstadoHabitacion, TransicionInvalidaError, transicionesPermitidas, validarTransicion } from '../domain/estado-habitacion';
 
 @Injectable()
@@ -13,10 +15,11 @@ export class HospedajeService {
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
     private readonly avisos: AvisosTablero,
+    private readonly operacion: OperacionService,
   ) {}
 
   async tablero(sucursalId: number) {
-    const pisos = await this.repo.tablero(sucursalId);
+    const [pisos, op] = await Promise.all([this.repo.tablero(sucursalId), this.operacion.obtener(sucursalId)]);
     const ahora = new Date();
     const resumen: Record<string, number> = {};
     const data = pisos.map((p) => ({
@@ -27,6 +30,7 @@ export class HospedajeService {
         const est = h.estancia[0];
         const codigo = h.estado_habitacion.codigo as EstadoHabitacion;
         resumen[codigo] = (resumen[codigo] ?? 0) + 1;
+        const desde = h.habitacion_estado_historial[0]?.fecha_hora ?? null;
         return {
           id: h.id,
           numero: h.numero,
@@ -36,6 +40,8 @@ export class HospedajeService {
           estado: codigo,
           estadoDescripcion: h.estado_habitacion.descripcion,
           color: h.estado_habitacion.color_hex,
+          estadoDesde: desde,
+          limpieza: codigo === 'LIMPIEZA' && desde ? { ...estadoLimpieza(desde, ahora, op.minutosLimpieza), esperados: op.minutosLimpieza } : null,
           // OCUPADA entra con el check-in y sale con el check-out o el traslado: no se ofrece a mano.
           siguientes: est ? [] : transicionesPermitidas(codigo).filter((x) => x !== 'OCUPADA'),
           estancia: est
