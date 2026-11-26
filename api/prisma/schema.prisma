@@ -508,7 +508,7 @@ model estancia_cargo {
   precio_unitario Decimal   @db.Decimal(14, 2)
   total           Decimal?  @db.Decimal(14, 2) /// columna generada por la BD (solo lectura)
   anulado         Boolean   @default(false) @db.TinyInt
-  /// Comprobante que cobró el cargo; NULL = pendiente (S-08, cobro en partes)
+  /// Comprobante que cobró el cargo; NULL = pendiente (operación real, cobro en partes)
   comprobante_id  BigInt?   @db.UnsignedBigInt
   usuario_id      Int       @db.UnsignedInt
   created_at      DateTime  @default(now()) @db.Timestamp(0)
@@ -1008,7 +1008,7 @@ model sunat_envio {
   @@index([lote_sunat_id], map: "ix_se_lote")
 }
 
-/// Operación de la sucursal (S-08). Sin fila, la sucursal sigue las reglas de siempre.
+/// Operación de la sucursal (operación real). Sin fila, la sucursal sigue las reglas de siempre.
 model sucursal_operacion {
   sucursal_id       Int      @id @db.UnsignedInt
   cobro_al_ingreso  Boolean  @default(true) @db.TinyInt
@@ -1023,7 +1023,7 @@ model sucursal_operacion {
   @@index([turno_sugerido_id], map: "fk_sop_turno")
 }
 
-/// Hora máxima de salida según la hora del check-in (S-08)
+/// Hora máxima de salida según la hora del check-in (operación real)
 model sucursal_franja_salida {
   id            Int      @id @default(autoincrement()) @db.UnsignedInt
   sucursal_id   Int      @db.UnsignedInt

@@ -7,7 +7,7 @@ import { Franja, minutosDe, Operacion, OPERACION_POR_DEFECTO, ReglaOperacionErro
 const aHora = (t: Date) => t.toISOString().slice(11, 16);
 const aTime = (h: string) => new Date(`1970-01-01T${h}:00Z`);
 
-/** Cómo trabaja la sucursal (spec S-08): cobro al ingreso, consumos, limpieza, salida de la noche y franjas. */
+/** Cómo trabaja la sucursal (spec 2026-11-26 operación real): cobro al ingreso, consumos, limpieza, salida de la noche y franjas. */
 @Injectable()
 export class OperacionService {
   constructor(

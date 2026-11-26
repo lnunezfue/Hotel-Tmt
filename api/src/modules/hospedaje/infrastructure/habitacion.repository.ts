@@ -21,7 +21,7 @@ export class HabitacionRepository {
             id: true, numero: true, descripcion: true,
             tipo_habitacion: { select: { id: true, nombre: true, capacidad_adultos: true } },
             estado_habitacion: { select: { codigo: true, descripcion: true, color_hex: true } },
-            // Desde cuándo está en su estado: el tablero cuenta el tiempo de limpieza (S-08)
+            // Desde cuándo está en su estado: el tablero cuenta el tiempo de limpieza (operación real)
             habitacion_estado_historial: { orderBy: { id: 'desc' }, take: 1, select: { fecha_hora: true } },
             estancia: {
               where: { estado: 'ACTIVA' },

@@ -1,5 +1,5 @@
 /**
- * Operación de la sucursal (spec S-08): hora máxima de salida según la hora del check-in, salida de la noche,
+ * Operación de la sucursal (spec 2026-11-26 operación real): hora máxima de salida según la hora del check-in, salida de la noche,
  * cobro al ingreso y tiempo de limpieza. Lógica pura; las horas son de Lima (UTC−5 todo el año).
  */
 export class ReglaOperacionError extends Error {}

@@ -13,7 +13,7 @@ import {
 /** Instante de Lima (UTC−5) como Date. */
 const lima = (fechaHora: string) => new Date(`${fechaHora}:00-05:00`);
 
-describe('franjas de salida (S-08)', () => {
+describe('franjas de salida', () => {
   it.each([
     ['2026-11-26T02:30', 'Madrugada', '2026-11-26T12:00'],
     ['2026-11-26T05:59', 'Madrugada', '2026-11-26T12:00'],
@@ -55,7 +55,7 @@ describe('franjas de salida (S-08)', () => {
   });
 });
 
-describe('salida de la noche (S-08)', () => {
+describe('salida de la noche', () => {
   it('quien entra en la tarde o la noche sale a las 9:00 del día siguiente', () => {
     expect(salidaNoche(lima('2026-11-26T20:30'), '09:00', 1)).toEqual(lima('2026-11-27T09:00'));
     expect(salidaNoche(lima('2026-11-26T10:00'), '09:00', 1)).toEqual(lima('2026-11-27T09:00'));
@@ -73,7 +73,7 @@ describe('salida de la noche (S-08)', () => {
   });
 });
 
-describe('limpieza (S-08)', () => {
+describe('limpieza', () => {
   it('avisa cuando pasa el tiempo esperado', () => {
     expect(estadoLimpieza(lima('2026-11-26T10:00'), lima('2026-11-26T10:25'), 30)).toEqual({ minutos: 25, demorada: false });
     expect(estadoLimpieza(lima('2026-11-26T10:00'), lima('2026-11-26T10:31'), 30)).toEqual({ minutos: 31, demorada: true });

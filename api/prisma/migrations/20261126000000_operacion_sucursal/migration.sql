@@ -1,5 +1,5 @@
--- S-08: operación real de la sucursal (hotel de parejas, estadías cortas con pago adelantado)
--- Spec: docs/superpowers/specs/2026-11-26-s08-operacion-real-design.md
+-- Operación real de la sucursal (hotel de parejas, estadías cortas con pago adelantado)
+-- Spec: docs/superpowers/specs/2026-11-26-operacion-real-design.md
 
 -- Cómo trabaja cada sucursal. Sin fila, la sucursal sigue las reglas de siempre (salida 12:00, sin topes, cobro al salir).
 CREATE TABLE sucursal_operacion (
