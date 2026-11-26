@@ -76,7 +76,7 @@ web/
   src/lib/api/        Cliente HTTP tipado y tipos compartidos
 ```
 
-## Avance (semana 4 · al 25 de noviembre)
+## Avance (semana 4 · al 26 de noviembre)
 
 | Sprint (DT-001) | Alcance | Estado |
 |---|---|---|
@@ -90,13 +90,24 @@ web/
 | S-07 Estadía, cobro y caja | Reservas de varias habitaciones con adelanto (entra a caja) y comisión del canal fijada al reservar; check-in con acompañantes por habitación; check-in directo sin reserva (por noche o por horas); consumos del frigobar y servicios; check-out con cuenta (hospedaje + consumos − adelanto), pago dividido con vuelto en efectivo, boleta, factura o nota interna con IGV y ticket imprimible, habitaciones a limpieza. Caja: apertura, gastos y retiros, cierre con arqueo (faltante o sobrante) | **Completo** (el envío a SUNAT es F3) |
 | S-06/S-07 Complementos de la estadía | Extensión por turnos al precio pactado y traslado a otra habitación con motivo (la que se deja pasa a limpieza). La cuenta cobra los turnos consumidos si se sale pasados 30 min de la salida prevista. Destino y motivo del viaje en el check-in y pantalla *Libro de huéspedes*. Cancelar y «no se presentó» guardan motivo y responsable. Pantalla *Clientes* con ficha editable (el documento no cambia si ya tiene historia) y permiso `cliente.gestionar` para caja. Reservas y walk-in se cruzan contra estadías y reservas con la habitación bloqueada; un huésped no se aloja dos veces y una empresa no se aloja. Turnos de cualquier duración | **Completo** (spec `2026-11-25-estadia-complementos-design.md`) |
 | S-07 Series, totales y descuento global | Pantalla *Series de comprobantes*: series por sucursal con el prefijo de SUNAT (F, B, I; F/B en notas), número inicial para continuar otro sistema, activar o desactivar sin dejar un tipo de venta sin serie. Series asignadas a usuarios: cada caja numera con la suya; quien no tiene una usa una compartida. Check-out con descuento global en soles o % (motivo y permiso `descuento.aplicar`), restado de la base y del IGV sin tocar las líneas; boleta a nombre de otra persona y boleta de más de S/ 700 solo con comprador identificado. Estructura del comprobante para el proveedor (`GET /comprobantes/:id/estructura`) verificada. Correlativo probado con 20 emisiones simultáneas sin saltos | **Completo** (spec `2026-11-25-s07-comprobantes-design.md`) |
+| Operación real del hotel | Con el plano y la información del cuartelero: *Hotel Centro* del seed es el local real de 2 niveles (13 matrimoniales y 1 doble). Pestaña *Operación* por sucursal: cobro al ingreso, venta de consumos, minutos de limpieza, salida de la noche (9:00), turno sugerido (4 h) y hora máxima de salida según la hora del check-in (madrugada → 12:00, mañana → 18:00, tarde y noche → 6:00 del día siguiente). El check-in cobra por adelantado (efectivo, Culqi u otros) y muestra a qué hora sale; no vende horas que pasen la hora máxima; la extensión cobra la diferencia; el check-out de una cuenta pagada solo cierra. El tablero cuenta el tiempo de limpieza y avisa las demoradas. Reservas sin adelanto: el tiempo corre desde que llegan | **Completo** (spec `2026-11-26-operacion-real-design.md`; reglas a confirmar con el hotel) |
 | F3 Facturación (S-08 en adelante) | Puerto del proveedor y adaptador simulado; envío a SUNAT, notas de crédito y débito, resumen diario y baja | **Pendiente** |
 
 Requerimientos cubiertos o iniciados: RF-SEG-01 a 05; RF-RES-01 a 18; RNF-12, 13, 14, 15, 16, 19 (bloqueo de serie ya en BD), 27, 30, 32, 34.
 
-Pruebas: 207 unitarias de API, 114 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 60 del cliente.
+Pruebas: 222 unitarias de API, 121 de integración contra MySQL y Redis reales (`pnpm --filter api test:e2e`, con `pnpm infra:up` antes) y 64 del cliente.
 
-**Demostración web** (sin instalar nada, publicada en https://lnunezfue.github.io/Hotel-Tmt/ desde la rama `gh-pages`): `pnpm --filter web build:demo` genera en `web/dist-demo` el cliente con una API simulada en el navegador, cargada con una foto del seed. Entra con `admin` o `recepcion1` (`Hotel2026!`); los cambios quedan solo en ese navegador y *Reiniciar demo* vuelve al inicio. El build normal no la incluye. Trae un **recorrido guiado** de 7 pasos con el día completo del hotel: abrir caja → reservar para una familia → check-in → consumo → check-out con cobro → limpieza → cierre de caja.
+**Demostración web** (sin instalar nada, publicada en https://lnunezfue.github.io/Hotel-Tmt/ desde la rama `gh-pages`): `pnpm --filter web build:demo` genera en `web/dist-demo` el cliente con una API simulada en el navegador, cargada con una foto del seed. Entra con `admin` o `recepcion1` (`Hotel2026!`); los cambios quedan solo en ese navegador y *Reiniciar demo* vuelve al inicio. El build normal no la incluye. Trae un **recorrido guiado** de 7 pasos con el día de recepción del hotel real: abrir caja → check-in por horas con pago adelantado (efectivo o Culqi) → extender y cobrar la diferencia → check-out sin cobro → limpieza de 30 min → reserva que no llegó → cierre de caja. La foto se vuelve a tomar con `node web/scripts/capturar-demo.mjs` (API en marcha y base recién sembrada).
+
+### Qué mostrar de la operación real
+
+1. **Plano del hotel**: los 2 niveles del local (garaje, recepción, sala-comedor, patio, SS.HH. y las 14 habitaciones).
+2. Clic en una libre → **Check-in directo**: propone 4 horas, dice a qué hora sale y la hora máxima de su franja; cobra por adelantado (efectivo con vuelto o Culqi con n.º de operación) y emite la boleta.
+3. Elegir 2 turnos de 12 h: el sistema avisa que pasa la hora máxima y cuántos turnos caben.
+4. **Tablero** → la habitación → *Ver estadía* → *Extender estadía* → *Cobrar* la diferencia. Luego *Check-out · la cuenta está pagada*: no emite otro comprobante.
+5. El tablero muestra «Limpiando hace N min»; la 103 ya pasó los 30 y sale *Limpieza demorada*.
+6. **Reservas** → la 202 de hoy no llegó → *No se presentó*.
+7. **Hotel y tarifas → Operación**: cambiar las horas o el tiempo de limpieza sin tocar código.
 
 ### Qué mostrar de la semana 4
 
@@ -139,6 +150,7 @@ Pruebas: 207 unitarias de API, 114 de integración contra MySQL y Redis reales (
 
 ## Próximos pasos
 
+1. Confirmar con el hotel la salida de la noche (9:00) frente a la hora máxima de 6:00 para quien entra en la tarde o noche, y los precios reales por turno (spec de la operación real, §7).
 1. Revisar con recepción la regla D10 del S-06: una reserva hecha antes para hoy no pinta la habitación de reservada hasta que alguien la toque.
 2. `build:demo` usa `VITE_DEMO=1 …`, que no funciona en la consola de Windows; en Windows se corre desde Git Bash.
 3. S-08: adaptador del proveedor, cola y trabajador, envío al ambiente beta y CDR, usando `GET /comprobantes/:id/estructura` como entrada.
