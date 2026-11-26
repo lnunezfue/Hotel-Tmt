@@ -6,13 +6,13 @@ import { useSesion } from '../features/auth/sesion';
 
 /** El proceso de un día en el hotel, en el orden en que ocurre. */
 const PASOS: Array<{ id: PasoRecorrido; titulo: string; como: string; ir: string; boton: string }> = [
-  { id: 'caja', titulo: 'Abrir la caja', como: 'Al empezar el turno: «Abrir caja» con el sencillo del cajón.', ir: '/caja', boton: 'Ir a Caja' },
-  { id: 'reserva', titulo: 'Reservar para una familia', como: '«+ Nueva reserva» → llegada hoy → dos habitaciones con «+ Agregar otra habitación» → adelanto con Yape.', ir: '/reservas', boton: 'Ir a Reservas' },
-  { id: 'checkin', titulo: 'Recibir a los huéspedes', como: 'En «Llegan hoy» abre la reserva, agrega acompañantes y pulsa «Hacer check-in».', ir: '/reservas', boton: 'Ir a Reservas' },
-  { id: 'consumo', titulo: 'Anotar un consumo', como: 'En el tablero o el plano, abre una habitación ocupada → «Ver cuenta» → «+ Agregar» (agua, desayuno…).', ir: '/', boton: 'Ir al Tablero' },
-  { id: 'checkout', titulo: 'Check-out y cobro', como: '«Check-out y cobrar»: elige boleta, paga en efectivo (calcula el vuelto) o divide con Yape. Sale el comprobante.', ir: '/', boton: 'Ir al Tablero' },
-  { id: 'limpieza', titulo: 'Terminar la limpieza', como: 'La habitación quedó «En limpieza». En el tablero, ábrela y pulsa «Marcar disponible».', ir: '/', boton: 'Ir al Tablero' },
-  { id: 'cierre', titulo: 'Cerrar la caja', como: 'Al final del turno: cuenta el efectivo, escríbelo y el sistema dice si cuadra, falta o sobra.', ir: '/caja', boton: 'Ir a Caja' },
+  { id: 'caja', titulo: 'Abrir la caja', como: 'Al empezar el turno: «Abrir caja» con el sencillo del cajón. Sin caja abierta no se cobra.', ir: '/caja', boton: 'Ir a Caja' },
+  { id: 'checkin', titulo: 'Recibir a una pareja y cobrar', como: 'En el plano o el tablero, abre una habitación libre → «Check-in directo». Propone 4 horas y muestra a qué hora sale; cobra por adelantado en efectivo (calcula el vuelto) o con Culqi.', ir: '/plano', boton: 'Ir al Plano' },
+  { id: 'extension', titulo: 'Se quedan más tiempo', como: 'Abre una habitación ocupada → «Extender estadía» y luego «Cobrar» la diferencia. No deja pasar la hora máxima de su franja (p. ej. 6:00 si entraron de noche).', ir: '/', boton: 'Ir al Tablero' },
+  { id: 'checkout', titulo: 'Salida sin cobrar', como: 'Como ya pagaron, «Check-out · la cuenta está pagada» solo libera la habitación: no emite otro comprobante.', ir: '/', boton: 'Ir al Tablero' },
+  { id: 'limpieza', titulo: 'Limpieza de 30 minutos', como: 'La habitación queda «En limpieza» y el tablero cuenta los minutos (la 103 ya pasó los 30). Al terminar: «Marcar disponible».', ir: '/', boton: 'Ir al Tablero' },
+  { id: 'reserva', titulo: 'Reserva que no llegó', como: 'Las reservas no piden adelanto y no todas se usan. En «Reservas», abre la de hoy de la 202 y márcala «No se presentó»: la habitación vuelve a venderse.', ir: '/reservas', boton: 'Ir a Reservas' },
+  { id: 'cierre', titulo: 'Cerrar la caja', como: 'Al final del turno: cuenta el efectivo; el sistema separa lo cobrado con Culqi y dice si el efectivo cuadra.', ir: '/caja', boton: 'Ir a Caja' },
 ];
 
 /** Recorrido guiado de la demostración web: muestra el proceso completo y marca cada paso cuando se hace. */

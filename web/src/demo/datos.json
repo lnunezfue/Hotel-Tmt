@@ -1,1 +1,3193 @@
-{"capturado":"2026-11-24T15:18:59.701Z","hoy":"2026-11-24","me":{"admin":{"sub":1,"username":"admin","nombre":"Ana Pérez Mamani","empresaId":1,"rol":"ADMINISTRADOR","permisos":["reserva.crear","reserva.cancelar","estancia.checkin","estancia.checkout","tarifa.editar","comprobante.emitir","comprobante.anular","descuento.aplicar","compra.registrar","caja.abrir","caja.cerrar","reporte.ver","config.empresa","usuario.ver","usuario.gestionar","habitacion.cambiar_estado","habitacion.gestionar","reserva.ver"],"sucursales":[1,2],"sucursalId":1,"inactividadMin":30,"debeCambiarClave":false,"sid":"3","iat":1795533539,"exp":1795534439},"recepcion1":{"sub":2,"username":"recepcion1","nombre":"Luis Quispe Flores","empresaId":1,"rol":"RECEPCIONISTA","permisos":["reserva.crear","reserva.cancelar","estancia.checkin","estancia.checkout","comprobante.emitir","descuento.aplicar","caja.abrir","caja.cerrar","habitacion.cambiar_estado","reserva.ver"],"sucursales":[1],"sucursalId":1,"inactividadMin":30,"debeCambiarClave":false,"sid":"4","iat":1795533539,"exp":1795534439}},"rutas":{"/organizacion/empresa":{"id":1,"ruc":"20123456789","razon_social":"HOTEL DEMO S.A.C.","nombre_comercial":"Hotel Demo","direccion_fiscal":"Av. Bolognesi 123, Tacna","ubigeo_codigo":"230101","sunat_entorno":"BETA"},"/organizacion/sucursales":[{"id":1,"nombre":"Hotel Centro","tipo":"HOTEL","codigo_establecimiento":"0000","direccion":"Av. Bolognesi 123"},{"id":2,"nombre":"Hostal Alto Tacna","tipo":"HOSTAL","codigo_establecimiento":"0001","direccion":"Calle Alto Lima 456"}],"/organizacion/sucursales/todas":[{"id":1,"nombre":"Hotel Centro","tipo":"HOTEL","codigo_establecimiento":"0000"},{"id":2,"nombre":"Hostal Alto Tacna","tipo":"HOSTAL","codigo_establecimiento":"0001"}],"/organizacion/usuarios":[{"id":1,"username":"admin","nombres":"Ana","apellidos":"Pérez Mamani","nombre":"Ana Pérez Mamani","email":"admin@hoteldemo.pe","rolId":1,"rol":"ADMINISTRADOR","estado":"ACTIVO","debeCambiarClave":false,"ultimoAcceso":"2026-11-24T15:18:59.000Z","sucursales":[{"id":1,"nombre":"Hotel Centro","principal":true},{"id":2,"nombre":"Hostal Alto Tacna","principal":false}],"sesionesActivas":2},{"id":2,"username":"recepcion1","nombres":"Luis","apellidos":"Quispe Flores","nombre":"Luis Quispe Flores","email":"recepcion1@hoteldemo.pe","rolId":2,"rol":"RECEPCIONISTA","estado":"ACTIVO","debeCambiarClave":false,"ultimoAcceso":"2026-11-24T15:19:00.000Z","sucursales":[{"id":1,"nombre":"Hotel Centro","principal":true}],"sesionesActivas":2},{"id":3,"username":"recepcion2","nombres":"María","apellidos":"Condori Ticona","nombre":"María Condori Ticona","email":"recepcion2@hoteldemo.pe","rolId":2,"rol":"RECEPCIONISTA","estado":"ACTIVO","debeCambiarClave":false,"ultimoAcceso":null,"sucursales":[{"id":2,"nombre":"Hostal Alto Tacna","principal":true}],"sesionesActivas":0},{"id":4,"username":"caja1","nombres":"Jorge","apellidos":"Ramos Vargas","nombre":"Jorge Ramos Vargas","email":"caja1@hoteldemo.pe","rolId":3,"rol":"CAJERO","estado":"ACTIVO","debeCambiarClave":false,"ultimoAcceso":null,"sucursales":[{"id":1,"nombre":"Hotel Centro","principal":true},{"id":2,"nombre":"Hostal Alto Tacna","principal":false}],"sesionesActivas":0},{"id":5,"username":"limpieza1","nombres":"Rosa","apellidos":"Huanca Choque","nombre":"Rosa Huanca Choque","email":"limpieza1@hoteldemo.pe","rolId":6,"rol":"LIMPIEZA","estado":"ACTIVO","debeCambiarClave":false,"ultimoAcceso":null,"sucursales":[{"id":1,"nombre":"Hotel Centro","principal":true}],"sesionesActivas":0}],"/organizacion/roles":[{"id":1,"nombre":"ADMINISTRADOR","descripcion":"Acceso total","editable":false,"usuarios":1,"permisos":["caja.abrir","caja.cerrar","compra.registrar","comprobante.anular","comprobante.emitir","config.empresa","descuento.aplicar","estancia.checkin","estancia.checkout","habitacion.cambiar_estado","habitacion.gestionar","reporte.ver","reserva.cancelar","reserva.crear","reserva.ver","tarifa.editar","usuario.gestionar","usuario.ver"]},{"id":2,"nombre":"RECEPCIONISTA","descripcion":"Reservas, check-in/out, ventas, caja","editable":true,"usuarios":2,"permisos":["caja.abrir","caja.cerrar","comprobante.emitir","descuento.aplicar","estancia.checkin","estancia.checkout","habitacion.cambiar_estado","reserva.cancelar","reserva.crear","reserva.ver"]},{"id":3,"nombre":"CAJERO","descripcion":"Ventas y caja","editable":true,"usuarios":1,"permisos":["caja.abrir","caja.cerrar","comprobante.emitir"]},{"id":4,"nombre":"ALMACEN","descripcion":"Compras e inventario","editable":true,"usuarios":0,"permisos":["compra.registrar","reporte.ver"]},{"id":5,"nombre":"CONTADOR","descripcion":"Reportes y facturación","editable":true,"usuarios":0,"permisos":["comprobante.anular","reporte.ver"]},{"id":6,"nombre":"LIMPIEZA","descripcion":"Solo cambia el estado de habitaciones","editable":true,"usuarios":1,"permisos":["habitacion.cambiar_estado"]}],"/organizacion/permisos":[{"codigo":"caja.abrir","modulo":"CAJA","descripcion":"Abrir caja"},{"codigo":"caja.cerrar","modulo":"CAJA","descripcion":"Cerrar caja"},{"codigo":"compra.registrar","modulo":"COMPRAS","descripcion":"Registrar compras"},{"codigo":"config.empresa","modulo":"CONFIG","descripcion":"Configurar empresa, series y certificado"},{"codigo":"usuario.gestionar","modulo":"CONFIG","descripcion":"Crear y editar usuarios y roles, desbloquear, restablecer contraseñas y cerrar sesiones"},{"codigo":"usuario.ver","modulo":"CONFIG","descripcion":"Ver usuarios y roles"},{"codigo":"reporte.ver","modulo":"REPORTES","descripcion":"Ver reportes"},{"codigo":"estancia.checkin","modulo":"RESERVAS","descripcion":"Registrar check-in"},{"codigo":"estancia.checkout","modulo":"RESERVAS","descripcion":"Registrar check-out"},{"codigo":"habitacion.cambiar_estado","modulo":"RESERVAS","descripcion":"Cambiar el estado de una habitación"},{"codigo":"habitacion.gestionar","modulo":"RESERVAS","descripcion":"Crear y editar habitaciones, pisos y tipos"},{"codigo":"reserva.cancelar","modulo":"RESERVAS","descripcion":"Cancelar reservas"},{"codigo":"reserva.crear","modulo":"RESERVAS","descripcion":"Crear reservas"},{"codigo":"reserva.ver","modulo":"RESERVAS","descripcion":"Ver el calendario de reservas y la disponibilidad"},{"codigo":"tarifa.editar","modulo":"RESERVAS","descripcion":"Modificar precios"},{"codigo":"comprobante.anular","modulo":"VENTAS","descripcion":"Anular / emitir NC"},{"codigo":"comprobante.emitir","modulo":"VENTAS","descripcion":"Emitir comprobantes"},{"codigo":"descuento.aplicar","modulo":"VENTAS","descripcion":"Aplicar descuentos"}],"/hospedaje/tablero":{"generadoEn":"2026-11-24T15:18:59.771Z","resumen":{"OCUPADA":4,"LIMPIEZA":2,"DESOCUPADA":13,"MANTENIMIENTO":1,"RESERVADA":1,"CONFIRMADA":1},"pisos":[{"id":1,"numero":1,"nombre":"Piso 1","habitaciones":[{"id":1,"numero":"101","tipo":"Simple","tipoId":1,"capacidad":1,"estado":"OCUPADA","estadoDescripcion":"Ocupada","color":"#F44336","siguientes":["LIMPIEZA"],"estancia":{"id":1,"huesped":"Carlos Mendoza Ríos","checkin":"2026-11-23T19:18:51.000Z","salidaPrevista":"2026-11-25T19:18:51.000Z","alerta":null}},{"id":2,"numero":"102","tipo":"Doble","tipoId":4,"capacidad":2,"estado":"LIMPIEZA","estadoDescripcion":"Limpieza","color":"#FFC107","siguientes":["DESOCUPADA","MANTENIMIENTO"],"estancia":null},{"id":3,"numero":"103","tipo":"Matrimonial","tipoId":2,"capacidad":2,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null},{"id":4,"numero":"104","tipo":"Simple","tipoId":1,"capacidad":1,"estado":"OCUPADA","estadoDescripcion":"Ocupada","color":"#F44336","siguientes":["LIMPIEZA"],"estancia":{"id":2,"huesped":"Valentina Soto","checkin":"2026-11-24T09:18:51.000Z","salidaPrevista":"2026-11-25T09:18:51.000Z","alerta":null}},{"id":5,"numero":"105","tipo":"Doble","tipoId":4,"capacidad":2,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null},{"id":6,"numero":"106","tipo":"Matrimonial","tipoId":2,"capacidad":2,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null},{"id":7,"numero":"107","tipo":"Simple","tipoId":1,"capacidad":1,"estado":"MANTENIMIENTO","estadoDescripcion":"Mantenimiento","color":"#795548","siguientes":["DESOCUPADA"],"estancia":null},{"id":8,"numero":"108","tipo":"Doble","tipoId":4,"capacidad":2,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null}]},{"id":2,"numero":2,"nombre":"Piso 2","habitaciones":[{"id":9,"numero":"201","tipo":"Simple","tipoId":1,"capacidad":1,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null},{"id":10,"numero":"202","tipo":"Doble","tipoId":4,"capacidad":2,"estado":"OCUPADA","estadoDescripcion":"Ocupada","color":"#F44336","siguientes":["LIMPIEZA"],"estancia":{"id":3,"huesped":"Lucía Gutiérrez Paz","checkin":"2026-11-24T12:33:51.000Z","salidaPrevista":"2026-11-24T15:33:51.000Z","alerta":"POR_VENCER"}},{"id":11,"numero":"203","tipo":"Matrimonial","tipoId":2,"capacidad":2,"estado":"RESERVADA","estadoDescripcion":"Reservada","color":"#2196F3","siguientes":["CONFIRMADA","OCUPADA","DESOCUPADA"],"estancia":null},{"id":12,"numero":"204","tipo":"Simple","tipoId":1,"capacidad":1,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null},{"id":13,"numero":"205","tipo":"Doble","tipoId":4,"capacidad":2,"estado":"OCUPADA","estadoDescripcion":"Ocupada","color":"#F44336","siguientes":["LIMPIEZA"],"estancia":{"id":4,"huesped":"Diego Arce","checkin":"2026-11-24T08:18:51.000Z","salidaPrevista":"2026-11-24T14:18:51.000Z","alerta":"VENCIDA"}},{"id":14,"numero":"206","tipo":"Matrimonial","tipoId":2,"capacidad":2,"estado":"LIMPIEZA","estadoDescripcion":"Limpieza","color":"#FFC107","siguientes":["DESOCUPADA","MANTENIMIENTO"],"estancia":null},{"id":15,"numero":"207","tipo":"Simple","tipoId":1,"capacidad":1,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null},{"id":16,"numero":"208","tipo":"Doble","tipoId":4,"capacidad":2,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null}]},{"id":3,"numero":3,"nombre":"Piso 3","habitaciones":[{"id":17,"numero":"301","tipo":"Simple","tipoId":1,"capacidad":1,"estado":"CONFIRMADA","estadoDescripcion":"Confirmada","color":"#3F51B5","siguientes":["OCUPADA","DESOCUPADA"],"estancia":null},{"id":18,"numero":"302","tipo":"Doble","tipoId":4,"capacidad":2,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null},{"id":19,"numero":"303","tipo":"Matrimonial","tipoId":2,"capacidad":2,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null},{"id":20,"numero":"304","tipo":"Simple","tipoId":1,"capacidad":1,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null},{"id":21,"numero":"305","tipo":"Suite","tipoId":3,"capacidad":3,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null},{"id":22,"numero":"306","tipo":"Suite","tipoId":3,"capacidad":3,"estado":"DESOCUPADA","estadoDescripcion":"Desocupada","color":"#4CAF50","siguientes":["RESERVADA","OCUPADA","MANTENIMIENTO","LIMPIEZA"],"estancia":null}]}]},"/hospedaje/plano":[{"id":1,"numero":1,"nombre":"Piso 1","columnas":13,"filas":5,"elementos":[{"id":1,"tipo":"PASILLO","etiqueta":null,"x":1,"y":2,"ancho":12,"alto":1},{"id":2,"tipo":"RECEPCION","etiqueta":"Recepción","x":0,"y":2,"ancho":1,"alto":1}],"habitaciones":[{"id":1,"numero":"101","descripcion":null,"estado":"OCUPADA","tipo":{"id":1,"nombre":"Simple","adultos":1,"ninos":0},"amenidades":["WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO","BALCON","ACCESIBLE"],"x":1,"y":0,"ancho":3,"alto":2,"ubicada":true,"estancia":{"huesped":"Carlos Mendoza Ríos","salidaPrevista":"2026-11-25T19:18:51.000Z","alerta":null}},{"id":2,"numero":"102","descripcion":null,"estado":"LIMPIEZA","tipo":{"id":4,"nombre":"Doble","adultos":2,"ninos":1},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO"],"x":4,"y":0,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":3,"numero":"103","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":2,"nombre":"Matrimonial","adultos":2,"ninos":1},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO","FRIGOBAR"],"x":7,"y":0,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":4,"numero":"104","descripcion":null,"estado":"OCUPADA","tipo":{"id":1,"nombre":"Simple","adultos":1,"ninos":0},"amenidades":["WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO"],"x":10,"y":0,"ancho":3,"alto":2,"ubicada":true,"estancia":{"huesped":"Valentina Soto","salidaPrevista":"2026-11-25T09:18:51.000Z","alerta":null}},{"id":5,"numero":"105","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":4,"nombre":"Doble","adultos":2,"ninos":1},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO"],"x":1,"y":3,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":6,"numero":"106","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":2,"nombre":"Matrimonial","adultos":2,"ninos":1},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO","FRIGOBAR"],"x":4,"y":3,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":7,"numero":"107","descripcion":null,"estado":"MANTENIMIENTO","tipo":{"id":1,"nombre":"Simple","adultos":1,"ninos":0},"amenidades":["WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO"],"x":7,"y":3,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":8,"numero":"108","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":4,"nombre":"Doble","adultos":2,"ninos":1},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO"],"x":10,"y":3,"ancho":3,"alto":2,"ubicada":true,"estancia":null}]},{"id":2,"numero":2,"nombre":"Piso 2","columnas":13,"filas":5,"elementos":[{"id":3,"tipo":"PASILLO","etiqueta":null,"x":1,"y":2,"ancho":12,"alto":1},{"id":4,"tipo":"ESCALERA","etiqueta":null,"x":0,"y":2,"ancho":1,"alto":1}],"habitaciones":[{"id":9,"numero":"201","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":1,"nombre":"Simple","adultos":1,"ninos":0},"amenidades":["WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO","BALCON"],"x":1,"y":0,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":10,"numero":"202","descripcion":null,"estado":"OCUPADA","tipo":{"id":4,"nombre":"Doble","adultos":2,"ninos":1},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO"],"x":4,"y":0,"ancho":3,"alto":2,"ubicada":true,"estancia":{"huesped":"Lucía Gutiérrez Paz","salidaPrevista":"2026-11-24T15:33:51.000Z","alerta":"POR_VENCER"}},{"id":11,"numero":"203","descripcion":null,"estado":"RESERVADA","tipo":{"id":2,"nombre":"Matrimonial","adultos":2,"ninos":1},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO","FRIGOBAR"],"x":7,"y":0,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":12,"numero":"204","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":1,"nombre":"Simple","adultos":1,"ninos":0},"amenidades":["WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO"],"x":10,"y":0,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":13,"numero":"205","descripcion":null,"estado":"OCUPADA","tipo":{"id":4,"nombre":"Doble","adultos":2,"ninos":1},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO"],"x":1,"y":3,"ancho":3,"alto":2,"ubicada":true,"estancia":{"huesped":"Diego Arce","salidaPrevista":"2026-11-24T14:18:51.000Z","alerta":"VENCIDA"}},{"id":14,"numero":"206","descripcion":null,"estado":"LIMPIEZA","tipo":{"id":2,"nombre":"Matrimonial","adultos":2,"ninos":1},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO","FRIGOBAR"],"x":4,"y":3,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":15,"numero":"207","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":1,"nombre":"Simple","adultos":1,"ninos":0},"amenidades":["WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO"],"x":7,"y":3,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":16,"numero":"208","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":4,"nombre":"Doble","adultos":2,"ninos":1},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO"],"x":10,"y":3,"ancho":3,"alto":2,"ubicada":true,"estancia":null}]},{"id":3,"numero":3,"nombre":"Piso 3","columnas":13,"filas":5,"elementos":[{"id":5,"tipo":"PASILLO","etiqueta":null,"x":1,"y":2,"ancho":12,"alto":1},{"id":6,"tipo":"ESCALERA","etiqueta":null,"x":0,"y":2,"ancho":1,"alto":1}],"habitaciones":[{"id":17,"numero":"301","descripcion":null,"estado":"CONFIRMADA","tipo":{"id":1,"nombre":"Simple","adultos":1,"ninos":0},"amenidades":["WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO","BALCON"],"x":1,"y":0,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":18,"numero":"302","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":4,"nombre":"Doble","adultos":2,"ninos":1},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO"],"x":4,"y":0,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":19,"numero":"303","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":2,"nombre":"Matrimonial","adultos":2,"ninos":1},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO","FRIGOBAR"],"x":7,"y":0,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":20,"numero":"304","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":1,"nombre":"Simple","adultos":1,"ninos":0},"amenidades":["WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO"],"x":1,"y":3,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":21,"numero":"305","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":3,"nombre":"Suite","adultos":3,"ninos":2},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO","FRIGOBAR","CAJA_FUERTE","BALCON","JACUZZI","ESCRITORIO"],"x":4,"y":3,"ancho":3,"alto":2,"ubicada":true,"estancia":null},{"id":22,"numero":"306","descripcion":null,"estado":"DESOCUPADA","tipo":{"id":3,"nombre":"Suite","adultos":3,"ninos":2},"amenidades":["AIRE","WIFI","TV","AGUA_CALIENTE","BANO_PRIVADO","FRIGOBAR","CAJA_FUERTE","BALCON","JACUZZI","ESCRITORIO"],"x":7,"y":3,"ancho":3,"alto":2,"ubicada":true,"estancia":null}]}],"/hospedaje/amenidades":[{"id":1,"codigo":"AIRE","nombre":"Aire acondicionado","icono":"aire","activo":true,"habitaciones":14},{"id":2,"codigo":"WIFI","nombre":"Internet wifi","icono":"wifi","activo":true,"habitaciones":22},{"id":3,"codigo":"TV","nombre":"Televisor","icono":"tv","activo":true,"habitaciones":22},{"id":4,"codigo":"AGUA_CALIENTE","nombre":"Agua caliente","icono":"ducha","activo":true,"habitaciones":22},{"id":5,"codigo":"BANO_PRIVADO","nombre":"Baño privado","icono":"bano","activo":true,"habitaciones":22},{"id":6,"codigo":"FRIGOBAR","nombre":"Frigobar","icono":"frigobar","activo":true,"habitaciones":7},{"id":7,"codigo":"CAJA_FUERTE","nombre":"Caja fuerte","icono":"caja_fuerte","activo":true,"habitaciones":2},{"id":8,"codigo":"CALEFACCION","nombre":"Calefacción","icono":"calefaccion","activo":true,"habitaciones":0},{"id":9,"codigo":"BALCON","nombre":"Balcón","icono":"balcon","activo":true,"habitaciones":5},{"id":10,"codigo":"JACUZZI","nombre":"Jacuzzi","icono":"jacuzzi","activo":true,"habitaciones":2},{"id":11,"codigo":"ESCRITORIO","nombre":"Escritorio de trabajo","icono":"escritorio","activo":true,"habitaciones":2},{"id":12,"codigo":"ACCESIBLE","nombre":"Accesible (silla de ruedas)","icono":"accesible","activo":true,"habitaciones":1}],"/hospedaje/canales":[{"id":1,"nombre":"Booking","es_ota":true,"comision_porcentaje":"15"},{"id":2,"nombre":"Teléfono","es_ota":false,"comision_porcentaje":"0"},{"id":3,"nombre":"Recepción","es_ota":false,"comision_porcentaje":"0"}],"/hospedaje/config/canales":[{"id":1,"nombre":"Booking","comisionPorcentaje":"15.00","esOta":true,"activo":true,"tarifas":16},{"id":2,"nombre":"Teléfono","comisionPorcentaje":"0.00","esOta":false,"activo":true,"tarifas":16},{"id":3,"nombre":"Recepción","comisionPorcentaje":"0.00","esOta":false,"activo":true,"tarifas":16}],"/hospedaje/turnos":[{"id":1,"nombre":"Turno 24 horas","duracion_horas":24,"activo":true},{"id":2,"nombre":"Turno 12 horas","duracion_horas":12,"activo":true},{"id":3,"nombre":"Turno 6 horas","duracion_horas":6,"activo":true},{"id":4,"nombre":"Turno 3 horas","duracion_horas":3,"activo":true}],"/hospedaje/tarifas":{"fecha":"2026-11-24","hoy":"2026-11-24","celdas":[{"tipoId":4,"canalId":1,"turnoId":1,"vigente":{"id":14,"precio":"126.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":3,"canalId":1,"turnoId":2,"vigente":{"id":41,"precio":"177.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":3,"canalId":1,"turnoId":3,"vigente":{"id":44,"precio":"126.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":3,"canalId":1,"turnoId":4,"vigente":{"id":47,"precio":"89.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":3,"canalId":2,"turnoId":1,"vigente":{"id":39,"precio":"220.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":3,"canalId":2,"turnoId":2,"vigente":{"id":42,"precio":"154.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":3,"canalId":2,"turnoId":3,"vigente":{"id":45,"precio":"110.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":3,"canalId":2,"turnoId":4,"vigente":{"id":48,"precio":"77.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":3,"canalId":3,"turnoId":1,"vigente":{"id":37,"precio":"220.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":3,"canalId":3,"turnoId":2,"vigente":{"id":40,"precio":"154.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":3,"canalId":3,"turnoId":3,"vigente":{"id":43,"precio":"110.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":3,"canalId":3,"turnoId":4,"vigente":{"id":46,"precio":"77.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":3,"canalId":1,"turnoId":1,"vigente":{"id":38,"precio":"253.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":4,"canalId":1,"turnoId":2,"vigente":{"id":17,"precio":"89.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":4,"canalId":1,"turnoId":3,"vigente":{"id":20,"precio":"63.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":4,"canalId":1,"turnoId":4,"vigente":{"id":23,"precio":"44.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":4,"canalId":2,"turnoId":1,"vigente":{"id":15,"precio":"110.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":4,"canalId":2,"turnoId":2,"vigente":{"id":18,"precio":"77.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":4,"canalId":2,"turnoId":3,"vigente":{"id":21,"precio":"55.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":4,"canalId":2,"turnoId":4,"vigente":{"id":24,"precio":"39.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":4,"canalId":3,"turnoId":1,"vigente":{"id":13,"precio":"110.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":4,"canalId":3,"turnoId":2,"vigente":{"id":16,"precio":"77.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":4,"canalId":3,"turnoId":3,"vigente":{"id":19,"precio":"55.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":4,"canalId":3,"turnoId":4,"vigente":{"id":22,"precio":"39.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":2,"canalId":1,"turnoId":1,"vigente":{"id":26,"precio":"138.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":1,"canalId":1,"turnoId":2,"vigente":{"id":5,"precio":"56.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":1,"canalId":1,"turnoId":3,"vigente":{"id":8,"precio":"40.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":1,"canalId":1,"turnoId":4,"vigente":{"id":11,"precio":"28.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":1,"canalId":2,"turnoId":1,"vigente":{"id":3,"precio":"70.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":1,"canalId":2,"turnoId":2,"vigente":{"id":6,"precio":"49.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":1,"canalId":2,"turnoId":3,"vigente":{"id":9,"precio":"35.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":1,"canalId":2,"turnoId":4,"vigente":{"id":12,"precio":"25.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":1,"canalId":3,"turnoId":1,"vigente":{"id":1,"precio":"70.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":1,"canalId":3,"turnoId":2,"vigente":{"id":4,"precio":"49.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":1,"canalId":3,"turnoId":3,"vigente":{"id":7,"precio":"35.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":1,"canalId":3,"turnoId":4,"vigente":{"id":10,"precio":"25.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":1,"canalId":1,"turnoId":1,"vigente":{"id":2,"precio":"81.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":2,"canalId":1,"turnoId":2,"vigente":{"id":29,"precio":"97.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":2,"canalId":1,"turnoId":3,"vigente":{"id":32,"precio":"69.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":2,"canalId":1,"turnoId":4,"vigente":{"id":35,"precio":"48.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":2,"canalId":2,"turnoId":1,"vigente":{"id":27,"precio":"120.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":2,"canalId":2,"turnoId":2,"vigente":{"id":30,"precio":"84.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":2,"canalId":2,"turnoId":3,"vigente":{"id":33,"precio":"60.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":2,"canalId":2,"turnoId":4,"vigente":{"id":36,"precio":"42.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":2,"canalId":3,"turnoId":1,"vigente":{"id":25,"precio":"120.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":2,"canalId":3,"turnoId":2,"vigente":{"id":28,"precio":"84.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":2,"canalId":3,"turnoId":3,"vigente":{"id":31,"precio":"60.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null},{"tipoId":2,"canalId":3,"turnoId":4,"vigente":{"id":34,"precio":"42.00","moneda":"S/","desde":"2026-01-01","hasta":null},"programada":null}]},"/hospedaje/config/tipos-habitacion":[{"id":1,"nombre":"Simple","descripcion":null,"capacidadAdultos":1,"capacidadNinos":0,"activo":true,"habitaciones":8},{"id":2,"nombre":"Matrimonial","descripcion":null,"capacidadAdultos":2,"capacidadNinos":1,"activo":true,"habitaciones":5},{"id":3,"nombre":"Suite","descripcion":null,"capacidadAdultos":3,"capacidadNinos":2,"activo":true,"habitaciones":2},{"id":4,"nombre":"Doble","descripcion":null,"capacidadAdultos":2,"capacidadNinos":1,"activo":true,"habitaciones":7}],"/hospedaje/estados":[{"id":1,"codigo":"DESOCUPADA","descripcion":"Desocupada","color_hex":"#4CAF50","permite_venta":true,"orden":1},{"id":2,"codigo":"RESERVADA","descripcion":"Reservada","color_hex":"#2196F3","permite_venta":false,"orden":2},{"id":3,"codigo":"CONFIRMADA","descripcion":"Confirmada","color_hex":"#3F51B5","permite_venta":false,"orden":3},{"id":4,"codigo":"OCUPADA","descripcion":"Ocupada","color_hex":"#F44336","permite_venta":false,"orden":4},{"id":5,"codigo":"LIMPIEZA","descripcion":"Limpieza","color_hex":"#FFC107","permite_venta":false,"orden":5},{"id":6,"codigo":"MANTENIMIENTO","descripcion":"Mantenimiento","color_hex":"#795548","permite_venta":false,"orden":6}],"/clientes/tipos-documento":[{"id":2,"abreviatura":"DNI","descripcion":"Documento Nacional de Identidad"},{"id":3,"abreviatura":"CE","descripcion":"Carnet de extranjería"},{"id":4,"abreviatura":"RUC","descripcion":"Registro Único de Contribuyentes"},{"id":5,"abreviatura":"PAS","descripcion":"Pasaporte"},{"id":6,"abreviatura":"CDI","descripcion":"Cédula diplomática de identidad"}],"/productos":[{"id":1,"codigo":"AGUA625","nombre":"Agua mineral 625 ml","precio":"3.00","categoria":"Frigobar","tipo":"BIEN"},{"id":3,"codigo":"CERVEZA","nombre":"Cerveza 330 ml","precio":"8.00","categoria":"Frigobar","tipo":"BIEN"},{"id":2,"codigo":"GASEOSA500","nombre":"Gaseosa 500 ml","precio":"4.00","categoria":"Frigobar","tipo":"BIEN"},{"id":4,"codigo":"SNACK","nombre":"Snack (papas o galletas)","precio":"3.50","categoria":"Frigobar","tipo":"BIEN"},{"id":7,"codigo":"COCHERA","nombre":"Cochera (por noche)","precio":"10.00","categoria":"Servicios","tipo":"SERVICIO"},{"id":5,"codigo":"DESAYUNO","nombre":"Desayuno continental","precio":"15.00","categoria":"Servicios","tipo":"SERVICIO"},{"id":6,"codigo":"LAVANDERIA","nombre":"Lavandería (por prenda)","precio":"5.00","categoria":"Servicios","tipo":"SERVICIO"}],"/caja/metodos-pago":[{"id":1,"codigo":"EFECTIVO","descripcion":"Efectivo","es_efectivo":true},{"id":2,"codigo":"TARJETA","descripcion":"Tarjeta débito/crédito","es_efectivo":false},{"id":3,"codigo":"YAPE","descripcion":"Yape","es_efectivo":false},{"id":4,"codigo":"PLIN","descripcion":"Plin","es_efectivo":false},{"id":5,"codigo":"TRANSFERENCIA","descripcion":"Transferencia bancaria","es_efectivo":false},{"id":6,"codigo":"OTA","descripcion":"Cobrado por la OTA","es_efectivo":false}],"/caja":{"cajas":[{"id":1,"nombre":"Recepción 1"}],"sesion":null,"ultimoCierre":null},"/reservas":[{"id":1,"codigo":"R-000001","estado":"PENDIENTE","entrada":"2026-11-24T19:00:00.000Z","salida":"2026-11-26T17:00:00.000Z","adultos":1,"ninos":0,"total":"240.00","comision":{"porcentaje":"0.00","monto":"0.00"},"adelanto":"0.00","saldo":"240.00","observaciones":null,"codigoExterno":null,"motivoCancelacion":null,"creada":"2026-11-24T15:18:51.000Z","canal":{"id":3,"nombre":"Recepción","esOta":false},"cliente":{"id":5,"documento":"DNI 42315678","nombre":"Martín Quispe Rojas","telefono":null,"pais":"PE"},"habitaciones":[{"id":11,"numero":"203","tipo":"Matrimonial","turno":"Turno 24 horas","horasTurno":24,"cantidad":2,"precio":"120.00"}]},{"id":2,"codigo":"R-000002","estado":"CONFIRMADA","entrada":"2026-11-24T19:00:00.000Z","salida":"2026-11-27T17:00:00.000Z","adultos":1,"ninos":0,"total":"243.00","comision":{"porcentaje":"15.00","monto":"36.45"},"adelanto":"81.00","saldo":"162.00","observaciones":null,"codigoExterno":"BK-4410237","motivoCancelacion":null,"creada":"2026-11-24T15:18:51.000Z","canal":{"id":1,"nombre":"Booking","esOta":true},"cliente":{"id":6,"documento":"DNI 40998877","nombre":"Gabriela Torres Vela","telefono":null,"pais":"PE"},"habitaciones":[{"id":17,"numero":"301","tipo":"Simple","turno":"Turno 24 horas","horasTurno":24,"cantidad":3,"precio":"81.00"}]},{"id":3,"codigo":"R-000003","estado":"CONFIRMADA","entrada":"2026-11-25T19:00:00.000Z","salida":"2026-11-27T17:00:00.000Z","adultos":1,"ninos":0,"total":"240.00","comision":{"porcentaje":"0.00","monto":"0.00"},"adelanto":"120.00","saldo":"120.00","observaciones":null,"codigoExterno":null,"motivoCancelacion":null,"creada":"2026-11-24T15:18:51.000Z","canal":{"id":2,"nombre":"Teléfono","esOta":false},"cliente":{"id":7,"documento":"PAS AR3399120","nombre":"Julián Ferreyra","telefono":null,"pais":"AR"},"habitaciones":[{"id":3,"numero":"103","tipo":"Matrimonial","turno":"Turno 24 horas","horasTurno":24,"cantidad":2,"precio":"120.00"}]},{"id":4,"codigo":"R-000004","estado":"CONFIRMADA","entrada":"2026-11-26T19:00:00.000Z","salida":"2026-11-30T17:00:00.000Z","adultos":1,"ninos":0,"total":"324.00","comision":{"porcentaje":"15.00","monto":"48.60"},"adelanto":"81.00","saldo":"243.00","observaciones":null,"codigoExterno":"BK-4410311","motivoCancelacion":null,"creada":"2026-11-24T15:18:51.000Z","canal":{"id":1,"nombre":"Booking","esOta":true},"cliente":{"id":2,"documento":"PAS CL8834521","nombre":"Valentina Soto","telefono":null,"pais":"CL"},"habitaciones":[{"id":9,"numero":"201","tipo":"Simple","turno":"Turno 24 horas","horasTurno":24,"cantidad":4,"precio":"81.00"}]},{"id":5,"codigo":"R-000005","estado":"PENDIENTE","entrada":"2026-11-27T19:00:00.000Z","salida":"2026-11-29T17:00:00.000Z","adultos":1,"ninos":0,"total":"506.00","comision":{"porcentaje":"15.00","monto":"75.90"},"adelanto":"0.00","saldo":"506.00","observaciones":null,"codigoExterno":"BK-4410348","motivoCancelacion":null,"creada":"2026-11-24T15:18:51.000Z","canal":{"id":1,"nombre":"Booking","esOta":true},"cliente":{"id":4,"documento":"PAS BO552310","nombre":"Diego Arce","telefono":null,"pais":"BO"},"habitaciones":[{"id":21,"numero":"305","tipo":"Suite","turno":"Turno 24 horas","horasTurno":24,"cantidad":2,"precio":"253.00"}]},{"id":6,"codigo":"R-000006","estado":"PENDIENTE","entrada":"2026-11-28T19:00:00.000Z","salida":"2026-11-29T17:00:00.000Z","adultos":1,"ninos":0,"total":"120.00","comision":{"porcentaje":"0.00","monto":"0.00"},"adelanto":"0.00","saldo":"120.00","observaciones":null,"codigoExterno":null,"motivoCancelacion":null,"creada":"2026-11-24T15:18:51.000Z","canal":{"id":3,"nombre":"Recepción","esOta":false},"cliente":{"id":3,"documento":"DNI 70123456","nombre":"Lucía Gutiérrez Paz","telefono":null,"pais":"PE"},"habitaciones":[{"id":6,"numero":"106","tipo":"Matrimonial","turno":"Turno 24 horas","horasTurno":24,"cantidad":1,"precio":"120.00"}]},{"id":7,"codigo":"R-000007","estado":"CONFIRMADA","entrada":"2026-11-29T19:00:00.000Z","salida":"2026-12-02T17:00:00.000Z","adultos":1,"ninos":0,"total":"210.00","comision":{"porcentaje":"0.00","monto":"0.00"},"adelanto":"70.00","saldo":"140.00","observaciones":null,"codigoExterno":null,"motivoCancelacion":null,"creada":"2026-11-24T15:18:51.000Z","canal":{"id":2,"nombre":"Teléfono","esOta":false},"cliente":{"id":6,"documento":"DNI 40998877","nombre":"Gabriela Torres Vela","telefono":null,"pais":"PE"},"habitaciones":[{"id":12,"numero":"204","tipo":"Simple","turno":"Turno 24 horas","horasTurno":24,"cantidad":3,"precio":"70.00"}]},{"id":8,"codigo":"R-000008","estado":"PENDIENTE","entrada":"2026-11-30T19:00:00.000Z","salida":"2026-12-02T17:00:00.000Z","adultos":1,"ninos":0,"total":"252.00","comision":{"porcentaje":"15.00","monto":"37.80"},"adelanto":"0.00","saldo":"252.00","observaciones":null,"codigoExterno":"BK-4410459","motivoCancelacion":null,"creada":"2026-11-24T15:18:51.000Z","canal":{"id":1,"nombre":"Booking","esOta":true},"cliente":{"id":7,"documento":"PAS AR3399120","nombre":"Julián Ferreyra","telefono":null,"pais":"AR"},"habitaciones":[{"id":8,"numero":"108","tipo":"Doble","turno":"Turno 24 horas","horasTurno":24,"cantidad":2,"precio":"126.00"}]}],"/clientes":[]},"clientes":[{"id":5,"documento":"DNI 42315678","nombre":"Martín Quispe Rojas","telefono":null,"pais":"PE"},{"id":6,"documento":"DNI 40998877","nombre":"Gabriela Torres Vela","telefono":null,"pais":"PE"},{"id":7,"documento":"PAS AR3399120","nombre":"Julián Ferreyra","telefono":null,"pais":"AR"},{"id":2,"documento":"PAS CL8834521","nombre":"Valentina Soto","telefono":null,"pais":"CL"},{"id":4,"documento":"PAS BO552310","nombre":"Diego Arce","telefono":null,"pais":"BO"},{"id":3,"documento":"DNI 70123456","nombre":"Lucía Gutiérrez Paz","telefono":null,"pais":"PE"},{"id":1,"documento":"DNI 45678912","nombre":"Carlos Mendoza Ríos","telefono":null,"pais":"PE"}],"estancias":[{"id":1,"estado":"ACTIVA","habitacion":{"id":1,"numero":"101","tipo":"Simple","capacidad":1},"checkin":"2026-11-23T19:18:51.000Z","salidaPrevista":"2026-11-25T19:18:51.000Z","checkout":null,"turno":"Turno 24 horas","horasTurno":24,"cantidad":2,"precio":"100.00","canal":"Recepción","procedencia":"Lima, Perú","placa":null,"reserva":null,"huespedes":[{"id":1,"titular":true,"nombre":"Carlos Mendoza Ríos","documento":"DNI 45678912"}],"cargos":[],"cuenta":{"lineas":[{"tipo":"HOSPEDAJE","descripcion":"Hospedaje hab. 101 (Simple) · 2 noches","cantidad":2,"precioUnitario":"100.00","total":"200.00","estanciaId":"1"}],"total":"200.00","adelanto":"0.00","saldo":"200.00","comision":{"porcentaje":"0.00","monto":"0.00"},"reserva":null},"grupo":[{"id":1,"habitacion":"101"}]},{"id":2,"estado":"ACTIVA","habitacion":{"id":4,"numero":"104","tipo":"Simple","capacidad":1},"checkin":"2026-11-24T09:18:51.000Z","salidaPrevista":"2026-11-25T09:18:51.000Z","checkout":null,"turno":"Turno 24 horas","horasTurno":24,"cantidad":1,"precio":"100.00","canal":"Booking","procedencia":"Exterior","placa":null,"reserva":null,"huespedes":[{"id":2,"titular":true,"nombre":"Valentina Soto","documento":"PAS CL8834521"}],"cargos":[],"cuenta":{"lineas":[{"tipo":"HOSPEDAJE","descripcion":"Hospedaje hab. 104 (Simple) · 1 noche","cantidad":1,"precioUnitario":"100.00","total":"100.00","estanciaId":"2"}],"total":"100.00","adelanto":"0.00","saldo":"100.00","comision":{"porcentaje":"0.00","monto":"0.00"},"reserva":null},"grupo":[{"id":2,"habitacion":"104"}]},{"id":3,"estado":"ACTIVA","habitacion":{"id":10,"numero":"202","tipo":"Doble","capacidad":3},"checkin":"2026-11-24T12:33:51.000Z","salidaPrevista":"2026-11-24T15:33:51.000Z","checkout":null,"turno":"Turno 3 horas","horasTurno":3,"cantidad":1,"precio":"100.00","canal":"Recepción","procedencia":"Lima, Perú","placa":null,"reserva":null,"huespedes":[{"id":3,"titular":true,"nombre":"Lucía Gutiérrez Paz","documento":"DNI 70123456"}],"cargos":[],"cuenta":{"lineas":[{"tipo":"HOSPEDAJE","descripcion":"Hospedaje hab. 202 (Doble) · 1 × turno de 3 h","cantidad":1,"precioUnitario":"100.00","total":"100.00","estanciaId":"3"}],"total":"100.00","adelanto":"0.00","saldo":"100.00","comision":{"porcentaje":"0.00","monto":"0.00"},"reserva":null},"grupo":[{"id":3,"habitacion":"202"}]},{"id":4,"estado":"ACTIVA","habitacion":{"id":13,"numero":"205","tipo":"Doble","capacidad":3},"checkin":"2026-11-24T08:18:51.000Z","salidaPrevista":"2026-11-24T14:18:51.000Z","checkout":null,"turno":"Turno 6 horas","horasTurno":6,"cantidad":1,"precio":"100.00","canal":"Booking","procedencia":"Exterior","placa":null,"reserva":null,"huespedes":[{"id":4,"titular":true,"nombre":"Diego Arce","documento":"PAS BO552310"}],"cargos":[],"cuenta":{"lineas":[{"tipo":"HOSPEDAJE","descripcion":"Hospedaje hab. 205 (Doble) · 1 × turno de 6 h","cantidad":1,"precioUnitario":"100.00","total":"100.00","estanciaId":"4"}],"total":"100.00","adelanto":"0.00","saldo":"100.00","comision":{"porcentaje":"0.00","monto":"0.00"},"reserva":null},"grupo":[{"id":4,"habitacion":"205"}]}]}
+{
+ "capturado": "2026-11-26T14:05:08.329Z",
+ "hoy": "2026-11-26",
+ "me": {
+  "admin": {
+   "sub": 1,
+   "username": "admin",
+   "nombre": "Ana Pérez Mamani",
+   "empresaId": 1,
+   "rol": "ADMINISTRADOR",
+   "permisos": [
+    "reserva.crear",
+    "reserva.cancelar",
+    "estancia.checkin",
+    "estancia.checkout",
+    "tarifa.editar",
+    "comprobante.emitir",
+    "comprobante.anular",
+    "descuento.aplicar",
+    "compra.registrar",
+    "caja.abrir",
+    "caja.cerrar",
+    "reporte.ver",
+    "config.empresa",
+    "usuario.ver",
+    "usuario.gestionar",
+    "habitacion.cambiar_estado",
+    "habitacion.gestionar",
+    "reserva.ver",
+    "cliente.gestionar",
+    "operacion.configurar"
+   ],
+   "sucursales": [
+    1,
+    2
+   ],
+   "sucursalId": 1,
+   "inactividadMin": 30,
+   "debeCambiarClave": false,
+   "sid": "1",
+   "iat": 1795701907,
+   "exp": 1795702807
+  },
+  "recepcion1": {
+   "sub": 2,
+   "username": "recepcion1",
+   "nombre": "Luis Quispe Flores",
+   "empresaId": 1,
+   "rol": "RECEPCIONISTA",
+   "permisos": [
+    "reserva.crear",
+    "reserva.cancelar",
+    "estancia.checkin",
+    "estancia.checkout",
+    "comprobante.emitir",
+    "descuento.aplicar",
+    "caja.abrir",
+    "caja.cerrar",
+    "habitacion.cambiar_estado",
+    "reserva.ver",
+    "cliente.gestionar"
+   ],
+   "sucursales": [
+    1
+   ],
+   "sucursalId": 1,
+   "inactividadMin": 30,
+   "debeCambiarClave": false,
+   "sid": "2",
+   "iat": 1795701908,
+   "exp": 1795702808
+  }
+ },
+ "rutas": {
+  "/organizacion/empresa": {
+   "id": 1,
+   "ruc": "20123456789",
+   "razon_social": "HOTEL DEMO S.A.C.",
+   "nombre_comercial": "Hotel Demo",
+   "direccion_fiscal": "Av. Bolognesi 123, Tacna",
+   "ubigeo_codigo": "230101",
+   "sunat_entorno": "BETA"
+  },
+  "/organizacion/sucursales": [
+   {
+    "id": 1,
+    "nombre": "Hotel Centro",
+    "tipo": "HOTEL",
+    "codigo_establecimiento": "0000",
+    "direccion": "Av. Bolognesi 123"
+   },
+   {
+    "id": 2,
+    "nombre": "Hostal Alto Tacna",
+    "tipo": "HOSTAL",
+    "codigo_establecimiento": "0001",
+    "direccion": "Calle Alto Lima 456"
+   }
+  ],
+  "/organizacion/sucursales/todas": [
+   {
+    "id": 1,
+    "nombre": "Hotel Centro",
+    "tipo": "HOTEL",
+    "codigo_establecimiento": "0000"
+   },
+   {
+    "id": 2,
+    "nombre": "Hostal Alto Tacna",
+    "tipo": "HOSTAL",
+    "codigo_establecimiento": "0001"
+   }
+  ],
+  "/organizacion/usuarios": [
+   {
+    "id": 1,
+    "username": "admin",
+    "nombres": "Ana",
+    "apellidos": "Pérez Mamani",
+    "nombre": "Ana Pérez Mamani",
+    "email": "admin@hoteldemo.pe",
+    "rolId": 1,
+    "rol": "ADMINISTRADOR",
+    "estado": "ACTIVO",
+    "debeCambiarClave": false,
+    "ultimoAcceso": "2026-11-26T14:05:08.000Z",
+    "sucursales": [
+     {
+      "id": 1,
+      "nombre": "Hotel Centro",
+      "principal": true
+     },
+     {
+      "id": 2,
+      "nombre": "Hostal Alto Tacna",
+      "principal": false
+     }
+    ],
+    "sesionesActivas": 1
+   },
+   {
+    "id": 2,
+    "username": "recepcion1",
+    "nombres": "Luis",
+    "apellidos": "Quispe Flores",
+    "nombre": "Luis Quispe Flores",
+    "email": "recepcion1@hoteldemo.pe",
+    "rolId": 2,
+    "rol": "RECEPCIONISTA",
+    "estado": "ACTIVO",
+    "debeCambiarClave": false,
+    "ultimoAcceso": "2026-11-26T14:05:08.000Z",
+    "sucursales": [
+     {
+      "id": 1,
+      "nombre": "Hotel Centro",
+      "principal": true
+     }
+    ],
+    "sesionesActivas": 1
+   },
+   {
+    "id": 3,
+    "username": "recepcion2",
+    "nombres": "María",
+    "apellidos": "Condori Ticona",
+    "nombre": "María Condori Ticona",
+    "email": "recepcion2@hoteldemo.pe",
+    "rolId": 2,
+    "rol": "RECEPCIONISTA",
+    "estado": "ACTIVO",
+    "debeCambiarClave": false,
+    "ultimoAcceso": null,
+    "sucursales": [
+     {
+      "id": 2,
+      "nombre": "Hostal Alto Tacna",
+      "principal": true
+     }
+    ],
+    "sesionesActivas": 0
+   },
+   {
+    "id": 4,
+    "username": "caja1",
+    "nombres": "Jorge",
+    "apellidos": "Ramos Vargas",
+    "nombre": "Jorge Ramos Vargas",
+    "email": "caja1@hoteldemo.pe",
+    "rolId": 3,
+    "rol": "CAJERO",
+    "estado": "ACTIVO",
+    "debeCambiarClave": false,
+    "ultimoAcceso": null,
+    "sucursales": [
+     {
+      "id": 1,
+      "nombre": "Hotel Centro",
+      "principal": true
+     },
+     {
+      "id": 2,
+      "nombre": "Hostal Alto Tacna",
+      "principal": false
+     }
+    ],
+    "sesionesActivas": 0
+   },
+   {
+    "id": 5,
+    "username": "limpieza1",
+    "nombres": "Rosa",
+    "apellidos": "Huanca Choque",
+    "nombre": "Rosa Huanca Choque",
+    "email": "limpieza1@hoteldemo.pe",
+    "rolId": 6,
+    "rol": "LIMPIEZA",
+    "estado": "ACTIVO",
+    "debeCambiarClave": false,
+    "ultimoAcceso": null,
+    "sucursales": [
+     {
+      "id": 1,
+      "nombre": "Hotel Centro",
+      "principal": true
+     }
+    ],
+    "sesionesActivas": 0
+   }
+  ],
+  "/organizacion/roles": [
+   {
+    "id": 1,
+    "nombre": "ADMINISTRADOR",
+    "descripcion": "Acceso total",
+    "editable": false,
+    "usuarios": 1,
+    "permisos": [
+     "caja.abrir",
+     "caja.cerrar",
+     "cliente.gestionar",
+     "compra.registrar",
+     "comprobante.anular",
+     "comprobante.emitir",
+     "config.empresa",
+     "descuento.aplicar",
+     "estancia.checkin",
+     "estancia.checkout",
+     "habitacion.cambiar_estado",
+     "habitacion.gestionar",
+     "operacion.configurar",
+     "reporte.ver",
+     "reserva.cancelar",
+     "reserva.crear",
+     "reserva.ver",
+     "tarifa.editar",
+     "usuario.gestionar",
+     "usuario.ver"
+    ]
+   },
+   {
+    "id": 2,
+    "nombre": "RECEPCIONISTA",
+    "descripcion": "Reservas, check-in/out, ventas, caja",
+    "editable": true,
+    "usuarios": 2,
+    "permisos": [
+     "caja.abrir",
+     "caja.cerrar",
+     "cliente.gestionar",
+     "comprobante.emitir",
+     "descuento.aplicar",
+     "estancia.checkin",
+     "estancia.checkout",
+     "habitacion.cambiar_estado",
+     "reserva.cancelar",
+     "reserva.crear",
+     "reserva.ver"
+    ]
+   },
+   {
+    "id": 3,
+    "nombre": "CAJERO",
+    "descripcion": "Ventas y caja",
+    "editable": true,
+    "usuarios": 1,
+    "permisos": [
+     "caja.abrir",
+     "caja.cerrar",
+     "cliente.gestionar",
+     "comprobante.emitir"
+    ]
+   },
+   {
+    "id": 4,
+    "nombre": "ALMACEN",
+    "descripcion": "Compras e inventario",
+    "editable": true,
+    "usuarios": 0,
+    "permisos": [
+     "compra.registrar",
+     "reporte.ver"
+    ]
+   },
+   {
+    "id": 5,
+    "nombre": "CONTADOR",
+    "descripcion": "Reportes y facturación",
+    "editable": true,
+    "usuarios": 0,
+    "permisos": [
+     "comprobante.anular",
+     "reporte.ver"
+    ]
+   },
+   {
+    "id": 6,
+    "nombre": "LIMPIEZA",
+    "descripcion": "Solo cambia el estado de habitaciones",
+    "editable": true,
+    "usuarios": 1,
+    "permisos": [
+     "habitacion.cambiar_estado"
+    ]
+   }
+  ],
+  "/organizacion/permisos": [
+   {
+    "codigo": "caja.abrir",
+    "modulo": "CAJA",
+    "descripcion": "Abrir caja"
+   },
+   {
+    "codigo": "caja.cerrar",
+    "modulo": "CAJA",
+    "descripcion": "Cerrar caja"
+   },
+   {
+    "codigo": "compra.registrar",
+    "modulo": "COMPRAS",
+    "descripcion": "Registrar compras"
+   },
+   {
+    "codigo": "config.empresa",
+    "modulo": "CONFIG",
+    "descripcion": "Configurar empresa, series y certificado"
+   },
+   {
+    "codigo": "usuario.gestionar",
+    "modulo": "CONFIG",
+    "descripcion": "Crear y editar usuarios y roles, desbloquear, restablecer contraseñas y cerrar sesiones"
+   },
+   {
+    "codigo": "usuario.ver",
+    "modulo": "CONFIG",
+    "descripcion": "Ver usuarios y roles"
+   },
+   {
+    "codigo": "reporte.ver",
+    "modulo": "REPORTES",
+    "descripcion": "Ver reportes"
+   },
+   {
+    "codigo": "cliente.gestionar",
+    "modulo": "RESERVAS",
+    "descripcion": "Buscar, crear y editar clientes y huéspedes"
+   },
+   {
+    "codigo": "estancia.checkin",
+    "modulo": "RESERVAS",
+    "descripcion": "Registrar check-in"
+   },
+   {
+    "codigo": "estancia.checkout",
+    "modulo": "RESERVAS",
+    "descripcion": "Registrar check-out"
+   },
+   {
+    "codigo": "habitacion.cambiar_estado",
+    "modulo": "RESERVAS",
+    "descripcion": "Cambiar el estado de una habitación"
+   },
+   {
+    "codigo": "habitacion.gestionar",
+    "modulo": "RESERVAS",
+    "descripcion": "Crear y editar habitaciones, pisos y tipos"
+   },
+   {
+    "codigo": "operacion.configurar",
+    "modulo": "RESERVAS",
+    "descripcion": "Configurar la operación de la sucursal (cobro, limpieza, horarios de salida)"
+   },
+   {
+    "codigo": "reserva.cancelar",
+    "modulo": "RESERVAS",
+    "descripcion": "Cancelar reservas"
+   },
+   {
+    "codigo": "reserva.crear",
+    "modulo": "RESERVAS",
+    "descripcion": "Crear reservas"
+   },
+   {
+    "codigo": "reserva.ver",
+    "modulo": "RESERVAS",
+    "descripcion": "Ver el calendario de reservas y la disponibilidad"
+   },
+   {
+    "codigo": "tarifa.editar",
+    "modulo": "RESERVAS",
+    "descripcion": "Modificar precios"
+   },
+   {
+    "codigo": "comprobante.anular",
+    "modulo": "VENTAS",
+    "descripcion": "Anular / emitir NC"
+   },
+   {
+    "codigo": "comprobante.emitir",
+    "modulo": "VENTAS",
+    "descripcion": "Emitir comprobantes"
+   },
+   {
+    "codigo": "descuento.aplicar",
+    "modulo": "VENTAS",
+    "descripcion": "Aplicar descuentos"
+   }
+  ],
+  "/hospedaje/tablero": {
+   "generadoEn": "2026-11-26T14:05:08.155Z",
+   "resumen": {
+    "DESOCUPADA": 4,
+    "OCUPADA": 5,
+    "LIMPIEZA": 2,
+    "RESERVADA": 1,
+    "CONFIRMADA": 1,
+    "MANTENIMIENTO": 1
+   },
+   "pisos": [
+    {
+     "id": 1,
+     "numero": 1,
+     "nombre": "1er nivel",
+     "habitaciones": [
+      {
+       "id": 1,
+       "numero": "101",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "DESOCUPADA",
+       "estadoDescripcion": "Desocupada",
+       "color": "#4CAF50",
+       "estadoDesde": null,
+       "limpieza": null,
+       "siguientes": [
+        "RESERVADA",
+        "MANTENIMIENTO",
+        "LIMPIEZA"
+       ],
+       "estancia": null
+      },
+      {
+       "id": 2,
+       "numero": "102",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "OCUPADA",
+       "estadoDescripcion": "Ocupada",
+       "color": "#F44336",
+       "estadoDesde": "2026-11-26T14:05:07.000Z",
+       "limpieza": null,
+       "siguientes": [],
+       "estancia": {
+        "id": 1,
+        "huesped": "Carlos Mendoza Ríos",
+        "checkin": "2026-11-26T12:35:07.000Z",
+        "salidaPrevista": "2026-11-26T16:35:07.000Z",
+        "alerta": null
+       }
+      },
+      {
+       "id": 3,
+       "numero": "103",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "LIMPIEZA",
+       "estadoDescripcion": "Limpieza",
+       "color": "#FFC107",
+       "estadoDesde": "2026-11-26T13:25:07.000Z",
+       "limpieza": {
+        "minutos": 40,
+        "demorada": true,
+        "esperados": 30
+       },
+       "siguientes": [
+        "DESOCUPADA",
+        "MANTENIMIENTO"
+       ],
+       "estancia": null
+      },
+      {
+       "id": 4,
+       "numero": "104",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "OCUPADA",
+       "estadoDescripcion": "Ocupada",
+       "color": "#F44336",
+       "estadoDesde": "2026-11-26T14:05:07.000Z",
+       "limpieza": null,
+       "siguientes": [],
+       "estancia": {
+        "id": 2,
+        "huesped": "Valentina Soto",
+        "checkin": "2026-11-26T10:29:07.000Z",
+        "salidaPrevista": "2026-11-26T14:29:07.000Z",
+        "alerta": "POR_VENCER"
+       }
+      },
+      {
+       "id": 5,
+       "numero": "105",
+       "tipo": "Doble",
+       "tipoId": 2,
+       "capacidad": 2,
+       "estado": "DESOCUPADA",
+       "estadoDescripcion": "Desocupada",
+       "color": "#4CAF50",
+       "estadoDesde": null,
+       "limpieza": null,
+       "siguientes": [
+        "RESERVADA",
+        "MANTENIMIENTO",
+        "LIMPIEZA"
+       ],
+       "estancia": null
+      }
+     ]
+    },
+    {
+     "id": 2,
+     "numero": 2,
+     "nombre": "2do nivel",
+     "habitaciones": [
+      {
+       "id": 6,
+       "numero": "201",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "LIMPIEZA",
+       "estadoDescripcion": "Limpieza",
+       "color": "#FFC107",
+       "estadoDesde": "2026-11-26T13:55:07.000Z",
+       "limpieza": {
+        "minutos": 10,
+        "demorada": false,
+        "esperados": 30
+       },
+       "siguientes": [
+        "DESOCUPADA",
+        "MANTENIMIENTO"
+       ],
+       "estancia": null
+      },
+      {
+       "id": 7,
+       "numero": "202",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "RESERVADA",
+       "estadoDescripcion": "Reservada",
+       "color": "#2196F3",
+       "estadoDesde": "2026-11-26T14:05:07.000Z",
+       "limpieza": null,
+       "siguientes": [
+        "CONFIRMADA",
+        "DESOCUPADA"
+       ],
+       "estancia": null
+      },
+      {
+       "id": 8,
+       "numero": "203",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "OCUPADA",
+       "estadoDescripcion": "Ocupada",
+       "color": "#F44336",
+       "estadoDesde": "2026-11-26T14:05:07.000Z",
+       "limpieza": null,
+       "siguientes": [],
+       "estancia": {
+        "id": 3,
+        "huesped": "Lucía Gutiérrez Paz",
+        "checkin": "2026-11-26T10:23:07.000Z",
+        "salidaPrevista": "2026-11-26T13:23:07.000Z",
+        "alerta": "VENCIDA"
+       }
+      },
+      {
+       "id": 9,
+       "numero": "204",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "DESOCUPADA",
+       "estadoDescripcion": "Desocupada",
+       "color": "#4CAF50",
+       "estadoDesde": null,
+       "limpieza": null,
+       "siguientes": [
+        "RESERVADA",
+        "MANTENIMIENTO",
+        "LIMPIEZA"
+       ],
+       "estancia": null
+      },
+      {
+       "id": 10,
+       "numero": "205",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "OCUPADA",
+       "estadoDescripcion": "Ocupada",
+       "color": "#F44336",
+       "estadoDesde": "2026-11-26T14:05:07.000Z",
+       "limpieza": null,
+       "siguientes": [],
+       "estancia": {
+        "id": 4,
+        "huesped": "Diego Arce",
+        "checkin": "2026-11-26T13:05:07.000Z",
+        "salidaPrevista": "2026-11-26T19:05:07.000Z",
+        "alerta": null
+       }
+      },
+      {
+       "id": 11,
+       "numero": "206",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "CONFIRMADA",
+       "estadoDescripcion": "Confirmada",
+       "color": "#3F51B5",
+       "estadoDesde": "2026-11-26T14:05:07.000Z",
+       "limpieza": null,
+       "siguientes": [
+        "DESOCUPADA"
+       ],
+       "estancia": null
+      },
+      {
+       "id": 12,
+       "numero": "207",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "OCUPADA",
+       "estadoDescripcion": "Ocupada",
+       "color": "#F44336",
+       "estadoDesde": "2026-11-26T14:05:07.000Z",
+       "limpieza": null,
+       "siguientes": [],
+       "estancia": {
+        "id": 5,
+        "huesped": "Rosa Flores Vega",
+        "checkin": "2026-11-26T12:05:07.000Z",
+        "salidaPrevista": "2026-11-27T14:00:00.000Z",
+        "alerta": null
+       }
+      },
+      {
+       "id": 13,
+       "numero": "208",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "DESOCUPADA",
+       "estadoDescripcion": "Desocupada",
+       "color": "#4CAF50",
+       "estadoDesde": null,
+       "limpieza": null,
+       "siguientes": [
+        "RESERVADA",
+        "MANTENIMIENTO",
+        "LIMPIEZA"
+       ],
+       "estancia": null
+      },
+      {
+       "id": 14,
+       "numero": "209",
+       "tipo": "Matrimonial",
+       "tipoId": 3,
+       "capacidad": 2,
+       "estado": "MANTENIMIENTO",
+       "estadoDescripcion": "Mantenimiento",
+       "color": "#795548",
+       "estadoDesde": "2026-11-26T09:05:07.000Z",
+       "limpieza": null,
+       "siguientes": [
+        "DESOCUPADA"
+       ],
+       "estancia": null
+      }
+     ]
+    }
+   ]
+  },
+  "/hospedaje/plano": [
+   {
+    "id": 1,
+    "numero": 1,
+    "nombre": "1er nivel",
+    "columnas": 17,
+    "filas": 8,
+    "elementos": [
+     {
+      "id": 1,
+      "tipo": "AREA_COMUN",
+      "etiqueta": "Garaje",
+      "x": 0,
+      "y": 0,
+      "ancho": 3,
+      "alto": 4
+     },
+     {
+      "id": 2,
+      "tipo": "RECEPCION",
+      "etiqueta": "Recepción · hall",
+      "x": 0,
+      "y": 4,
+      "ancho": 2,
+      "alto": 4
+     },
+     {
+      "id": 3,
+      "tipo": "ESCALERA",
+      "etiqueta": null,
+      "x": 2,
+      "y": 4,
+      "ancho": 1,
+      "alto": 4
+     },
+     {
+      "id": 4,
+      "tipo": "AREA_COMUN",
+      "etiqueta": "Sala · comedor · cocineta",
+      "x": 3,
+      "y": 0,
+      "ancho": 3,
+      "alto": 8
+     },
+     {
+      "id": 5,
+      "tipo": "PASILLO",
+      "etiqueta": null,
+      "x": 6,
+      "y": 3,
+      "ancho": 9,
+      "alto": 2
+     },
+     {
+      "id": 6,
+      "tipo": "BANO_COMUN",
+      "etiqueta": "SS.HH.",
+      "x": 9,
+      "y": 5,
+      "ancho": 3,
+      "alto": 3
+     },
+     {
+      "id": 7,
+      "tipo": "AREA_COMUN",
+      "etiqueta": "Patio",
+      "x": 15,
+      "y": 0,
+      "ancho": 2,
+      "alto": 5
+     },
+     {
+      "id": 8,
+      "tipo": "BANO_COMUN",
+      "etiqueta": "SS.HH.",
+      "x": 15,
+      "y": 5,
+      "ancho": 2,
+      "alto": 3
+     }
+    ],
+    "habitaciones": [
+     {
+      "id": 1,
+      "numero": "101",
+      "descripcion": null,
+      "estado": "DESOCUPADA",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR",
+       "BALCON",
+       "ACCESIBLE"
+      ],
+      "x": 6,
+      "y": 0,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": null
+     },
+     {
+      "id": 2,
+      "numero": "102",
+      "descripcion": null,
+      "estado": "OCUPADA",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR"
+      ],
+      "x": 9,
+      "y": 0,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": {
+       "huesped": "Carlos Mendoza Ríos",
+       "salidaPrevista": "2026-11-26T16:35:07.000Z",
+       "alerta": null
+      }
+     },
+     {
+      "id": 3,
+      "numero": "103",
+      "descripcion": null,
+      "estado": "LIMPIEZA",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR"
+      ],
+      "x": 12,
+      "y": 0,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": null
+     },
+     {
+      "id": 4,
+      "numero": "104",
+      "descripcion": null,
+      "estado": "OCUPADA",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR"
+      ],
+      "x": 6,
+      "y": 5,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": {
+       "huesped": "Valentina Soto",
+       "salidaPrevista": "2026-11-26T14:29:07.000Z",
+       "alerta": "POR_VENCER"
+      }
+     },
+     {
+      "id": 5,
+      "numero": "105",
+      "descripcion": null,
+      "estado": "DESOCUPADA",
+      "tipo": {
+       "id": 2,
+       "nombre": "Doble",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO"
+      ],
+      "x": 12,
+      "y": 5,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": null
+     }
+    ]
+   },
+   {
+    "id": 2,
+    "numero": 2,
+    "nombre": "2do nivel",
+    "columnas": 19,
+    "filas": 8,
+    "elementos": [
+     {
+      "id": 9,
+      "tipo": "BANO_COMUN",
+      "etiqueta": "SS.HH.",
+      "x": 3,
+      "y": 0,
+      "ancho": 2,
+      "alto": 3
+     },
+     {
+      "id": 10,
+      "tipo": "BANO_COMUN",
+      "etiqueta": "SS.HH.",
+      "x": 11,
+      "y": 0,
+      "ancho": 2,
+      "alto": 3
+     },
+     {
+      "id": 11,
+      "tipo": "PASILLO",
+      "etiqueta": null,
+      "x": 0,
+      "y": 3,
+      "ancho": 19,
+      "alto": 2
+     },
+     {
+      "id": 12,
+      "tipo": "ESCALERA",
+      "etiqueta": null,
+      "x": 3,
+      "y": 5,
+      "ancho": 3,
+      "alto": 3
+     },
+     {
+      "id": 13,
+      "tipo": "BANO_COMUN",
+      "etiqueta": "SS.HH.",
+      "x": 6,
+      "y": 5,
+      "ancho": 2,
+      "alto": 3
+     },
+     {
+      "id": 14,
+      "tipo": "BANO_COMUN",
+      "etiqueta": "SS.HH.",
+      "x": 14,
+      "y": 5,
+      "ancho": 2,
+      "alto": 3
+     }
+    ],
+    "habitaciones": [
+     {
+      "id": 6,
+      "numero": "201",
+      "descripcion": null,
+      "estado": "LIMPIEZA",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR",
+       "BALCON"
+      ],
+      "x": 0,
+      "y": 0,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": null
+     },
+     {
+      "id": 7,
+      "numero": "202",
+      "descripcion": null,
+      "estado": "RESERVADA",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR"
+      ],
+      "x": 5,
+      "y": 0,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": null
+     },
+     {
+      "id": 8,
+      "numero": "203",
+      "descripcion": null,
+      "estado": "OCUPADA",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR"
+      ],
+      "x": 8,
+      "y": 0,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": {
+       "huesped": "Lucía Gutiérrez Paz",
+       "salidaPrevista": "2026-11-26T13:23:07.000Z",
+       "alerta": "VENCIDA"
+      }
+     },
+     {
+      "id": 9,
+      "numero": "204",
+      "descripcion": null,
+      "estado": "DESOCUPADA",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR"
+      ],
+      "x": 13,
+      "y": 0,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": null
+     },
+     {
+      "id": 10,
+      "numero": "205",
+      "descripcion": null,
+      "estado": "OCUPADA",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR"
+      ],
+      "x": 16,
+      "y": 0,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": {
+       "huesped": "Diego Arce",
+       "salidaPrevista": "2026-11-26T19:05:07.000Z",
+       "alerta": null
+      }
+     },
+     {
+      "id": 11,
+      "numero": "206",
+      "descripcion": null,
+      "estado": "CONFIRMADA",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR"
+      ],
+      "x": 0,
+      "y": 5,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": null
+     },
+     {
+      "id": 12,
+      "numero": "207",
+      "descripcion": null,
+      "estado": "OCUPADA",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR"
+      ],
+      "x": 8,
+      "y": 5,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": {
+       "huesped": "Rosa Flores Vega",
+       "salidaPrevista": "2026-11-27T14:00:00.000Z",
+       "alerta": null
+      }
+     },
+     {
+      "id": 13,
+      "numero": "208",
+      "descripcion": null,
+      "estado": "DESOCUPADA",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR"
+      ],
+      "x": 11,
+      "y": 5,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": null
+     },
+     {
+      "id": 14,
+      "numero": "209",
+      "descripcion": null,
+      "estado": "MANTENIMIENTO",
+      "tipo": {
+       "id": 3,
+       "nombre": "Matrimonial",
+       "adultos": 2,
+       "ninos": 1
+      },
+      "amenidades": [
+       "AIRE",
+       "WIFI",
+       "TV",
+       "AGUA_CALIENTE",
+       "BANO_PRIVADO",
+       "FRIGOBAR"
+      ],
+      "x": 16,
+      "y": 5,
+      "ancho": 3,
+      "alto": 3,
+      "ubicada": true,
+      "estancia": null
+     }
+    ]
+   }
+  ],
+  "/hospedaje/amenidades": [
+   {
+    "id": 1,
+    "codigo": "AIRE",
+    "nombre": "Aire acondicionado",
+    "icono": "aire",
+    "activo": true,
+    "habitaciones": 14
+   },
+   {
+    "id": 2,
+    "codigo": "WIFI",
+    "nombre": "Internet wifi",
+    "icono": "wifi",
+    "activo": true,
+    "habitaciones": 14
+   },
+   {
+    "id": 3,
+    "codigo": "TV",
+    "nombre": "Televisor",
+    "icono": "tv",
+    "activo": true,
+    "habitaciones": 14
+   },
+   {
+    "id": 4,
+    "codigo": "AGUA_CALIENTE",
+    "nombre": "Agua caliente",
+    "icono": "ducha",
+    "activo": true,
+    "habitaciones": 14
+   },
+   {
+    "id": 5,
+    "codigo": "BANO_PRIVADO",
+    "nombre": "Baño privado",
+    "icono": "bano",
+    "activo": true,
+    "habitaciones": 14
+   },
+   {
+    "id": 6,
+    "codigo": "FRIGOBAR",
+    "nombre": "Frigobar",
+    "icono": "frigobar",
+    "activo": true,
+    "habitaciones": 13
+   },
+   {
+    "id": 7,
+    "codigo": "CAJA_FUERTE",
+    "nombre": "Caja fuerte",
+    "icono": "caja_fuerte",
+    "activo": true,
+    "habitaciones": 0
+   },
+   {
+    "id": 8,
+    "codigo": "CALEFACCION",
+    "nombre": "Calefacción",
+    "icono": "calefaccion",
+    "activo": true,
+    "habitaciones": 0
+   },
+   {
+    "id": 9,
+    "codigo": "BALCON",
+    "nombre": "Balcón",
+    "icono": "balcon",
+    "activo": true,
+    "habitaciones": 2
+   },
+   {
+    "id": 10,
+    "codigo": "JACUZZI",
+    "nombre": "Jacuzzi",
+    "icono": "jacuzzi",
+    "activo": true,
+    "habitaciones": 0
+   },
+   {
+    "id": 11,
+    "codigo": "ESCRITORIO",
+    "nombre": "Escritorio de trabajo",
+    "icono": "escritorio",
+    "activo": true,
+    "habitaciones": 0
+   },
+   {
+    "id": 12,
+    "codigo": "ACCESIBLE",
+    "nombre": "Accesible (silla de ruedas)",
+    "icono": "accesible",
+    "activo": true,
+    "habitaciones": 1
+   }
+  ],
+  "/hospedaje/canales": [
+   {
+    "id": 1,
+    "nombre": "Recepción",
+    "es_ota": false,
+    "comision_porcentaje": "0"
+   },
+   {
+    "id": 2,
+    "nombre": "Booking",
+    "es_ota": true,
+    "comision_porcentaje": "15"
+   },
+   {
+    "id": 3,
+    "nombre": "Teléfono",
+    "es_ota": false,
+    "comision_porcentaje": "0"
+   }
+  ],
+  "/hospedaje/config/canales": [
+   {
+    "id": 1,
+    "nombre": "Recepción",
+    "comisionPorcentaje": "0.00",
+    "esOta": false,
+    "activo": true,
+    "tarifas": 20
+   },
+   {
+    "id": 2,
+    "nombre": "Booking",
+    "comisionPorcentaje": "15.00",
+    "esOta": true,
+    "activo": true,
+    "tarifas": 20
+   },
+   {
+    "id": 3,
+    "nombre": "Teléfono",
+    "comisionPorcentaje": "0.00",
+    "esOta": false,
+    "activo": true,
+    "tarifas": 20
+   }
+  ],
+  "/hospedaje/turnos": [
+   {
+    "id": 1,
+    "nombre": "Turno 24 horas",
+    "duracion_horas": 24,
+    "activo": true
+   },
+   {
+    "id": 2,
+    "nombre": "Turno 12 horas",
+    "duracion_horas": 12,
+    "activo": true
+   },
+   {
+    "id": 3,
+    "nombre": "Turno 6 horas",
+    "duracion_horas": 6,
+    "activo": true
+   },
+   {
+    "id": 5,
+    "nombre": "Turno 4 horas",
+    "duracion_horas": 4,
+    "activo": true
+   },
+   {
+    "id": 4,
+    "nombre": "Turno 3 horas",
+    "duracion_horas": 3,
+    "activo": true
+   }
+  ],
+  "/hospedaje/config/turnos": [
+   {
+    "id": 1,
+    "nombre": "Turno 24 horas",
+    "duracionHoras": 24,
+    "activo": true,
+    "tarifas": 12,
+    "usado": true
+   },
+   {
+    "id": 2,
+    "nombre": "Turno 12 horas",
+    "duracionHoras": 12,
+    "activo": true,
+    "tarifas": 12,
+    "usado": true
+   },
+   {
+    "id": 3,
+    "nombre": "Turno 6 horas",
+    "duracionHoras": 6,
+    "activo": true,
+    "tarifas": 12,
+    "usado": true
+   },
+   {
+    "id": 5,
+    "nombre": "Turno 4 horas",
+    "duracionHoras": 4,
+    "activo": true,
+    "tarifas": 12,
+    "usado": true
+   },
+   {
+    "id": 4,
+    "nombre": "Turno 3 horas",
+    "duracionHoras": 3,
+    "activo": true,
+    "tarifas": 12,
+    "usado": true
+   }
+  ],
+  "/hospedaje/tarifas": {
+   "fecha": "2026-11-26",
+   "hoy": "2026-11-26",
+   "celdas": [
+    {
+     "tipoId": 4,
+     "canalId": 1,
+     "turnoId": 1,
+     "vigente": {
+      "id": 46,
+      "precio": "220.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 1,
+     "turnoId": 2,
+     "vigente": {
+      "id": 34,
+      "precio": "84.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 1,
+     "turnoId": 3,
+     "vigente": {
+      "id": 37,
+      "precio": "60.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 1,
+     "turnoId": 4,
+     "vigente": {
+      "id": 40,
+      "precio": "42.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 1,
+     "turnoId": 5,
+     "vigente": {
+      "id": 43,
+      "precio": "48.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 2,
+     "turnoId": 1,
+     "vigente": {
+      "id": 32,
+      "precio": "138.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 2,
+     "turnoId": 2,
+     "vigente": {
+      "id": 35,
+      "precio": "97.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 2,
+     "turnoId": 3,
+     "vigente": {
+      "id": 38,
+      "precio": "69.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 2,
+     "turnoId": 4,
+     "vigente": {
+      "id": 41,
+      "precio": "48.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 2,
+     "turnoId": 5,
+     "vigente": {
+      "id": 44,
+      "precio": "55.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 3,
+     "turnoId": 1,
+     "vigente": {
+      "id": 33,
+      "precio": "120.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 3,
+     "turnoId": 2,
+     "vigente": {
+      "id": 36,
+      "precio": "84.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 3,
+     "turnoId": 3,
+     "vigente": {
+      "id": 39,
+      "precio": "60.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 3,
+     "turnoId": 4,
+     "vigente": {
+      "id": 42,
+      "precio": "42.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 3,
+     "turnoId": 5,
+     "vigente": {
+      "id": 45,
+      "precio": "48.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 3,
+     "canalId": 1,
+     "turnoId": 1,
+     "vigente": {
+      "id": 31,
+      "precio": "120.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 1,
+     "turnoId": 2,
+     "vigente": {
+      "id": 49,
+      "precio": "154.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 1,
+     "turnoId": 3,
+     "vigente": {
+      "id": 52,
+      "precio": "110.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 1,
+     "turnoId": 4,
+     "vigente": {
+      "id": 55,
+      "precio": "77.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 1,
+     "turnoId": 5,
+     "vigente": {
+      "id": 58,
+      "precio": "88.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 2,
+     "turnoId": 1,
+     "vigente": {
+      "id": 47,
+      "precio": "253.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 2,
+     "turnoId": 2,
+     "vigente": {
+      "id": 50,
+      "precio": "177.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 2,
+     "turnoId": 3,
+     "vigente": {
+      "id": 53,
+      "precio": "126.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 2,
+     "turnoId": 4,
+     "vigente": {
+      "id": 56,
+      "precio": "89.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 2,
+     "turnoId": 5,
+     "vigente": {
+      "id": 59,
+      "precio": "101.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 3,
+     "turnoId": 1,
+     "vigente": {
+      "id": 48,
+      "precio": "220.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 3,
+     "turnoId": 2,
+     "vigente": {
+      "id": 51,
+      "precio": "154.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 3,
+     "turnoId": 3,
+     "vigente": {
+      "id": 54,
+      "precio": "110.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 3,
+     "turnoId": 4,
+     "vigente": {
+      "id": 57,
+      "precio": "77.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 4,
+     "canalId": 3,
+     "turnoId": 5,
+     "vigente": {
+      "id": 60,
+      "precio": "88.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 1,
+     "turnoId": 1,
+     "vigente": {
+      "id": 16,
+      "precio": "110.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 1,
+     "turnoId": 2,
+     "vigente": {
+      "id": 4,
+      "precio": "49.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 1,
+     "turnoId": 3,
+     "vigente": {
+      "id": 7,
+      "precio": "35.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 1,
+     "turnoId": 4,
+     "vigente": {
+      "id": 10,
+      "precio": "25.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 1,
+     "turnoId": 5,
+     "vigente": {
+      "id": 13,
+      "precio": "28.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 2,
+     "turnoId": 1,
+     "vigente": {
+      "id": 2,
+      "precio": "81.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 2,
+     "turnoId": 2,
+     "vigente": {
+      "id": 5,
+      "precio": "56.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 2,
+     "turnoId": 3,
+     "vigente": {
+      "id": 8,
+      "precio": "40.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 2,
+     "turnoId": 4,
+     "vigente": {
+      "id": 11,
+      "precio": "28.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 2,
+     "turnoId": 5,
+     "vigente": {
+      "id": 14,
+      "precio": "32.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 3,
+     "turnoId": 1,
+     "vigente": {
+      "id": 3,
+      "precio": "70.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 3,
+     "turnoId": 2,
+     "vigente": {
+      "id": 6,
+      "precio": "49.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 3,
+     "turnoId": 3,
+     "vigente": {
+      "id": 9,
+      "precio": "35.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 3,
+     "turnoId": 4,
+     "vigente": {
+      "id": 12,
+      "precio": "25.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 3,
+     "turnoId": 5,
+     "vigente": {
+      "id": 15,
+      "precio": "28.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 1,
+     "canalId": 1,
+     "turnoId": 1,
+     "vigente": {
+      "id": 1,
+      "precio": "70.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 1,
+     "turnoId": 2,
+     "vigente": {
+      "id": 19,
+      "precio": "77.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 1,
+     "turnoId": 3,
+     "vigente": {
+      "id": 22,
+      "precio": "55.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 1,
+     "turnoId": 4,
+     "vigente": {
+      "id": 25,
+      "precio": "39.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 1,
+     "turnoId": 5,
+     "vigente": {
+      "id": 28,
+      "precio": "44.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 2,
+     "turnoId": 1,
+     "vigente": {
+      "id": 17,
+      "precio": "126.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 2,
+     "turnoId": 2,
+     "vigente": {
+      "id": 20,
+      "precio": "89.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 2,
+     "turnoId": 3,
+     "vigente": {
+      "id": 23,
+      "precio": "63.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 2,
+     "turnoId": 4,
+     "vigente": {
+      "id": 26,
+      "precio": "44.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 2,
+     "turnoId": 5,
+     "vigente": {
+      "id": 29,
+      "precio": "51.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 3,
+     "turnoId": 1,
+     "vigente": {
+      "id": 18,
+      "precio": "110.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 3,
+     "turnoId": 2,
+     "vigente": {
+      "id": 21,
+      "precio": "77.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 3,
+     "turnoId": 3,
+     "vigente": {
+      "id": 24,
+      "precio": "55.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 3,
+     "turnoId": 4,
+     "vigente": {
+      "id": 27,
+      "precio": "39.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    },
+    {
+     "tipoId": 2,
+     "canalId": 3,
+     "turnoId": 5,
+     "vigente": {
+      "id": 30,
+      "precio": "44.00",
+      "moneda": "S/",
+      "desde": "2026-01-01",
+      "hasta": null
+     },
+     "programada": null
+    }
+   ]
+  },
+  "/hospedaje/config/tipos-habitacion": [
+   {
+    "id": 1,
+    "nombre": "Simple",
+    "descripcion": null,
+    "capacidadAdultos": 1,
+    "capacidadNinos": 0,
+    "activo": true,
+    "habitaciones": 0
+   },
+   {
+    "id": 2,
+    "nombre": "Doble",
+    "descripcion": null,
+    "capacidadAdultos": 2,
+    "capacidadNinos": 1,
+    "activo": true,
+    "habitaciones": 1
+   },
+   {
+    "id": 3,
+    "nombre": "Matrimonial",
+    "descripcion": null,
+    "capacidadAdultos": 2,
+    "capacidadNinos": 1,
+    "activo": true,
+    "habitaciones": 13
+   },
+   {
+    "id": 4,
+    "nombre": "Suite",
+    "descripcion": null,
+    "capacidadAdultos": 3,
+    "capacidadNinos": 2,
+    "activo": true,
+    "habitaciones": 0
+   }
+  ],
+  "/hospedaje/estados": [
+   {
+    "id": 1,
+    "codigo": "DESOCUPADA",
+    "descripcion": "Desocupada",
+    "color_hex": "#4CAF50",
+    "permite_venta": true,
+    "orden": 1
+   },
+   {
+    "id": 2,
+    "codigo": "RESERVADA",
+    "descripcion": "Reservada",
+    "color_hex": "#2196F3",
+    "permite_venta": false,
+    "orden": 2
+   },
+   {
+    "id": 3,
+    "codigo": "CONFIRMADA",
+    "descripcion": "Confirmada",
+    "color_hex": "#3F51B5",
+    "permite_venta": false,
+    "orden": 3
+   },
+   {
+    "id": 4,
+    "codigo": "OCUPADA",
+    "descripcion": "Ocupada",
+    "color_hex": "#F44336",
+    "permite_venta": false,
+    "orden": 4
+   },
+   {
+    "id": 5,
+    "codigo": "LIMPIEZA",
+    "descripcion": "Limpieza",
+    "color_hex": "#FFC107",
+    "permite_venta": false,
+    "orden": 5
+   },
+   {
+    "id": 6,
+    "codigo": "MANTENIMIENTO",
+    "descripcion": "Mantenimiento",
+    "color_hex": "#795548",
+    "permite_venta": false,
+    "orden": 6
+   }
+  ],
+  "/hospedaje/operacion": {
+   "configurada": true,
+   "cobroAlIngreso": true,
+   "vendeConsumos": false,
+   "minutosLimpieza": 30,
+   "horaSalidaNoche": "09:00",
+   "turnoSugeridoId": 5,
+   "franjas": [
+    {
+     "nombre": "Madrugada",
+     "desde": "00:00",
+     "hasta": "06:00",
+     "salidaMaxima": "12:00",
+     "diasDespues": 0
+    },
+    {
+     "nombre": "Mañana",
+     "desde": "06:00",
+     "hasta": "12:00",
+     "salidaMaxima": "18:00",
+     "diasDespues": 0
+    },
+    {
+     "nombre": "Tarde y noche",
+     "desde": "12:00",
+     "hasta": "00:00",
+     "salidaMaxima": "06:00",
+     "diasDespues": 1
+    }
+   ]
+  },
+  "/clientes/tipos-documento": [
+   {
+    "id": 2,
+    "abreviatura": "DNI",
+    "descripcion": "Documento Nacional de Identidad"
+   },
+   {
+    "id": 3,
+    "abreviatura": "CE",
+    "descripcion": "Carnet de extranjería"
+   },
+   {
+    "id": 4,
+    "abreviatura": "RUC",
+    "descripcion": "Registro Único de Contribuyentes"
+   },
+   {
+    "id": 5,
+    "abreviatura": "PAS",
+    "descripcion": "Pasaporte"
+   },
+   {
+    "id": 6,
+    "abreviatura": "CDI",
+    "descripcion": "Cédula diplomática de identidad"
+   }
+  ],
+  "/productos": [
+   {
+    "id": 1,
+    "codigo": "AGUA625",
+    "nombre": "Agua mineral 625 ml",
+    "precio": "3.00",
+    "categoria": "Frigobar",
+    "tipo": "BIEN"
+   },
+   {
+    "id": 3,
+    "codigo": "CERVEZA",
+    "nombre": "Cerveza 330 ml",
+    "precio": "8.00",
+    "categoria": "Frigobar",
+    "tipo": "BIEN"
+   },
+   {
+    "id": 2,
+    "codigo": "GASEOSA500",
+    "nombre": "Gaseosa 500 ml",
+    "precio": "4.00",
+    "categoria": "Frigobar",
+    "tipo": "BIEN"
+   },
+   {
+    "id": 4,
+    "codigo": "SNACK",
+    "nombre": "Snack (papas o galletas)",
+    "precio": "3.50",
+    "categoria": "Frigobar",
+    "tipo": "BIEN"
+   },
+   {
+    "id": 7,
+    "codigo": "COCHERA",
+    "nombre": "Cochera (por noche)",
+    "precio": "10.00",
+    "categoria": "Servicios",
+    "tipo": "SERVICIO"
+   },
+   {
+    "id": 5,
+    "codigo": "DESAYUNO",
+    "nombre": "Desayuno continental",
+    "precio": "15.00",
+    "categoria": "Servicios",
+    "tipo": "SERVICIO"
+   },
+   {
+    "id": 6,
+    "codigo": "LAVANDERIA",
+    "nombre": "Lavandería (por prenda)",
+    "precio": "5.00",
+    "categoria": "Servicios",
+    "tipo": "SERVICIO"
+   }
+  ],
+  "/caja/metodos-pago": [
+   {
+    "id": 1,
+    "codigo": "EFECTIVO",
+    "descripcion": "Efectivo",
+    "es_efectivo": true
+   },
+   {
+    "id": 2,
+    "codigo": "TARJETA",
+    "descripcion": "Tarjeta débito/crédito",
+    "es_efectivo": false
+   },
+   {
+    "id": 3,
+    "codigo": "YAPE",
+    "descripcion": "Yape",
+    "es_efectivo": false
+   },
+   {
+    "id": 4,
+    "codigo": "PLIN",
+    "descripcion": "Plin",
+    "es_efectivo": false
+   },
+   {
+    "id": 5,
+    "codigo": "TRANSFERENCIA",
+    "descripcion": "Transferencia bancaria",
+    "es_efectivo": false
+   },
+   {
+    "id": 6,
+    "codigo": "OTA",
+    "descripcion": "Cobrado por la OTA",
+    "es_efectivo": false
+   },
+   {
+    "id": 7,
+    "codigo": "CULQI",
+    "descripcion": "Culqi (tarjeta / QR)",
+    "es_efectivo": false
+   }
+  ],
+  "/caja": {
+   "cajas": [
+    {
+     "id": 1,
+     "nombre": "Recepción 1"
+    }
+   ],
+   "sesion": null,
+   "ultimoCierre": null
+  },
+  "/clientes": [],
+  "/facturacion/series": [
+   {
+    "id": 1,
+    "tipo": "FACTURA",
+    "tipoDescripcion": "Factura electrónica",
+    "serie": "F001",
+    "ultimoNumero": 0,
+    "siguiente": "F001-00000001",
+    "comprobantes": 0,
+    "contingencia": false,
+    "activo": true,
+    "usuarios": []
+   },
+   {
+    "id": 2,
+    "tipo": "BOLETA",
+    "tipoDescripcion": "Boleta de venta electrónica",
+    "serie": "B001",
+    "ultimoNumero": 5,
+    "siguiente": "B001-00000006",
+    "comprobantes": 5,
+    "contingencia": false,
+    "activo": true,
+    "usuarios": []
+   },
+   {
+    "id": 3,
+    "tipo": "INTERNO",
+    "tipoDescripcion": "Comprobante interno (no tributario)",
+    "serie": "I001",
+    "ultimoNumero": 0,
+    "siguiente": "I001-00000001",
+    "comprobantes": 0,
+    "contingencia": false,
+    "activo": true,
+    "usuarios": []
+   }
+  ],
+  "/reservas": [
+   {
+    "id": 1,
+    "codigo": "R-000001",
+    "estado": "PENDIENTE",
+    "entrada": "2026-11-26T12:35:07.000Z",
+    "salida": "2026-11-26T16:35:07.000Z",
+    "adultos": 2,
+    "ninos": 0,
+    "total": "48.00",
+    "comision": {
+     "porcentaje": "0.00",
+     "monto": "0.00"
+    },
+    "adelanto": "0.00",
+    "saldo": "48.00",
+    "observaciones": null,
+    "codigoExterno": null,
+    "motivoCancelacion": null,
+    "canceladaPor": null,
+    "canceladaEn": null,
+    "creada": "2026-11-26T14:05:07.000Z",
+    "canal": {
+     "id": 3,
+     "nombre": "Teléfono",
+     "esOta": false
+    },
+    "cliente": {
+     "id": 6,
+     "documento": "DNI 42315678",
+     "nombre": "Martín Quispe Rojas",
+     "telefono": null,
+     "pais": "PE"
+    },
+    "habitaciones": [
+     {
+      "id": 7,
+      "numero": "202",
+      "tipo": "Matrimonial",
+      "turno": "Turno 4 horas",
+      "horasTurno": 4,
+      "cantidad": 1,
+      "precio": "48.00"
+     }
+    ]
+   },
+   {
+    "id": 2,
+    "codigo": "R-000002",
+    "estado": "CONFIRMADA",
+    "entrada": "2026-11-26T16:05:07.000Z",
+    "salida": "2026-11-26T20:05:07.000Z",
+    "adultos": 2,
+    "ninos": 0,
+    "total": "48.00",
+    "comision": {
+     "porcentaje": "0.00",
+     "monto": "0.00"
+    },
+    "adelanto": "0.00",
+    "saldo": "48.00",
+    "observaciones": "Confirmó por teléfono; paga al llegar",
+    "codigoExterno": null,
+    "motivoCancelacion": null,
+    "canceladaPor": null,
+    "canceladaEn": null,
+    "creada": "2026-11-26T14:05:07.000Z",
+    "canal": {
+     "id": 3,
+     "nombre": "Teléfono",
+     "esOta": false
+    },
+    "cliente": {
+     "id": 7,
+     "documento": "DNI 40998877",
+     "nombre": "Gabriela Torres Vela",
+     "telefono": null,
+     "pais": "PE"
+    },
+    "habitaciones": [
+     {
+      "id": 11,
+      "numero": "206",
+      "tipo": "Matrimonial",
+      "turno": "Turno 4 horas",
+      "horasTurno": 4,
+      "cantidad": 1,
+      "precio": "48.00"
+     }
+    ]
+   },
+   {
+    "id": 3,
+    "codigo": "R-000003",
+    "estado": "PENDIENTE",
+    "entrada": "2026-11-27T19:00:00.000Z",
+    "salida": "2026-11-28T14:00:00.000Z",
+    "adultos": 2,
+    "ninos": 0,
+    "total": "120.00",
+    "comision": {
+     "porcentaje": "0.00",
+     "monto": "0.00"
+    },
+    "adelanto": "0.00",
+    "saldo": "120.00",
+    "observaciones": null,
+    "codigoExterno": null,
+    "motivoCancelacion": null,
+    "canceladaPor": null,
+    "canceladaEn": null,
+    "creada": "2026-11-26T14:05:07.000Z",
+    "canal": {
+     "id": 1,
+     "nombre": "Recepción",
+     "esOta": false
+    },
+    "cliente": {
+     "id": 8,
+     "documento": "PAS AR3399120",
+     "nombre": "Julián Ferreyra",
+     "telefono": null,
+     "pais": "AR"
+    },
+    "habitaciones": [
+     {
+      "id": 13,
+      "numero": "208",
+      "tipo": "Matrimonial",
+      "turno": "Turno 24 horas",
+      "horasTurno": 24,
+      "cantidad": 1,
+      "precio": "120.00"
+     }
+    ]
+   },
+   {
+    "id": 4,
+    "codigo": "R-000004",
+    "estado": "CONFIRMADA",
+    "entrada": "2026-11-28T19:00:00.000Z",
+    "salida": "2026-11-30T14:00:00.000Z",
+    "adultos": 2,
+    "ninos": 0,
+    "total": "276.00",
+    "comision": {
+     "porcentaje": "15.00",
+     "monto": "41.40"
+    },
+    "adelanto": "0.00",
+    "saldo": "276.00",
+    "observaciones": "Confirmó por teléfono; paga al llegar",
+    "codigoExterno": "BK-4410311",
+    "motivoCancelacion": null,
+    "canceladaPor": null,
+    "canceladaEn": null,
+    "creada": "2026-11-26T14:05:07.000Z",
+    "canal": {
+     "id": 2,
+     "nombre": "Booking",
+     "esOta": true
+    },
+    "cliente": {
+     "id": 2,
+     "documento": "PAS CL8834521",
+     "nombre": "Valentina Soto",
+     "telefono": null,
+     "pais": "CL"
+    },
+    "habitaciones": [
+     {
+      "id": 1,
+      "numero": "101",
+      "tipo": "Matrimonial",
+      "turno": "Turno 24 horas",
+      "horasTurno": 24,
+      "cantidad": 2,
+      "precio": "138.00"
+     }
+    ]
+   },
+   {
+    "id": 5,
+    "codigo": "R-000005",
+    "estado": "PENDIENTE",
+    "entrada": "2026-11-29T19:00:00.000Z",
+    "salida": "2026-11-29T22:00:00.000Z",
+    "adultos": 2,
+    "ninos": 0,
+    "total": "42.00",
+    "comision": {
+     "porcentaje": "0.00",
+     "monto": "0.00"
+    },
+    "adelanto": "0.00",
+    "saldo": "42.00",
+    "observaciones": null,
+    "codigoExterno": null,
+    "motivoCancelacion": null,
+    "canceladaPor": null,
+    "canceladaEn": null,
+    "creada": "2026-11-26T14:05:07.000Z",
+    "canal": {
+     "id": 3,
+     "nombre": "Teléfono",
+     "esOta": false
+    },
+    "cliente": {
+     "id": 3,
+     "documento": "DNI 70123456",
+     "nombre": "Lucía Gutiérrez Paz",
+     "telefono": null,
+     "pais": "PE"
+    },
+    "habitaciones": [
+     {
+      "id": 9,
+      "numero": "204",
+      "tipo": "Matrimonial",
+      "turno": "Turno 3 horas",
+      "horasTurno": 3,
+      "cantidad": 1,
+      "precio": "42.00"
+     }
+    ]
+   }
+  ]
+ },
+ "clientes": [
+  {
+   "id": 7,
+   "documento": "DNI 40998877",
+   "nombre": "Gabriela Torres Vela",
+   "telefono": null,
+   "pais": "PE"
+  },
+  {
+   "id": 6,
+   "documento": "DNI 42315678",
+   "nombre": "Martín Quispe Rojas",
+   "telefono": null,
+   "pais": "PE"
+  },
+  {
+   "id": 1,
+   "documento": "DNI 45678912",
+   "nombre": "Carlos Mendoza Ríos",
+   "telefono": null,
+   "pais": "PE"
+  },
+  {
+   "id": 5,
+   "documento": "DNI 46781234",
+   "nombre": "Rosa Flores Vega",
+   "telefono": null,
+   "pais": "PE"
+  },
+  {
+   "id": 3,
+   "documento": "DNI 70123456",
+   "nombre": "Lucía Gutiérrez Paz",
+   "telefono": null,
+   "pais": "PE"
+  },
+  {
+   "id": 8,
+   "documento": "PAS AR3399120",
+   "nombre": "Julián Ferreyra",
+   "telefono": null,
+   "pais": "AR"
+  },
+  {
+   "id": 4,
+   "documento": "PAS BO552310",
+   "nombre": "Diego Arce",
+   "telefono": null,
+   "pais": "BO"
+  },
+  {
+   "id": 2,
+   "documento": "PAS CL8834521",
+   "nombre": "Valentina Soto",
+   "telefono": null,
+   "pais": "CL"
+  }
+ ],
+ "estancias": [
+  {
+   "id": 1,
+   "estado": "ACTIVA",
+   "habitacion": {
+    "id": 2,
+    "numero": "102",
+    "tipo": "Matrimonial",
+    "capacidad": 3
+   },
+   "checkin": "2026-11-26T12:35:07.000Z",
+   "salidaPrevista": "2026-11-26T16:35:07.000Z",
+   "checkout": null,
+   "turno": "Turno 4 horas",
+   "horasTurno": 4,
+   "cantidad": 1,
+   "precio": "48.00",
+   "canal": "Recepción",
+   "procedencia": "Tacna, Perú",
+   "destino": null,
+   "motivoViaje": null,
+   "placa": null,
+   "reserva": null,
+   "huespedes": [
+    {
+     "id": 1,
+     "titular": true,
+     "nombre": "Carlos Mendoza Ríos",
+     "documento": "DNI 45678912"
+    }
+   ],
+   "cargos": [],
+   "cuenta": {
+    "lineas": [
+     {
+      "tipo": "HOSPEDAJE",
+      "descripcion": "Hospedaje hab. 102 (Matrimonial) · 1 × turno de 4 h",
+      "cantidad": 1,
+      "precioUnitario": "48.00",
+      "total": "48.00",
+      "estanciaId": "1"
+     }
+    ],
+    "pendientes": [],
+    "total": "48.00",
+    "porCobrar": "0.00",
+    "cobrado": "48.00",
+    "comprobantes": [
+     {
+      "id": 1,
+      "numero": "B001-00000001",
+      "total": "48.00"
+     }
+    ],
+    "adelanto": "0.00",
+    "saldo": "0.00",
+    "comision": {
+     "porcentaje": "0.00",
+     "monto": "0.00"
+    },
+    "reserva": null
+   },
+   "grupo": [
+    {
+     "id": 1,
+     "habitacion": "102"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "estado": "ACTIVA",
+   "habitacion": {
+    "id": 4,
+    "numero": "104",
+    "tipo": "Matrimonial",
+    "capacidad": 3
+   },
+   "checkin": "2026-11-26T10:29:07.000Z",
+   "salidaPrevista": "2026-11-26T14:29:07.000Z",
+   "checkout": null,
+   "turno": "Turno 4 horas",
+   "horasTurno": 4,
+   "cantidad": 1,
+   "precio": "48.00",
+   "canal": "Recepción",
+   "procedencia": "Exterior",
+   "destino": null,
+   "motivoViaje": null,
+   "placa": null,
+   "reserva": null,
+   "huespedes": [
+    {
+     "id": 2,
+     "titular": true,
+     "nombre": "Valentina Soto",
+     "documento": "PAS CL8834521"
+    }
+   ],
+   "cargos": [],
+   "cuenta": {
+    "lineas": [
+     {
+      "tipo": "HOSPEDAJE",
+      "descripcion": "Hospedaje hab. 104 (Matrimonial) · 1 × turno de 4 h",
+      "cantidad": 1,
+      "precioUnitario": "48.00",
+      "total": "48.00",
+      "estanciaId": "2"
+     }
+    ],
+    "pendientes": [],
+    "total": "48.00",
+    "porCobrar": "0.00",
+    "cobrado": "48.00",
+    "comprobantes": [
+     {
+      "id": 2,
+      "numero": "B001-00000002",
+      "total": "48.00"
+     }
+    ],
+    "adelanto": "0.00",
+    "saldo": "0.00",
+    "comision": {
+     "porcentaje": "0.00",
+     "monto": "0.00"
+    },
+    "reserva": null
+   },
+   "grupo": [
+    {
+     "id": 2,
+     "habitacion": "104"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "estado": "ACTIVA",
+   "habitacion": {
+    "id": 8,
+    "numero": "203",
+    "tipo": "Matrimonial",
+    "capacidad": 3
+   },
+   "checkin": "2026-11-26T10:23:07.000Z",
+   "salidaPrevista": "2026-11-26T13:23:07.000Z",
+   "checkout": null,
+   "turno": "Turno 3 horas",
+   "horasTurno": 3,
+   "cantidad": 1,
+   "precio": "42.00",
+   "canal": "Recepción",
+   "procedencia": "Tacna, Perú",
+   "destino": null,
+   "motivoViaje": null,
+   "placa": null,
+   "reserva": null,
+   "huespedes": [
+    {
+     "id": 3,
+     "titular": true,
+     "nombre": "Lucía Gutiérrez Paz",
+     "documento": "DNI 70123456"
+    }
+   ],
+   "cargos": [],
+   "cuenta": {
+    "lineas": [
+     {
+      "tipo": "HOSPEDAJE",
+      "descripcion": "Hospedaje hab. 203 (Matrimonial) · 2 × turno de 3 h (incluye 1 por salida tardía)",
+      "cantidad": 2,
+      "precioUnitario": "42.00",
+      "total": "84.00",
+      "estanciaId": "3"
+     }
+    ],
+    "pendientes": [
+     {
+      "tipo": "HOSPEDAJE",
+      "descripcion": "Hospedaje hab. 203 (Matrimonial) · 1 × turno de 3 h · salida tardía",
+      "cantidad": 1,
+      "precioUnitario": "42.00",
+      "total": "42.00",
+      "estanciaId": "3"
+     }
+    ],
+    "total": "84.00",
+    "porCobrar": "42.00",
+    "cobrado": "42.00",
+    "comprobantes": [
+     {
+      "id": 3,
+      "numero": "B001-00000003",
+      "total": "42.00"
+     }
+    ],
+    "adelanto": "0.00",
+    "saldo": "42.00",
+    "comision": {
+     "porcentaje": "0.00",
+     "monto": "0.00"
+    },
+    "reserva": null
+   },
+   "grupo": [
+    {
+     "id": 3,
+     "habitacion": "203"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "estado": "ACTIVA",
+   "habitacion": {
+    "id": 10,
+    "numero": "205",
+    "tipo": "Matrimonial",
+    "capacidad": 3
+   },
+   "checkin": "2026-11-26T13:05:07.000Z",
+   "salidaPrevista": "2026-11-26T19:05:07.000Z",
+   "checkout": null,
+   "turno": "Turno 6 horas",
+   "horasTurno": 6,
+   "cantidad": 1,
+   "precio": "60.00",
+   "canal": "Recepción",
+   "procedencia": "Exterior",
+   "destino": null,
+   "motivoViaje": null,
+   "placa": null,
+   "reserva": null,
+   "huespedes": [
+    {
+     "id": 4,
+     "titular": true,
+     "nombre": "Diego Arce",
+     "documento": "PAS BO552310"
+    }
+   ],
+   "cargos": [],
+   "cuenta": {
+    "lineas": [
+     {
+      "tipo": "HOSPEDAJE",
+      "descripcion": "Hospedaje hab. 205 (Matrimonial) · 1 × turno de 6 h",
+      "cantidad": 1,
+      "precioUnitario": "60.00",
+      "total": "60.00",
+      "estanciaId": "4"
+     }
+    ],
+    "pendientes": [],
+    "total": "60.00",
+    "porCobrar": "0.00",
+    "cobrado": "60.00",
+    "comprobantes": [
+     {
+      "id": 4,
+      "numero": "B001-00000004",
+      "total": "60.00"
+     }
+    ],
+    "adelanto": "0.00",
+    "saldo": "0.00",
+    "comision": {
+     "porcentaje": "0.00",
+     "monto": "0.00"
+    },
+    "reserva": null
+   },
+   "grupo": [
+    {
+     "id": 4,
+     "habitacion": "205"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "estado": "ACTIVA",
+   "habitacion": {
+    "id": 12,
+    "numero": "207",
+    "tipo": "Matrimonial",
+    "capacidad": 3
+   },
+   "checkin": "2026-11-26T12:05:07.000Z",
+   "salidaPrevista": "2026-11-27T14:00:00.000Z",
+   "checkout": null,
+   "turno": "Turno 24 horas",
+   "horasTurno": 24,
+   "cantidad": 1,
+   "precio": "120.00",
+   "canal": "Recepción",
+   "procedencia": "Tacna, Perú",
+   "destino": null,
+   "motivoViaje": null,
+   "placa": null,
+   "reserva": null,
+   "huespedes": [
+    {
+     "id": 5,
+     "titular": true,
+     "nombre": "Rosa Flores Vega",
+     "documento": "DNI 46781234"
+    }
+   ],
+   "cargos": [],
+   "cuenta": {
+    "lineas": [
+     {
+      "tipo": "HOSPEDAJE",
+      "descripcion": "Hospedaje hab. 207 (Matrimonial) · 1 noche",
+      "cantidad": 1,
+      "precioUnitario": "120.00",
+      "total": "120.00",
+      "estanciaId": "5"
+     }
+    ],
+    "pendientes": [],
+    "total": "120.00",
+    "porCobrar": "0.00",
+    "cobrado": "120.00",
+    "comprobantes": [
+     {
+      "id": 5,
+      "numero": "B001-00000005",
+      "total": "120.00"
+     }
+    ],
+    "adelanto": "0.00",
+    "saldo": "0.00",
+    "comision": {
+     "porcentaje": "0.00",
+     "monto": "0.00"
+    },
+    "reserva": null
+   },
+   "grupo": [
+    {
+     "id": 5,
+     "habitacion": "207"
+    }
+   ]
+  }
+ ]
+}
