@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { api, type Cliente, type Estancia, type MetodoPago, type Producto, type ResultadoCheckout, type Tablero } from '../../lib/api';
+import { api, type Cliente, type Estancia, type MetodoPago, type Producto, type ResultadoCheckout, type SerieParaEmitir, type Tablero } from '../../lib/api';
 import { puede, useSesion } from '../auth/sesion';
 import { soles } from '../hospedaje/formato';
 import { horaLima } from '../reservas/fechas';
@@ -46,13 +46,25 @@ interface FilaPago { metodoPagoId: number; monto: string; referencia: string }
 
 export function PanelCheckout({ e, onListo, onVolver }: { e: Estancia; onListo: (r: ResultadoCheckout) => void; onVolver: () => void }) {
   const refrescar = useRefrescarHotel();
+  const { data: sesion } = useSesion();
   const metodos = useQuery({ queryKey: ['caja', 'metodos'], queryFn: () => api<MetodoPago[]>('/caja/metodos-pago') });
   const [tipo, setTipo] = useState<'BOLETA' | 'FACTURA' | 'INTERNO'>('BOLETA');
   const [empresa, setEmpresa] = useState<Cliente | null>(null);
-  const saldo = cent(e.cuenta.saldo);
+  // Boleta a nombre de otra persona (S-07 D9); por defecto, el titular
+  const [otraPersona, setOtraPersona] = useState<Cliente | null>(null);
+  const [aOtro, setAOtro] = useState(false);
+  // Descuento global (RF-FAC-08): en soles o %, con motivo; lo valida la API
+  const [conDescuento, setConDescuento] = useState(false);
+  const [desc, setDesc] = useState<{ tipo: 'MONTO' | 'PORCENTAJE'; valor: string; motivo: string }>({ tipo: 'MONTO', valor: '', motivo: '' });
+  const total = cent(e.cuenta.total);
+  const descCent = !conDescuento || !(Number(desc.valor) > 0) ? 0 : desc.tipo === 'MONTO' ? cent(desc.valor) : Math.round((total * Number(desc.valor)) / 100);
+  const descError = !conDescuento ? null : !(Number(desc.valor) > 0) ? 'Indica el descuento' : descCent > total - cent(e.cuenta.adelanto) ? 'El descuento no puede bajar el total por debajo del adelanto' : desc.motivo.trim().length < 5 ? 'Escribe el motivo (5 caracteres o más)' : null;
+  const serie = useQuery({ queryKey: ['serie-para-emitir', tipo], queryFn: () => api<SerieParaEmitir>(`/facturacion/series/para-emitir?tipo=${tipo}`), retry: false });
+  const saldo = cent(e.cuenta.saldo) - descCent;
+  const saldoTexto = (saldo / 100).toFixed(2);
   const efectivo = metodos.data?.find((m) => m.es_efectivo);
   const [pagos, setPagos] = useState<FilaPago[]>([]);
-  const filas = pagos.length || saldo === 0 ? pagos : efectivo ? [{ metodoPagoId: efectivo.id, monto: e.cuenta.saldo, referencia: '' }] : [];
+  const filas = pagos.length || saldo === 0 ? pagos : efectivo ? [{ metodoPagoId: efectivo.id, monto: saldoTexto, referencia: '' }] : [];
   const esEfectivo = (id: number) => !!metodos.data?.find((m) => m.id === id)?.es_efectivo;
   const entregado = filas.reduce((s, p) => s + cent(p.monto || 0), 0);
   const noEfectivo = filas.filter((p) => !esEfectivo(p.metodoPagoId)).reduce((s, p) => s + cent(p.monto || 0), 0);
@@ -64,7 +76,8 @@ export function PanelCheckout({ e, onListo, onVolver }: { e: Estancia; onListo: 
     mutationFn: () =>
       api<ResultadoCheckout>(`/estancias/${e.id}/checkout`, json('POST', {
         tipoComprobante: tipo,
-        clienteId: tipo === 'FACTURA' ? empresa?.id : undefined,
+        clienteId: tipo === 'FACTURA' ? empresa?.id : tipo === 'BOLETA' && aOtro ? otraPersona?.id : undefined,
+        descuento: conDescuento ? { tipo: desc.tipo, valor: Number(desc.valor), motivo: desc.motivo } : undefined,
         pagos: filas.filter((p) => Number(p.monto) > 0).map((p) => ({ metodoPagoId: p.metodoPagoId, monto: Number(p.monto), referencia: p.referencia || null })),
       })),
     onSuccess: (r) => { refrescar(); onListo(r); },
@@ -88,10 +101,41 @@ export function PanelCheckout({ e, onListo, onVolver }: { e: Estancia; onListo: 
           ))}
         </div>
         <span className="text-xs text-tinta-suave">
-          {tipo === 'FACTURA' ? 'A nombre de una empresa con RUC.' : tipo === 'BOLETA' ? `A nombre de ${e.huespedes.find((h) => h.titular)?.nombre ?? 'el titular'}.` : 'Uso interno: no se envía a SUNAT.'}
+          {tipo === 'FACTURA' ? 'A nombre de una empresa con RUC.' : tipo === 'BOLETA' ? `A nombre de ${aOtro && otraPersona ? otraPersona.nombre : (e.huespedes.find((h) => h.titular)?.nombre ?? 'el titular')}.` : 'Uso interno: no se envía a SUNAT.'}
           {tipo !== 'INTERNO' && ' El envío a SUNAT se activa en la fase de facturación (F3).'}
         </span>
+        <span className="text-xs">
+          {serie.data ? <>Se emitirá como <b className="font-mono">{serie.data.siguiente}</b></> : serie.error ? <span className="text-ocupada">{serie.error.message}</span> : null}
+        </span>
+        {tipo === 'BOLETA' && (
+          <label className="flex items-center gap-2 text-xs text-tinta-suave">
+            <input type="checkbox" checked={aOtro} onChange={(ev) => setAOtro(ev.target.checked)} /> A nombre de otra persona
+          </label>
+        )}
+        {tipo === 'BOLETA' && aOtro && <ElegirHuesped valor={otraPersona} onCambio={setOtraPersona} />}
       </div>
+
+      {puede(sesion, 'descuento.aplicar') && (
+        <div className="flex flex-col gap-2 text-sm">
+          <label className="flex items-center gap-2 font-medium">
+            <input type="checkbox" checked={conDescuento} onChange={(ev) => { setConDescuento(ev.target.checked); setPagos([]); }} /> Descuento global
+          </label>
+          {conDescuento && (
+            <div className="flex flex-col gap-2 rounded-lg border border-borde p-2">
+              <div className="grid grid-cols-[110px_1fr] gap-2">
+                <Selector value={desc.tipo} onChange={(ev) => { setDesc({ ...desc, tipo: ev.target.value as 'MONTO' | 'PORCENTAJE' }); setPagos([]); }} aria-label="Tipo de descuento">
+                  <option value="MONTO">En soles</option>
+                  <option value="PORCENTAJE">En %</option>
+                </Selector>
+                <Entrada type="number" min={0} step="0.10" value={desc.valor} onChange={(ev) => { setDesc({ ...desc, valor: ev.target.value }); setPagos([]); }} aria-label="Valor del descuento" placeholder={desc.tipo === 'MONTO' ? 'S/' : '%'} />
+              </div>
+              <Entrada value={desc.motivo} maxLength={250} onChange={(ev) => setDesc({ ...desc, motivo: ev.target.value })} placeholder="Motivo (ej. cliente frecuente)" aria-label="Motivo del descuento" />
+              {descCent > 0 && <span className="text-xs text-tinta-suave">Descuento de {soles(descCent / 100)} sobre el total; las líneas no cambian. Queda registrado con tu usuario.</span>}
+              {descError && <span className="text-xs text-ocupada">{descError}</span>}
+            </div>
+          )}
+        </div>
+      )}
       {tipo === 'FACTURA' && (
         <div className="flex flex-col gap-1 text-sm">
           <span className="font-medium">Empresa (RUC)</span>
@@ -105,7 +149,7 @@ export function PanelCheckout({ e, onListo, onVolver }: { e: Estancia; onListo: 
           <span className="text-sm font-medium">Pagos</span>
           <div className="flex flex-wrap gap-1">
             {metodos.data?.filter((m) => m.codigo !== 'OTA').map((m) => (
-              <button key={m.id} onClick={() => setPagos([{ metodoPagoId: m.id, monto: e.cuenta.saldo, referencia: '' }])} className="rounded-md border border-borde px-2 py-1 text-xs hover:border-acento">
+              <button key={m.id} onClick={() => setPagos([{ metodoPagoId: m.id, monto: saldoTexto, referencia: '' }])} className="rounded-md border border-borde px-2 py-1 text-xs hover:border-acento">
                 Todo en {m.descripcion.toLowerCase()}
               </button>
             ))}
@@ -131,12 +175,12 @@ export function PanelCheckout({ e, onListo, onVolver }: { e: Estancia; onListo: 
           </div>
         </div>
       ) : (
-        <Aviso tipo="info">La cuenta ya está pagada (adelanto o canal). Solo se emite el comprobante.</Aviso>
+        <Aviso tipo="info">{descCent > 0 ? 'Con el descuento, la cuenta queda pagada.' : 'La cuenta ya está pagada (adelanto o canal).'} Solo se emite el comprobante.</Aviso>
       )}
       {error && saldo > 0 && <Aviso>{error}</Aviso>}
       {cobrar.error && <Aviso>{cobrar.error.message}</Aviso>}
-      <Button variante="primario" className="h-11" disabled={(saldo > 0 && !!error) || cobrar.isPending || (tipo === 'FACTURA' && !empresa?.documento.startsWith('RUC'))} onClick={() => cobrar.mutate()}>
-        {cobrar.isPending ? 'Cobrando…' : `Cobrar ${soles(e.cuenta.saldo)} y hacer check-out`}
+      <Button variante="primario" className="h-11" disabled={(saldo > 0 && !!error) || cobrar.isPending || !!descError || !serie.data || (tipo === 'FACTURA' && !empresa?.documento.startsWith('RUC')) || (tipo === 'BOLETA' && aOtro && !otraPersona)} onClick={() => cobrar.mutate()}>
+        {cobrar.isPending ? 'Cobrando…' : `Cobrar ${soles(saldoTexto)} y hacer check-out`}
       </Button>
       <p className="text-xs text-tinta-suave">Al confirmar se emite el comprobante, el pago entra a la caja y {e.grupo.length > 1 ? 'las habitaciones pasan' : 'la habitación pasa'} a limpieza.</p>
     </div>

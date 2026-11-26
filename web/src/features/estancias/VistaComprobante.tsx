@@ -43,10 +43,14 @@ export function VistaComprobante({ id, vuelto }: { id: number; vuelto?: string }
         ))}
       </div>
       <div className="mt-1 border-t border-dashed border-black pt-1">
+        {Number(c.descuento) > 0 && (
+          <div className="flex justify-between"><span>DESCUENTO GLOBAL</span><span>-{soles(c.descuento)}</span></div>
+        )}
         <div className="flex justify-between"><span>OP. GRAVADA</span><span>{soles(c.gravada)}</span></div>
         <div className="flex justify-between"><span>IGV 18%</span><span>{soles(c.igv)}</span></div>
         <div className="flex justify-between text-sm font-bold"><span>TOTAL</span><span>{soles(c.total)}</span></div>
         {c.letras && <div className="mt-1">SON: {c.letras}</div>}
+        {c.descuentoMotivo && <div className="mt-1 text-[11px]">Descuento: {c.descuentoMotivo}</div>}
       </div>
       <div className="mt-2 border-t border-dashed border-black pt-1">
         {c.pagos.map((p, i) => <div key={i} className="flex justify-between"><span>{p.metodo}{p.referencia ? ` (${p.referencia})` : ''}</span><span>{Number(p.monto).toFixed(2)}</span></div>)}

@@ -25,6 +25,8 @@ const CargoSchema = z
 const CheckoutSchema = z.object({
   tipoComprobante: z.enum(['BOLETA', 'FACTURA', 'INTERNO']),
   clienteId: Id.optional(),
+  serieId: Id.optional(),
+  descuento: z.object({ tipo: z.enum(['MONTO', 'PORCENTAJE']), valor: z.number(), motivo: z.string().max(400) }).optional(),
   pagos: z.array(z.object({ metodoPagoId: Id, monto: z.number().positive().max(999_999), referencia: z.string().max(60).nullable().optional() })).max(6),
 });
 const FechaSchema = z.object({ fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
@@ -116,6 +118,12 @@ export class EstanciasController {
   @Get('comprobantes')
   listar(@UsuarioActual() u: UsuarioSesion, @Query(new ZodValidationPipe(FechaSchema)) q: z.infer<typeof FechaSchema>) {
     return this.comprobantes.listar(u.sucursalId, q.fecha ?? hoyLima());
+  }
+
+  /** Lo que se enviará al proveedor en el S-08, armado y verificado (spec S-07 D10). */
+  @Get('comprobantes/:id/estructura')
+  estructura(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseIntPipe) id: number) {
+    return this.comprobantes.estructura(u.sucursalId, id);
   }
 
   @Get('comprobantes/:id')

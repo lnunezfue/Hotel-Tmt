@@ -264,13 +264,12 @@ async function main() {
     });
   }
 
-  // Series y cajas (preparadas para la fase de facturación)
+  // Series compartidas por sucursal (sin usuarios asignados: las usa cualquiera, S-07 D4) y cajas
   const tc = await prisma.tipo_comprobante.findMany();
   const tcid = (c: string) => tc.find((t) => t.codigo === c)!.id;
   for (const [suc, n] of [[centro.id, 1], [alto.id, 2]] as const) {
     for (const [cod, pref] of [['FACTURA', 'F'], ['BOLETA', 'B'], ['INTERNO', 'I']] as const) {
-      const s = await prisma.serie.create({ data: { sucursal_id: suc, tipo_comprobante_id: tcid(cod), serie: `${pref}00${n}` } });
-      await prisma.usuario_serie.create({ data: { usuario_id: creados.admin, serie_id: s.id } });
+      await prisma.serie.create({ data: { sucursal_id: suc, tipo_comprobante_id: tcid(cod), serie: `${pref}00${n}` } });
     }
     await prisma.caja.create({ data: { sucursal_id: suc, nombre: 'Recepción 1' } });
   }

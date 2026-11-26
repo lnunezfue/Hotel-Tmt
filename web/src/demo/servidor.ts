@@ -296,7 +296,13 @@ function letras(soles: string): string {
 function checkout(h: Hab, b: Record<string, unknown>) {
   const grupo = grupoDe(h);
   const c = cuenta(grupo);
-  const saldo = cent(c.saldo);
+  // Descuento global (S-07): en soles o %, sin bajar el total por debajo del adelanto
+  const d = b.descuento as { tipo: 'MONTO' | 'PORCENTAJE'; valor: number; motivo: string } | undefined;
+  const descCent = d ? (d.tipo === 'MONTO' ? cent(d.valor) : Math.round((cent(c.total) * d.valor) / 100)) : 0;
+  if (d && String(d.motivo ?? '').trim().length < 5) return error(400, 'El motivo del descuento debe tener entre 5 y 250 caracteres');
+  if (descCent > cent(c.total) - cent(c.adelanto)) return error(400, 'El descuento no puede bajar el total por debajo del adelanto');
+  const saldo = cent(c.saldo) - descCent;
+  const totalFinal = cent(c.total) - descCent;
   const pagos = (b.pagos as Array<{ metodoPagoId: number; monto: number; referencia?: string | null }>) ?? [];
   const noEf = pagos.filter((p) => !metodo(p.metodoPagoId)?.es_efectivo).reduce((s, p) => s + cent(p.monto), 0);
   const total = pagos.reduce((s, p) => s + cent(p.monto), 0);
@@ -305,7 +311,7 @@ function checkout(h: Hab, b: Record<string, unknown>) {
   if (pagos.length && !db.caja) return error(409, 'La caja está cerrada. Ábrela en «Caja» para registrar cobros.', 'CAJA_CERRADA');
   const tipo = b.tipoComprobante as Comprobante['tipo'];
   const titular = grupo[0].estancia!.huespedes.find((x) => x.titular) ?? grupo[0].estancia!.huespedes[0];
-  const cliente = tipo === 'FACTURA' ? db.clientes.find((x) => x.id === b.clienteId) : { nombre: titular.nombre, documento: titular.documento };
+  const cliente = tipo === 'FACTURA' || b.clienteId ? db.clientes.find((x) => x.id === b.clienteId) : { nombre: titular.nombre, documento: titular.documento };
   if (!cliente) return error(400, 'El cliente del comprobante no existe');
   if (tipo === 'FACTURA' && !cliente.documento.startsWith('RUC')) return error(400, 'La factura requiere un cliente con RUC');
   const serie = { BOLETA: 'B001', FACTURA: 'F001', INTERNO: 'I001' }[tipo];
@@ -322,6 +328,7 @@ function checkout(h: Hab, b: Record<string, unknown>) {
   const lima = new Date(ahora.getTime() - 5 * 3_600_000).toISOString();
   let gravada = 0;
   for (const l of c.lineas) gravada += Math.round(cent(l.total) / 1.18);
+  gravada -= Math.round(descCent / 1.18);
   const empresa = R<{ ruc: string; razon_social: string; nombre_comercial: string | null }>('/organizacion/empresa');
   const tipoDoc = cliente.documento.split(' ')[0];
   const comp: Comprobante = {
@@ -329,7 +336,7 @@ function checkout(h: Hab, b: Record<string, unknown>) {
     emisor: { ruc: empresa.ruc, razonSocial: empresa.razon_social, nombreComercial: empresa.nombre_comercial, direccion: 'Av. Bolognesi 123, Tacna', sucursal: 'Hotel Centro' },
     cliente: { tipoDoc: { DNI: '1', RUC: '6', CE: '4', PAS: '7' }[tipoDoc] ?? '0', documento: cliente.documento.split(' ').slice(1).join(' '), nombre: cliente.nombre, direccion: null },
     lineas: c.lineas.map((l, i) => ({ item: i + 1, descripcion: l.descripcion, cantidad: l.cantidad, precio: l.precioUnitario, total: l.total })),
-    gravada: soles(gravada), igv: soles(cent(c.total) - gravada), total: c.total, letras: letras(c.total),
+    gravada: soles(gravada), igv: soles(totalFinal - gravada), descuento: soles(descCent), descuentoMotivo: d?.motivo ?? null, total: soles(totalFinal), letras: letras(soles(totalFinal)),
     pagos: [
       ...(cent(c.adelanto) > 0 ? [{ metodo: 'Adelanto', monto: c.adelanto, referencia: `Adelanto ${c.reserva!.codigo}` }] : []),
       ...registrados.map((p) => ({ metodo: metodo(p.metodoPagoId)!.descripcion, monto: soles(p.monto), referencia: p.referencia ?? null })),
@@ -345,7 +352,7 @@ function checkout(h: Hab, b: Record<string, unknown>) {
   const r = db.reservas.find((x) => x.id === c.reserva?.id);
   if (r) r.estado = 'FINALIZADA';
   marcar('checkout');
-  return { comprobanteId: comp.id, comprobante: numero, total: c.total, vuelto: soles(total - saldo) };
+  return { comprobanteId: comp.id, comprobante: numero, total: soles(totalFinal), descuento: soles(descCent), vuelto: soles(total - saldo) };
 }
 
 // ── Vistas de tablero y plano ──────────────────────────────────
@@ -525,6 +532,10 @@ export async function responder<T>(rutaCompleta: string, init: RequestInit): Pro
     if (ruta === '/clientes') {
       const t = (q.get('q') ?? '').toLowerCase();
       return salida(t.length < 2 ? [] : db.clientes.filter((c) => `${c.nombre} ${c.documento}`.toLowerCase().includes(t)).slice(0, 8));
+    }
+    if (ruta === '/facturacion/series/para-emitir') {
+      const serie = { BOLETA: 'B001', FACTURA: 'F001', INTERNO: 'I001' }[q.get('tipo') as 'BOLETA'] ?? 'B001';
+      return salida({ id: 0, serie, siguiente: `${serie}-${String((db.correlativos[serie] ?? 0) + 1).padStart(8, '0')}` });
     }
     if (ruta === '/clientes/cartera') {
       const t = (q.get('q') ?? '').toLowerCase();

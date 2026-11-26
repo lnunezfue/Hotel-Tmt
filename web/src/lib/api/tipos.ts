@@ -204,7 +204,22 @@ export interface Estancia {
 export interface Producto { id: number; codigo: string; nombre: string; precio: string; categoria: string; tipo: 'BIEN' | 'SERVICIO' }
 export interface MetodoPago { id: number; codigo: string; descripcion: string; es_efectivo: boolean }
 
-export interface ResultadoCheckout { comprobanteId: number; comprobante: string; total: string; vuelto: string }
+export interface ResultadoCheckout { comprobanteId: number; comprobante: string; total: string; descuento: string; vuelto: string }
+
+/** Serie de comprobantes de la sucursal (S-07). */
+export interface SerieComprobante {
+  id: number;
+  tipo: 'FACTURA' | 'BOLETA' | 'INTERNO' | 'NOTA_CREDITO' | 'NOTA_DEBITO';
+  tipoDescripcion: string;
+  serie: string;
+  ultimoNumero: number;
+  siguiente: string;
+  comprobantes: number;
+  contingencia: boolean;
+  activo: boolean;
+  usuarios: Array<{ id: number; username: string; nombre: string }>;
+}
+export interface SerieParaEmitir { id: number; serie: string; siguiente: string }
 
 export interface Comprobante {
   id: number;
@@ -218,6 +233,9 @@ export interface Comprobante {
   lineas: Array<{ item: number; descripcion: string; cantidad: number; precio: string; total: string }>;
   gravada: string;
   igv: string;
+  /** Descuento global con IGV (S-07). */
+  descuento: string;
+  descuentoMotivo: string | null;
   total: string;
   letras: string | null;
   pagos: Array<{ metodo: string; monto: string; referencia: string | null }>;
