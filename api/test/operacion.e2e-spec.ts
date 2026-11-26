@@ -111,8 +111,8 @@ describe('Operación de la sucursal (e2e)', () => {
     const e = await walkin(hab().id, await persona(), 3);
     expect(e.status).toBe(201);
     const salida = new Date(e.body.salidaPrevista as string).getTime();
-    expect(salida).toBeGreaterThanOrEqual(antes - 1000 + 3 * HORA); // la base guarda segundos enteros
-    expect(salida).toBeLessThanOrEqual(Date.now() + 3 * HORA);
+    expect(salida).toBeGreaterThanOrEqual(antes - 1000 + 3 * HORA); // la base redondea a segundos
+    expect(salida).toBeLessThanOrEqual(Date.now() + 1000 + 3 * HORA);
     // Dos turnos de 12 h (24 h) no caben en ninguna franja
     const tope = await walkin(hab().id, await persona(), 12, 2);
     expect(tope.status).toBe(400);
