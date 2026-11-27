@@ -7,6 +7,8 @@ import { api, type FranjaSalida, type Operacion } from '../../lib/api';
  */
 const MIN_DIA = 24 * 60;
 const MIN_HORAS_NOCHE = 3;
+/** La hora máxima se mira por minuto (los segundos del check-in no cuentan). */
+export const MARGEN_MINUTO_MS = 59_999;
 
 export const useOperacion = () => useQuery({ queryKey: ['operacion'], queryFn: () => api<Operacion>('/hospedaje/operacion'), staleTime: 60_000 });
 
@@ -45,7 +47,7 @@ export function salidaPrevista(ahora: Date, horasTurno: number, cantidad: number
   const f = horasTurno === 24 ? null : franjaDe(ahora, op?.franjas ?? []);
   if (!f) return { salida, maxima: null, franja: null, excede: false, caben: null };
   const maxima = new Date(medianoche + (f.diasDespues * MIN_DIA + minutos(f.salidaMaxima)) * 60_000);
-  return { salida, maxima, franja: f.nombre, excede: salida > maxima, caben: Math.floor((maxima.getTime() - ahora.getTime()) / (horasTurno * 3_600_000)) };
+  return { salida, maxima, franja: f.nombre, excede: salida.getTime() > maxima.getTime() + MARGEN_MINUTO_MS, caben: Math.floor((maxima.getTime() + MARGEN_MINUTO_MS - ahora.getTime()) / (horasTurno * 3_600_000)) };
 }
 
 /** «01:15» o «09:00 de mañana». */

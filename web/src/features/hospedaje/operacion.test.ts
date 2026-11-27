@@ -19,6 +19,10 @@ describe('vista previa de la salida', () => {
     expect(salidaPrevista(lima('2026-11-26T23:00'), 4, 2, OP).excede).toBe(true);
   });
 
+  it('los segundos del check-in no cuentan contra la hora máxima', () => {
+    expect(salidaPrevista(new Date(lima('2026-11-26T10:00').getTime() + 12_000), 4, 2, OP)).toMatchObject({ excede: false, caben: 2 });
+  });
+
   it('la noche sale a las 9:00; de madrugada, el mismo día', () => {
     expect(salidaPrevista(lima('2026-11-26T20:00'), 24, 1, OP).salida).toEqual(lima('2026-11-27T09:00'));
     expect(salidaPrevista(lima('2026-11-26T02:00'), 24, 1, OP).salida).toEqual(lima('2026-11-26T09:00'));

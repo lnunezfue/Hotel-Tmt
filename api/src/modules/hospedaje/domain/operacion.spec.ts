@@ -41,6 +41,12 @@ describe('franjas de salida', () => {
     expect(salidaPorHoras(lima('2026-11-26T08:00'), 10, 1, [{ nombre: 'Mañana', desde: '06:00', hasta: '12:00', salidaMaxima: '18:00', diasDespues: 0 }]).salida).toEqual(lima('2026-11-26T18:00'));
   });
 
+  it('los segundos del check-in no cuentan contra la hora máxima', () => {
+    const conSegundos = new Date(lima('2026-11-26T10:00').getTime() + 12_000);
+    expect(salidaPorHoras(conSegundos, 4, 2, FRANJAS_SUGERIDAS).salida.getTime()).toBe(lima('2026-11-26T18:00').getTime() + 12_000);
+    expect(() => salidaPorHoras(lima('2026-11-26T10:01'), 4, 2, FRANJAS_SUGERIDAS)).toThrow('Caben 1 turno');
+  });
+
   it('sin franjas no hay tope', () => {
     expect(salidaPorHoras(lima('2026-11-26T23:00'), 12, 2, []).maxima).toBeNull();
   });

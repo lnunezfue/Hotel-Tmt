@@ -7,7 +7,7 @@ import { CajaService } from '../../caja/application/caja.service';
 import { AvisosTablero } from '../../hospedaje/application/avisos-tablero.service';
 import { ConfiguracionService } from '../../hospedaje/application/configuracion.service';
 import { OperacionService } from '../../hospedaje/application/operacion.service';
-import { franjaDe, ReglaOperacionError, salidaMaxima, salidaNoche, salidaPorHoras } from '../../hospedaje/domain/operacion';
+import { franjaDe, MARGEN_MINUTO_MS, ReglaOperacionError, salidaMaxima, salidaNoche, salidaPorHoras } from '../../hospedaje/domain/operacion';
 import { esEstado, TransicionInvalidaError, validarTransicion } from '../../hospedaje/domain/estado-habitacion';
 import { hoyLima } from '../../hospedaje/domain/tarifa';
 import { rangoPorHoras, rangoPorNoches, ReglaReservaError, validarHuespedes } from '../../reservas/domain/reserva';
@@ -381,9 +381,9 @@ export class EstanciasService {
         const nueva = salidaExtendida(actual.checkout_previsto, e.turno.duracion_horas, turnos);
         // La extensión por horas tampoco pasa la hora máxima de la franja en que entró (operación real)
         const f = e.turno.duracion_horas === 24 ? null : franjaDe(actual.checkin_at, op.franjas);
-        if (f && nueva > salidaMaxima(actual.checkin_at, f)) {
+        if (f && nueva.getTime() > salidaMaxima(actual.checkin_at, f).getTime() + MARGEN_MINUTO_MS) {
           const max = salidaMaxima(actual.checkin_at, f);
-          const caben = Math.floor((max.getTime() - actual.checkout_previsto.getTime()) / (e.turno.duracion_horas * 3_600_000));
+          const caben = Math.floor((max.getTime() + MARGEN_MINUTO_MS - actual.checkout_previsto.getTime()) / (e.turno.duracion_horas * 3_600_000));
           throw new ReglaOperacionError(
             `Entró en la franja «${f.nombre}»: la salida máxima es a las ${horaLima(max)}. ` +
               (caben > 0 ? `Se puede extender hasta ${caben} ${caben === 1 ? 'turno' : 'turnos'}.` : 'Ya no se puede extender por horas.'),

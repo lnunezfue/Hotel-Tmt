@@ -8,6 +8,8 @@ const ZONA_LIMA_MIN = -5 * 60;
 const MIN_DIA = 24 * 60;
 /** Una noche vendida en la madrugada sale ese mismo día solo si quedan al menos estas horas hasta la salida. */
 export const MIN_HORAS_NOCHE = 3;
+/** La hora máxima se mira por minuto: quien entra a las 10:00:12 con 8 h sale a las 18:00, no «a las 18:00:12». */
+export const MARGEN_MINUTO_MS = 59_999;
 
 export interface Franja {
   nombre: string;
@@ -118,8 +120,8 @@ export function salidaPorHoras(checkin: Date, horasTurno: number, turnos: number
   const f = franjaDe(checkin, franjas);
   if (!f) return { salida, maxima: null };
   const maxima = salidaMaxima(checkin, f);
-  if (salida > maxima) {
-    const caben = Math.floor((maxima.getTime() - checkin.getTime()) / (horasTurno * 3_600_000));
+  if (salida.getTime() > maxima.getTime() + MARGEN_MINUTO_MS) {
+    const caben = Math.floor((maxima.getTime() + MARGEN_MINUTO_MS - checkin.getTime()) / (horasTurno * 3_600_000));
     throw new ReglaOperacionError(
       `Con ingreso en la franja «${f.nombre}» la salida máxima es a las ${formatoSalida(checkin, maxima)}. ` +
         (caben > 0 ? `Caben ${caben} ${caben === 1 ? 'turno' : 'turnos'} de ${horasTurno} h, o vende la noche completa.` : `No cabe un turno de ${horasTurno} h; elige uno más corto o la noche completa.`),
