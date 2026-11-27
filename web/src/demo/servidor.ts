@@ -7,12 +7,12 @@
  */
 import { ApiError } from '../lib/api/cliente';
 import type { Amenidad, Cliente, Comprobante, Disponibilidad, ElementoPlano, Estado, Estancia, MetodoPago, Operacion, PisoPlano, Producto, Reserva, SesionCaja } from '../lib/api/tipos';
-import { horaConDia, salidaPrevista } from '../features/hospedaje/operacion';
+import { horaConDia, MARGEN_MINUTO_MS, salidaPrevista } from '../features/hospedaje/operacion';
 import { cabe, distribucionInicial } from '../features/hospedaje/plano';
 import { diasEntre, fechaDe, hoyLima, sumarDias } from '../features/reservas/fechas';
 import foto from './datos.json';
 
-const CLAVE = 'hotel-demo-v3';
+const CLAVE = 'hotel-demo-v4';
 const CLAVE_DEMO = 'Hotel2026!';
 const TRANSICIONES: Record<Estado, Estado[]> = {
   DESOCUPADA: ['RESERVADA', 'OCUPADA', 'MANTENIMIENTO', 'LIMPIEZA'],
@@ -102,10 +102,11 @@ function inicial(): Datos {
   const tipos = R<Array<{ id: number; nombre: string; capacidadAdultos: number; capacidadNinos: number }>>('/hospedaje/config/tipos-habitacion');
   const enTablero = new Map(R<{ pisos: Array<{ habitaciones: Array<{ id: number; estadoDesde?: string | null }> }> }>('/hospedaje/tablero').pisos.flatMap((p) => p.habitaciones).map((h) => [h.id, h.estadoDesde]));
   const pagados = F.estancias.flatMap((e) => e.cuenta.comprobantes);
+  const operacionFoto = R<Operacion>('/hospedaje/operacion');
   return {
-    version: 3,
+    version: 4,
     usuario: null,
-    operacion: R<Operacion>('/hospedaje/operacion'),
+    operacion: operacionFoto,
     pisos: plano.map((p) => ({ id: p.id, numero: p.numero, nombre: p.nombre, columnas: p.columnas, filas: p.filas, elementos: p.elementos })),
     habs: plano.flatMap((p) =>
       p.habitaciones.map((h) => {
@@ -115,7 +116,11 @@ function inicial(): Datos {
           x: h.x, y: h.y, ancho: h.ancho, alto: h.alto, amenidades: h.amenidades, activo: true,
           estancia: e
             ? {
-                id: e.id, reservaId: null, checkin: mover(e.checkin, msDesde), salidaPrevista: mover(e.salidaPrevista, msDesde), turno: e.turno, horasTurno: e.horasTurno,
+                id: e.id, reservaId: null, checkin: mover(e.checkin, msDesde),
+                // La noche sale a la hora fija (9:00): se recalcula desde el check-in corrido, no se corre
+                salidaPrevista: e.horasTurno === 24 && operacionFoto.horaSalidaNoche
+                  ? salidaPrevista(new Date(mover(e.checkin, msDesde)), 24, e.cantidad, operacionFoto).salida.toISOString()
+                  : mover(e.salidaPrevista, msDesde), turno: e.turno, horasTurno: e.horasTurno,
                 cantidad: e.cantidad, precio: e.precio, canal: e.canal, comision: canales.find((c) => c.nombre === e.canal)?.comisionPorcentaje ?? '0.00',
                 procedencia: e.procedencia, huespedes: e.huespedes, cargos: [],
                 pagos: e.cuenta.comprobantes.map((c) => ({ ...c, turnos: e.cantidad, cargos: [] })),
@@ -150,7 +155,7 @@ function cargar(): Datos {
     const t = localStorage.getItem(CLAVE);
     if (t) {
       const d = JSON.parse(t) as Datos;
-      if (d.version === 3) return d;
+      if (d.version === 4) return d;
     }
   } catch {
     // almacenamiento no disponible: la demo funciona en memoria
@@ -765,8 +770,8 @@ export async function responder<T>(rutaCompleta: string, init: RequestInit): Pro
     if (e.horasTurno !== 24) {
       // Tampoco pasa la hora máxima de la franja en que entró (operación real)
       const p = salidaPrevista(new Date(e.checkin), e.horasTurno, 1, db.operacion);
-      if (p.maxima && Date.parse(nueva) > p.maxima.getTime()) {
-        const caben = Math.floor((p.maxima.getTime() - Date.parse(e.salidaPrevista)) / (e.horasTurno * 3_600_000));
+      if (p.maxima && Date.parse(nueva) > p.maxima.getTime() + MARGEN_MINUTO_MS) {
+        const caben = Math.floor((p.maxima.getTime() + MARGEN_MINUTO_MS - Date.parse(e.salidaPrevista)) / (e.horasTurno * 3_600_000));
         return error(400, `Entró en la franja «${p.franja}»: la salida máxima es a las ${horaConDia(p.maxima).replace(' de mañana', '')}. ${caben > 0 ? `Se puede extender hasta ${caben} ${caben === 1 ? 'turno' : 'turnos'}.` : 'Ya no se puede extender por horas.'}`);
       }
     }
