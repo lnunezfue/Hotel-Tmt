@@ -8,6 +8,7 @@ import { soles } from '../features/hospedaje/formato';
 import { diaCorto, fechaDe, horaLima, hoyLima, posicionEnDias, sumarDias } from '../features/reservas/fechas';
 import { ElegirHuesped, PanelNuevaReserva, type InicialReserva } from '../features/reservas/PanelNuevaReserva';
 import { CajonEstancia } from '../features/estancias/Cajones';
+import { useOperacion } from '../features/hospedaje/operacion';
 import { esEmpresa, MOTIVOS_VIAJE } from '../features/estancias/libro';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -28,6 +29,7 @@ const ESTILO: Record<EstadoReserva, { texto: string; barra: string; pildora: str
 function DetalleReserva({ r, onListo }: { r: Reserva; onListo: (msg: string) => void }) {
   const qc = useQueryClient();
   const { data: sesion } = useSesion();
+  const op = useOperacion().data;
   const [motivo, setMotivo] = useState('');
   const [baja, setBaja] = useState<'cancelar' | 'no-show' | null>(null);
   const [procedencia, setProcedencia] = useState('');
@@ -80,7 +82,7 @@ function DetalleReserva({ r, onListo }: { r: Reserva; onListo: (msg: string) => 
       </div>
       {Number(r.comision.monto) > 0 && <p className="text-xs text-tinta-suave">Comisión de {r.canal.nombre} ({Number(r.comision.porcentaje)} %): {soles(r.comision.monto)}, fijada al reservar.</p>}
       {r.estado === 'EN_CURSO' && (
-        <Button variante="primario" onClick={() => setCajon({ id: r.habitaciones[0].id, numero: r.habitaciones[0].numero })}>Ver cuenta y hacer check-out</Button>
+        <Button variante="primario" onClick={() => setCajon({ id: r.habitaciones[0].id, numero: r.habitaciones[0].numero })}>Ver estadía: cobro y check-out</Button>
       )}
       <CajonEstancia habitacionId={cajon?.id ?? null} numero={cajon?.numero} onCerrar={() => setCajon(null)} />
       {r.observaciones && <p className="rounded-lg bg-acento-suave/50 p-2 text-sm">{r.observaciones}</p>}
@@ -132,6 +134,7 @@ function DetalleReserva({ r, onListo }: { r: Reserva; onListo: (msg: string) => 
                 </Campo>
               </div>
               <span className="text-xs text-tinta-suave">Procedencia, destino y motivo van al libro de registro de huéspedes.</span>
+              {op?.cobroAlIngreso && <span className="text-xs text-tinta-suave">El tiempo corre desde que llegan. Después del check-in, cobra el pago adelantado con «Ver estadía» → «Cobrar».</span>}
               <Button
                 variante="primario"
                 disabled={accion.isPending || procedencia.trim().length < 2 || faltanTitulares}

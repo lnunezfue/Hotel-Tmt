@@ -23,11 +23,12 @@ const CargoSchema = z
   .object({ productoId: Id.optional(), descripcion: z.string().trim().max(200).optional(), cantidad: z.number().positive().max(999), precio: z.number().min(0).max(99_999).optional() })
   .refine((c) => c.productoId || (c.descripcion && c.precio !== undefined), 'Elige un producto o escribe la descripción y el precio');
 const CheckoutSchema = z.object({
-  tipoComprobante: z.enum(['BOLETA', 'FACTURA', 'INTERNO']),
+  // Con la cuenta pagada al ingreso el check-out no emite nada: el comprobante y los pagos sobran
+  tipoComprobante: z.enum(['BOLETA', 'FACTURA', 'INTERNO']).optional(),
   clienteId: Id.optional(),
   serieId: Id.optional(),
   descuento: z.object({ tipo: z.enum(['MONTO', 'PORCENTAJE']), valor: z.number(), motivo: z.string().max(400) }).optional(),
-  pagos: z.array(z.object({ metodoPagoId: Id, monto: z.number().positive().max(999_999), referencia: z.string().max(60).nullable().optional() })).max(6),
+  pagos: z.array(z.object({ metodoPagoId: Id, monto: z.number().positive().max(999_999), referencia: z.string().max(60).nullable().optional() })).max(6).default([]),
 });
 const FechaSchema = z.object({ fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
 
@@ -105,6 +106,15 @@ export class EstanciasController {
   @Delete('estancias/:id/cargos/:cargoId')
   anularCargo(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseIntPipe) id: number, @Param('cargoId', ParseIntPipe) cargoId: number) {
     return this.svc.anularCargo(u, id, cargoId);
+  }
+
+  /** Cobro sin cerrar la estadía: el pago adelantado del check-in, una extensión o la salida tardía (operación real). */
+  @RequierePermiso('estancia.checkin', 'estancia.checkout')
+  @Auditar('estancia.cobro')
+  @Post('estancias/:id/cobro')
+  @HttpCode(200)
+  cobro(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseIntPipe) id: number, @Body(new ZodValidationPipe(CheckoutSchema)) body: z.infer<typeof CheckoutSchema>) {
+    return this.svc.cobrarPendiente(u, id, body);
   }
 
   @RequierePermiso('estancia.checkout')

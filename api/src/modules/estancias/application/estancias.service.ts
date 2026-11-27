@@ -6,6 +6,8 @@ import { AuditoriaService } from '../../auditoria/application/auditoria.service'
 import { CajaService } from '../../caja/application/caja.service';
 import { AvisosTablero } from '../../hospedaje/application/avisos-tablero.service';
 import { ConfiguracionService } from '../../hospedaje/application/configuracion.service';
+import { OperacionService } from '../../hospedaje/application/operacion.service';
+import { franjaDe, MARGEN_MINUTO_MS, ReglaOperacionError, salidaMaxima, salidaNoche, salidaPorHoras } from '../../hospedaje/domain/operacion';
 import { esEstado, TransicionInvalidaError, validarTransicion } from '../../hospedaje/domain/estado-habitacion';
 import { hoyLima } from '../../hospedaje/domain/tarifa';
 import { rangoPorHoras, rangoPorNoches, ReglaReservaError, validarHuespedes } from '../../reservas/domain/reserva';
@@ -44,7 +46,8 @@ export interface CheckinDirecto {
 }
 
 export interface Checkout {
-  tipoComprobante: 'BOLETA' | 'FACTURA' | 'INTERNO';
+  /** Obligatorio si queda algo por cobrar; con la cuenta pagada el check-out solo cierra (operación real). */
+  tipoComprobante?: 'BOLETA' | 'FACTURA' | 'INTERNO';
   /** Receptor: una empresa con RUC para factura, o cualquier persona para boleta; por defecto, el titular. */
   clienteId?: number;
   /** Serie a usar entre las que el usuario puede (S-07 D4); por defecto la que corresponde. */
@@ -55,7 +58,7 @@ export interface Checkout {
 }
 
 function traducir(e: unknown): never {
-  if (e instanceof ReglaReservaError || e instanceof ReglaCobroError || e instanceof ReglaEstadiaError) throw new BadRequestException(e.message);
+  if (e instanceof ReglaReservaError || e instanceof ReglaCobroError || e instanceof ReglaEstadiaError || e instanceof ReglaOperacionError) throw new BadRequestException(e.message);
   if (e instanceof TransicionInvalidaError) throw new ConflictException(`La habitación no está lista: ${e.message}`);
   const texto = e instanceof Error ? e.message : '';
   const m = /(La habitación está ocupada[^"'\n]*|La factura requiere cliente con RUC|Serie inactiva|Serie inexistente)/.exec(texto);
@@ -69,10 +72,18 @@ const INCLUIR = {
   canal_venta: { select: { nombre: true } },
   estancia_huesped: { include: { cliente: { include: { tipo_documento: true } } }, orderBy: { es_titular: 'desc' as const } },
   estancia_cargo: { where: { anulado: false }, orderBy: { created_at: 'asc' as const } },
+  // Lo ya cobrado de esta estadía (cobro al ingreso o en partes); los comprobantes anulados no cuentan
+  comprobante_detalle: {
+    where: { comprobante: { estado_sunat: { not: 'ANULADO' } } },
+    select: { cantidad: true, unidad_medida: { select: { codigo_sunat: true } }, comprobante: { select: { id: true, serie: true, numero: true, total: true, reserva_id: true } } },
+  },
   reserva_habitacion: { select: { reserva: { select: { id: true, codigo: true, monto_adelanto: true, cliente_id: true, comision_porcentaje: true } } } },
 } satisfies Prisma.estanciaInclude;
 
 type FilaEstancia = Prisma.estanciaGetPayload<{ include: typeof INCLUIR }>;
+
+/** HH:MM de Lima (UTC−5). */
+const horaLima = (d: Date) => new Date(d.getTime() - 5 * 3_600_000).toISOString().slice(11, 16);
 
 const nombreCliente = (c: { nombre_completo: string | null; razon_social: string | null }) => c.nombre_completo ?? c.razon_social ?? '';
 
@@ -89,6 +100,7 @@ export class EstanciasService {
     private readonly config: ConfiguracionService,
     private readonly caja: CajaService,
     private readonly series: SeriesService,
+    private readonly operacion: OperacionService,
   ) {}
 
   productos(empresaId: number) {
@@ -127,14 +139,14 @@ export class EstanciasService {
     this.exigirPersonas(clientes);
     const ahora = new Date();
     const hoy = hoyLima(ahora);
+    const op = await this.operacion.obtener(c.sucursalId);
     let salida: Date;
     let libro: ReturnType<typeof normalizarLibro>;
     try {
       if (!esEstado(hab.estado_habitacion.codigo)) throw new ReglaReservaError('Estado desconocido');
       validarTransicion(hab.estado_habitacion.codigo, 'OCUPADA');
       validarHuespedes(huespedes.length, 0, { adultos: hab.tipo_habitacion.capacidad_adultos + hab.tipo_habitacion.capacidad_ninos, ninos: 0 });
-      salida = turno.duracion_horas === 24 ? rangoPorNoches(hoy, d.cantidad).salida : rangoPorHoras(hoy, '00:00', turno.duracion_horas, d.cantidad).salida;
-      if (turno.duracion_horas !== 24) salida = new Date(ahora.getTime() + turno.duracion_horas * d.cantidad * 3_600_000);
+      salida = this.salidaDe(ahora, turno.duracion_horas, d.cantidad, op);
       libro = normalizarLibro(d);
     } catch (e) {
       traducir(e);
@@ -221,17 +233,35 @@ export class EstanciasService {
    * LIMPIEZA y la reserva FINALIZADA. Todo o nada.
    */
   async checkout(actor: UsuarioSesion, id: number, d: Checkout) {
+    return this.cobrar(actor, id, d, true);
+  }
+
+  /**
+   * Cobra lo pendiente sin cerrar la estadía (operación real: el pago es adelantado). Emite el comprobante de lo que
+   * falta —el hospedaje al ingresar, después una extensión o la salida tardía— y registra los pagos en la caja.
+   */
+  async cobrarPendiente(actor: UsuarioSesion, id: number, d: Checkout) {
+    return this.cobrar(actor, id, d, false);
+  }
+
+  private async cobrar(actor: UsuarioSesion, id: number, d: Checkout, cerrar: boolean) {
     const e = await this.buscar(actor.sucursalId, id, true);
     const grupo = await this.grupo(e);
     const ahora = new Date();
     const cuenta = this.cuenta(grupo, ahora);
+    if (!cuenta.pendientes.length) {
+      if (!cerrar) throw new ConflictException('La cuenta está pagada: no hay nada por cobrar');
+      return this.cerrarPagada(actor, grupo, cuenta, ahora);
+    }
+    if (!d.tipoComprobante) throw new BadRequestException(`Hay S/ ${cuenta.saldo} por cobrar: elige el comprobante y el pago`);
+    const tipoComprobante = d.tipoComprobante;
     const metodos = await this.prisma.metodo_pago.findMany({ where: { activo: true } });
     if (d.descuento && !actor.permisos.includes('descuento.aplicar')) throw new ForbiddenException('Tu rol no tiene el permiso «descuento.aplicar»');
     let reparto: ReturnType<typeof repartirPagos>;
     let descuento: ReturnType<typeof calcularDescuento> | null = null;
     try {
       // El descuento global baja el total y el saldo; el adelanto ya cobrado no cambia (S-07 D6–D7)
-      if (d.descuento) descuento = calcularDescuento(aCentimos(cuenta.total), aCentimos(cuenta.adelanto), d.descuento);
+      if (d.descuento) descuento = calcularDescuento(aCentimos(cuenta.porCobrar), aCentimos(cuenta.adelanto), d.descuento);
       reparto = repartirPagos(aCentimos(cuenta.saldo) - (descuento?.conIgv ?? 0), d.pagos.map((p) => {
         const m = metodos.find((x) => x.id === p.metodoPagoId);
         if (!m) throw new ReglaCobroError('Método de pago no válido');
@@ -243,16 +273,16 @@ export class EstanciasService {
     const titularId = d.clienteId ?? Number(grupo[0].estancia_huesped.find((h) => h.es_titular)?.cliente_id ?? grupo[0].estancia_huesped[0].cliente_id);
     const cliente = await this.prisma.cliente.findFirst({ where: { id: titularId, empresa_id: actor.empresaId }, include: { tipo_documento: true } });
     if (!cliente) throw new BadRequestException('El cliente del comprobante no existe');
-    if (d.tipoComprobante === 'FACTURA' && cliente.tipo_documento.abreviatura !== 'RUC') throw new BadRequestException('La factura requiere un cliente con RUC');
-    const totales = totalesComprobante(cuenta.lineas, descuento ? { base: descuento.base, igv: descuento.igv } : undefined);
-    if (d.tipoComprobante === 'BOLETA') {
+    if (tipoComprobante === 'FACTURA' && cliente.tipo_documento.abreviatura !== 'RUC') throw new BadRequestException('La factura requiere un cliente con RUC');
+    const totales = totalesComprobante(cuenta.pendientes, descuento ? { base: descuento.base, igv: descuento.igv } : undefined);
+    if (tipoComprobante === 'BOLETA') {
       try {
         validarReceptorBoleta(aCentimos(totales.total), cliente.tipo_documento.codigo_sunat);
       } catch (err) {
         traducir(err);
       }
     }
-    const tipo = await this.prisma.tipo_comprobante.findUniqueOrThrow({ where: { codigo: d.tipoComprobante } });
+    const tipo = await this.prisma.tipo_comprobante.findUniqueOrThrow({ where: { codigo: tipoComprobante } });
     const [pen, um, afecto] = await Promise.all([
       this.prisma.moneda.findUniqueOrThrow({ where: { codigo_iso: 'PEN' } }),
       this.prisma.unidad_medida.findMany({ where: { codigo_sunat: { in: ['ZZ', 'NIU'] } } }),
@@ -266,7 +296,7 @@ export class EstanciasService {
       const comp = await this.prisma.$transaction(async (tx) => {
         const sesion = reparto.registrados.length ? await this.caja.exigirSesion(tx, actor.sucursalId) : await this.caja.sesionAbierta(tx, actor.sucursalId);
         // La serie del usuario o una libre (RF-FAC-02); el correlativo con bloqueo de fila dentro de la misma transacción
-        const serie = await this.series.paraEmitir(actor.sucursalId, actor.sub, d.tipoComprobante, d.serieId, tx);
+        const serie = await this.series.paraEmitir(actor.sucursalId, actor.sub, tipoComprobante, d.serieId, tx);
         await tx.$executeRaw`CALL sp_siguiente_correlativo(${serie.id}, @numero)`;
         const [{ numero }] = await tx.$queryRaw<Array<{ numero: number | bigint }>>`SELECT @numero AS numero`;
         const comprobante = await tx.comprobante.create({
@@ -280,7 +310,7 @@ export class EstanciasService {
             descuento_global: new Prisma.Decimal(totales.descuentoBase), descuento_igv: new Prisma.Decimal(totales.descuentoIgv), descuento_motivo: descuento?.motivo ?? null,
             monto_letras: montoEnLetras(totales.total), usuario_id: actor.sub,
             comprobante_detalle: {
-              create: cuenta.lineas.map((l, i) => {
+              create: cuenta.pendientes.map((l, i) => {
                 const des = desglosarIgv(aCentimos(l.total));
                 return {
                   item: i + 1, producto_id: l.productoId ?? null, estancia_id: l.estanciaId ? BigInt(l.estanciaId) : null, descripcion: l.descripcion,
@@ -292,6 +322,9 @@ export class EstanciasService {
             },
           },
         });
+        // Los cargos quedan cobrados por este comprobante
+        const cargos = cuenta.pendientes.filter((l) => l.cargoId).map((l) => BigInt(l.cargoId!));
+        if (cargos.length) await tx.estancia_cargo.updateMany({ where: { id: { in: cargos } }, data: { comprobante_id: comprobante.id } });
         // Pagos: el adelanto de la reserva (ya entró a caja al reservar) y lo cobrado ahora
         if (aCentimos(cuenta.adelanto) > 0) {
           const mAdelanto = await tx.caja_movimiento.findFirst({ where: { reserva_id: BigInt(cuenta.reserva!.id) } });
@@ -301,21 +334,16 @@ export class EstanciasService {
         }
         for (const p of reparto.registrados) {
           const m = metodos.find((x) => x.codigo === p.metodo)!;
-          await tx.comprobante_pago.create({ data: { comprobante_id: comprobante.id, metodo_pago_id: m.id, monto: new Prisma.Decimal(p.monto.toFixed(2)), referencia: p.referencia ?? null } });
+          // El movimiento de caja apunta al pago del comprobante (fk_cm_cpago), no al comprobante
+          const pago = await tx.comprobante_pago.create({ data: { comprobante_id: comprobante.id, metodo_pago_id: m.id, monto: new Prisma.Decimal(p.monto.toFixed(2)), referencia: p.referencia ?? null } });
           await this.caja.registrar(tx, {
             sesionId: sesion!.id, concepto: 'VENTA', metodoPagoId: m.id, monto: p.monto.toFixed(2), usuarioId: actor.sub,
-            reservaId: cuenta.reserva ? BigInt(cuenta.reserva.id) : null, comprobanteId: comprobante.id, descripcion: `${comprobante.serie}-${String(comprobante.numero).padStart(8, '0')} · Hab. ${grupo.map((g) => g.habitacion.numero).join(', ')}`,
+            reservaId: cuenta.reserva ? BigInt(cuenta.reserva.id) : null, comprobantePagoId: pago.id, descripcion: `${comprobante.serie}-${String(comprobante.numero).padStart(8, '0')} · Hab. ${grupo.map((g) => g.habitacion.numero).join(', ')}`,
           });
         }
-        for (const g of grupo) {
-          // Se guardan los turnos consumidos: los contratados más los de una salida tardía (RF-RES-12).
-          const extra = turnosAdicionales(g.checkout_previsto, ahora, g.turno.duracion_horas);
-          await tx.estancia.update({ where: { id: g.id }, data: { estado: 'FINALIZADA', checkout_at: ahora, usuario_checkout_id: actor.sub, cantidad_turnos: g.cantidad_turnos + extra } });
-          await this.cambiarEstadoHabitacion(tx, g.habitacion_id, 'LIMPIEZA', actor.sub, `Check-out ${comprobante.serie}-${String(comprobante.numero).padStart(8, '0')}`);
-        }
-        if (cuenta.reserva) await tx.reserva.update({ where: { id: BigInt(cuenta.reserva.id) }, data: { estado: 'FINALIZADA' } });
+        if (cerrar) await this.finalizar(tx, actor, grupo, cuenta, ahora, `Check-out ${comprobante.serie}-${String(comprobante.numero).padStart(8, '0')}`);
         await this.auditoria.registrar(tx, {
-          accion: 'estancia.checkout',
+          accion: cerrar ? 'estancia.checkout' : 'estancia.cobro',
           tabla: 'comprobante',
           registroId: comprobante.id,
           despues: { comprobante: `${comprobante.serie}-${comprobante.numero}`, total: totales.total, descuento: descuento ? { conIgv: aSoles(descuento.conIgv), motivo: descuento.motivo } : null, habitaciones: grupo.map((g) => g.habitacion.numero), pagos: reparto.registrados, vuelto: aSoles(reparto.vuelto) },
@@ -324,6 +352,7 @@ export class EstanciasService {
       });
       await this.avisos.avisar(actor.sucursalId, 'estado');
       return {
+        cerrada: cerrar,
         comprobanteId: Number(comp.id),
         comprobante: `${comp.serie}-${String(comp.numero).padStart(8, '0')}`,
         total: totales.total,
@@ -343,12 +372,23 @@ export class EstanciasService {
       traducir(err);
     }
     const e = await this.buscar(actor.sucursalId, id, true);
+    const op = await this.operacion.obtener(actor.sucursalId);
     try {
       await this.prisma.$transaction(async (tx) => {
         await bloquearHabitaciones(tx, [e.habitacion_id]);
         const actual = await tx.estancia.findUniqueOrThrow({ where: { id: e.id } });
         if (actual.estado !== 'ACTIVA') throw new ConflictException('La estadía ya terminó');
         const nueva = salidaExtendida(actual.checkout_previsto, e.turno.duracion_horas, turnos);
+        // La extensión por horas tampoco pasa la hora máxima de la franja en que entró (operación real)
+        const f = e.turno.duracion_horas === 24 ? null : franjaDe(actual.checkin_at, op.franjas);
+        if (f && nueva.getTime() > salidaMaxima(actual.checkin_at, f).getTime() + MARGEN_MINUTO_MS) {
+          const max = salidaMaxima(actual.checkin_at, f);
+          const caben = Math.floor((max.getTime() + MARGEN_MINUTO_MS - actual.checkout_previsto.getTime()) / (e.turno.duracion_horas * 3_600_000));
+          throw new ReglaOperacionError(
+            `Entró en la franja «${f.nombre}»: la salida máxima es a las ${horaLima(max)}. ` +
+              (caben > 0 ? `Se puede extender hasta ${caben} ${caben === 1 ? 'turno' : 'turnos'}.` : 'Ya no se puede extender por horas.'),
+          );
+        }
         await exigirSinCruces(tx, [e.habitacion_id], actual.checkout_previsto, nueva, {
           estanciaId: e.id,
           ...(e.reserva_habitacion && { reservaId: e.reserva_habitacion.reserva.id }),
@@ -488,27 +528,73 @@ export class EstanciasService {
   }
 
   /**
+   * Salida prevista de un ingreso ahora (operación real): la noche o turno completo sale a la hora de la noche
+   * (09:00) y por horas no pasa la hora máxima de la franja del check-in. Sin configuración, la regla de siempre.
+   */
+  private salidaDe(ahora: Date, horas: number, cantidad: number, op: Awaited<ReturnType<OperacionService['obtener']>>): Date {
+    if (horas === 24) return op.horaSalidaNoche ? salidaNoche(ahora, op.horaSalidaNoche, cantidad) : rangoPorNoches(hoyLima(ahora), cantidad).salida;
+    rangoPorHoras(hoyLima(ahora), '00:00', horas, cantidad); // valida la cantidad de turnos
+    return salidaPorHoras(ahora, horas, cantidad, op.franjas).salida;
+  }
+
+  /** Cierra las estadías del grupo: turnos consumidos, habitación a limpieza y reserva finalizada. */
+  private async finalizar(tx: Tx, actor: UsuarioSesion, grupo: FilaEstancia[], cuenta: ReturnType<EstanciasService['cuenta']>, ahora: Date, motivo: string) {
+    for (const g of grupo) {
+      // Se guardan los turnos consumidos: los contratados más los de una salida tardía (RF-RES-12).
+      const extra = turnosAdicionales(g.checkout_previsto, ahora, g.turno.duracion_horas);
+      await tx.estancia.update({ where: { id: g.id }, data: { estado: 'FINALIZADA', checkout_at: ahora, usuario_checkout_id: actor.sub, cantidad_turnos: g.cantidad_turnos + extra } });
+      await this.cambiarEstadoHabitacion(tx, g.habitacion_id, 'LIMPIEZA', actor.sub, motivo);
+    }
+    if (cuenta.reserva) await tx.reserva.update({ where: { id: BigInt(cuenta.reserva.id) }, data: { estado: 'FINALIZADA' } });
+  }
+
+  /** Check-out de una cuenta ya pagada al ingreso: no hay comprobante nuevo, solo se libera la habitación. */
+  private async cerrarPagada(actor: UsuarioSesion, grupo: FilaEstancia[], cuenta: ReturnType<EstanciasService['cuenta']>, ahora: Date) {
+    await this.prisma.$transaction(async (tx) => {
+      await this.finalizar(tx, actor, grupo, cuenta, ahora, `Check-out (pagado: ${cuenta.comprobantes.map((c) => c.numero).join(', ')})`);
+      await this.auditoria.registrar(tx, {
+        accion: 'estancia.checkout',
+        tabla: 'estancia',
+        registroId: grupo[0].id,
+        despues: { habitaciones: grupo.map((g) => g.habitacion.numero), pagado: cuenta.cobrado, comprobantes: cuenta.comprobantes.map((c) => c.numero) },
+      });
+    });
+    await this.avisos.avisar(actor.sucursalId, 'estado');
+    return { cerrada: true, comprobanteId: null, comprobante: null, total: '0.00', descuento: '0.00', vuelto: '0.00' };
+  }
+
+  /**
    * Cuenta de la estadía. Una estadía en curso que pasó su salida prevista más la tolerancia suma los turnos
    * consumidos (RF-RES-12), con el mismo precio pactado.
    */
   private cuenta(grupo: FilaEstancia[], ahora: Date = new Date()) {
     const lineas: LineaCuenta[] = [];
+    const pendientes: LineaCuenta[] = [];
+    const comprobantes = new Map<string, { id: number; numero: string; total: string; reservaId: bigint | null }>();
     for (const g of grupo) {
       const horas = g.turno.duracion_horas;
       const extra = g.estado === 'ACTIVA' ? turnosAdicionales(g.checkout_previsto, ahora, horas) : 0;
       const n = g.cantidad_turnos + extra;
-      lineas.push({
-        tipo: 'HOSPEDAJE',
-        descripcion:
-          `Hospedaje hab. ${g.habitacion.numero} (${g.habitacion.tipo_habitacion.nombre}) · ${horas === 24 ? `${n} ${n === 1 ? 'noche' : 'noches'}` : `${n} × turno de ${horas} h`}` +
-          (extra ? ` (incluye ${extra} por salida tardía)` : ''),
-        cantidad: n,
-        precioUnitario: g.precio_unitario.toFixed(2),
-        total: g.precio_unitario.mul(n).toFixed(2),
-        estanciaId: String(g.id),
+      const unidad = (k: number) => (horas === 24 ? `${k} ${k === 1 ? 'noche' : 'noches'}` : `${k} × turno de ${horas} h`);
+      const base = `Hospedaje hab. ${g.habitacion.numero} (${g.habitacion.tipo_habitacion.nombre})`;
+      const hospedaje = (k: number, desc: string): LineaCuenta => ({
+        tipo: 'HOSPEDAJE', descripcion: desc, cantidad: k, precioUnitario: g.precio_unitario.toFixed(2), total: g.precio_unitario.mul(k).toFixed(2), estanciaId: String(g.id),
       });
+      lineas.push(hospedaje(n, `${base} · ${unidad(n)}` + (extra ? ` (incluye ${extra} por salida tardía)` : '')));
+      for (const d of g.comprobante_detalle) {
+        comprobantes.set(String(d.comprobante.id), {
+          id: Number(d.comprobante.id), numero: `${d.comprobante.serie}-${String(d.comprobante.numero).padStart(8, '0')}`, total: d.comprobante.total.toFixed(2), reservaId: d.comprobante.reserva_id,
+        });
+      }
+      // Turnos ya cobrados (al ingreso o en un cobro anterior): solo se cobra la diferencia
+      const cobrados = g.comprobante_detalle.filter((d) => d.unidad_medida.codigo_sunat === 'ZZ').reduce((a, d) => a + Number(d.cantidad), 0);
+      if (n > cobrados) {
+        const k = n - cobrados;
+        const motivo = cobrados === 0 ? (extra ? ` (incluye ${extra} por salida tardía)` : '') : extra && k <= extra ? ' · salida tardía' : ' · extensión';
+        pendientes.push(hospedaje(k, `${base} · ${unidad(k)}${motivo}`));
+      }
       for (const c of g.estancia_cargo) {
-        lineas.push({
+        const linea: LineaCuenta = {
           tipo: 'CARGO',
           descripcion: `${c.descripcion}${grupo.length > 1 ? ` (hab. ${g.habitacion.numero})` : ''}`,
           cantidad: Number(c.cantidad),
@@ -517,19 +603,30 @@ export class EstanciasService {
           cargoId: String(c.id),
           estanciaId: String(g.id),
           productoId: c.producto_id,
-        });
+        };
+        lineas.push(linea);
+        if (!c.comprobante_id) pendientes.push(linea);
       }
     }
-    const total = lineas.reduce((s, l) => s + aCentimos(l.total), 0);
+    const suma = (ls: LineaCuenta[]) => ls.reduce((s, l) => s + aCentimos(l.total), 0);
+    const total = suma(lineas);
+    const porCobrar = suma(pendientes);
     const reserva = grupo[0].reserva_habitacion?.reserva ?? null;
-    const adelanto = reserva ? Math.min(aCentimos(reserva.monto_adelanto.toFixed(2)), total) : 0;
+    // El adelanto de la reserva se aplica una vez: en el primer comprobante de la reserva
+    const adelantoUsado = reserva ? [...comprobantes.values()].some((c) => c.reservaId === reserva.id) : false;
+    const adelanto = reserva && !adelantoUsado ? Math.min(aCentimos(reserva.monto_adelanto.toFixed(2)), porCobrar) : 0;
+    const cobrado = [...comprobantes.values()].reduce((s, c) => s + aCentimos(c.total), 0);
     const hospedaje = lineas.filter((l) => l.tipo === 'HOSPEDAJE').reduce((s, l) => s + aCentimos(l.total), 0);
     const porcentaje = reserva ? reserva.comision_porcentaje.toFixed(2) : grupo[0].comision_porcentaje.toFixed(2);
     return {
       lineas,
+      pendientes,
       total: aSoles(total),
+      porCobrar: aSoles(porCobrar),
+      cobrado: aSoles(cobrado),
+      comprobantes: [...comprobantes.values()].map(({ id, numero, total }) => ({ id, numero, total })),
       adelanto: aSoles(adelanto),
-      saldo: aSoles(total - adelanto),
+      saldo: aSoles(porCobrar - adelanto),
       comision: { porcentaje, monto: aSoles(comision(hospedaje, porcentaje)) },
       reserva: reserva ? { id: Number(reserva.id), codigo: reserva.codigo } : null,
     };

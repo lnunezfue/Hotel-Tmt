@@ -117,7 +117,7 @@ describe('Check-out con cobro (e2e)', () => {
     expect(comp).toMatchObject({ tipo: 'BOLETA', total: '246.00', estadoSunat: 'PENDIENTE', letras: 'DOSCIENTOS CUARENTA Y SEIS CON 00/100 SOLES' });
     expect(Number(comp.gravada) + Number(comp.igv)).toBeCloseTo(246, 2);
     expect(comp.pagos.map((p: { monto: string }) => p.monto).sort()).toEqual(['196.00', '50.00']);
-    const venta = await prisma.caja_movimiento.findMany({ where: { comprobante_pago_id: BigInt(co.body.comprobanteId as number) } });
+    const venta = await prisma.caja_movimiento.findMany({ where: { comprobante_pago: { comprobante_id: BigInt(co.body.comprobanteId as number) } } });
     expect(venta.map((v) => v.monto.toFixed(2))).toEqual(['196.00']);
     expect(await prisma.auditoria.count({ where: { accion: 'estancia.checkout', registro_id: BigInt(co.body.comprobanteId as number) } })).toBe(1);
   });

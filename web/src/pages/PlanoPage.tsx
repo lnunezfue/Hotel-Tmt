@@ -202,7 +202,7 @@ export function PlanoPage() {
   const [lienzoRef, anchoLienzo] = useAncho();
   const columnas = borrador?.columnas ?? piso?.columnas ?? 12;
   const filas = borrador?.filas ?? piso?.filas ?? 6;
-  const celda = Math.max(34, Math.min(84, Math.floor((anchoLienzo - 12) / columnas)));
+  const celda = Math.max(30, Math.min(84, Math.floor((anchoLienzo - 12) / columnas)));
 
   const rectDe = useCallback(
     (clave: string): Rect | null => {
@@ -663,7 +663,7 @@ function PanelHabitacion({ h, amenidades, onCerrar, onReservar, onTablero, onEst
       </div>
       {h.descripcion && <p className="text-sm text-tinta-suave">{h.descripcion}</p>}
       <div className="flex flex-wrap gap-2">
-        {h.estado === 'OCUPADA' && onEstancia && <Button variante="primario" onClick={onEstancia}>Ver cuenta y hacer check-out</Button>}
+        {h.estado === 'OCUPADA' && onEstancia && <Button variante="primario" onClick={onEstancia}>Ver estadía: cobro y check-out</Button>}
         {['DESOCUPADA', 'RESERVADA', 'CONFIRMADA'].includes(h.estado) && onCheckin && <Button variante="primario" onClick={onCheckin}>Check-in directo</Button>}
         {onReservar && <Button onClick={onReservar}>Reservar esta habitación</Button>}
         <Button variante="fantasma" onClick={onTablero}>Ir al tablero</Button>

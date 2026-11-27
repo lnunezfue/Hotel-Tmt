@@ -27,6 +27,10 @@ export interface HabitacionTablero {
   color: string;
   siguientes: Estado[];
   estancia: null | { id: number; huesped: string | null; checkin: string; salidaPrevista: string; alerta: 'VENCIDA' | 'POR_VENCER' | null };
+  /** Desde cuándo está en su estado (último cambio del historial). */
+  estadoDesde?: string | null;
+  /** En limpieza: minutos que lleva y si pasó el tiempo esperado de la sucursal. */
+  limpieza?: null | { minutos: number; demorada: boolean; esperados: number };
 }
 
 export interface Tablero {
@@ -167,11 +171,20 @@ export interface LineaCuenta {
   precioUnitario: string;
   total: string;
   cargoId?: string;
+  /** Estadía de la línea (cuando se cobran varias habitaciones juntas). */
+  estanciaId?: string;
 }
 
 export interface Cuenta {
+  /** Todo lo consumido (hospedaje, extensiones, salida tardía, cargos). */
   lineas: LineaCuenta[];
+  /** Lo que aún no tiene comprobante: el próximo cobro emite exactamente esto (operación real). */
+  pendientes: LineaCuenta[];
   total: string;
+  porCobrar: string;
+  /** Lo ya cobrado (al ingreso o en cobros anteriores) y sus comprobantes. */
+  cobrado: string;
+  comprobantes: Array<{ id: number; numero: string; total: string }>;
   adelanto: string;
   saldo: string;
   comision: { porcentaje: string; monto: string };
@@ -204,7 +217,20 @@ export interface Estancia {
 export interface Producto { id: number; codigo: string; nombre: string; precio: string; categoria: string; tipo: 'BIEN' | 'SERVICIO' }
 export interface MetodoPago { id: number; codigo: string; descripcion: string; es_efectivo: boolean }
 
-export interface ResultadoCheckout { comprobanteId: number; comprobante: string; total: string; descuento: string; vuelto: string }
+/** Resultado de un cobro o de un check-out. Con la cuenta ya pagada, el check-out no emite comprobante. */
+export interface ResultadoCheckout { cerrada: boolean; comprobanteId: number | null; comprobante: string | null; total: string; descuento: string; vuelto: string }
+
+/** Cómo trabaja la sucursal (operación real): cobro al ingreso, consumos, limpieza y horas de salida. */
+export interface FranjaSalida { nombre: string; desde: string; hasta: string; salidaMaxima: string; diasDespues: number }
+export interface Operacion {
+  configurada: boolean;
+  cobroAlIngreso: boolean;
+  vendeConsumos: boolean;
+  minutosLimpieza: number;
+  horaSalidaNoche: string | null;
+  turnoSugeridoId: number | null;
+  franjas: FranjaSalida[];
+}
 
 /** Serie de comprobantes de la sucursal (S-07). */
 export interface SerieComprobante {

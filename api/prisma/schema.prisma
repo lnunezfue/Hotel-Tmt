@@ -297,6 +297,7 @@ model comprobante {
   comprobante_cuota                      comprobante_cuota[]
   comprobante_detalle                    comprobante_detalle[]
   comprobante_pago                       comprobante_pago[]
+  estancia_cargo                         estancia_cargo[]
   lote_sunat_detalle                     lote_sunat_detalle[]
   sunat_envio                            sunat_envio[]
 
@@ -507,14 +508,18 @@ model estancia_cargo {
   precio_unitario Decimal   @db.Decimal(14, 2)
   total           Decimal?  @db.Decimal(14, 2) /// columna generada por la BD (solo lectura)
   anulado         Boolean   @default(false) @db.TinyInt
+  /// Comprobante que cobró el cargo; NULL = pendiente (operación real, cobro en partes)
+  comprobante_id  BigInt?   @db.UnsignedBigInt
   usuario_id      Int       @db.UnsignedInt
   created_at      DateTime  @default(now()) @db.Timestamp(0)
+  comprobante     comprobante? @relation(fields: [comprobante_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ecargo_comprobante")
   estancia        estancia  @relation(fields: [estancia_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ec_estancia")
   producto        producto? @relation(fields: [producto_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ec_producto")
   usuario         usuario   @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ec_usuario")
 
   @@index([estancia_id], map: "ix_ec_estancia")
   @@index([producto_id], map: "ix_ec_producto")
+  @@index([comprobante_id], map: "fk_ecargo_comprobante")
   @@index([usuario_id], map: "ix_ec_usuario")
 }
 
@@ -978,6 +983,8 @@ model sucursal {
   sesion_usuario         sesion_usuario[]
   tarifa                 tarifa[]
   usuario_sucursal       usuario_sucursal[]
+  sucursal_operacion     sucursal_operacion?
+  sucursal_franja_salida sucursal_franja_salida[]
 
   @@unique([empresa_id, codigo_establecimiento], map: "uk_sucursal_estab")
   @@index([ubigeo_codigo], map: "fk_sucursal_ubigeo")
@@ -999,6 +1006,35 @@ model sunat_envio {
 
   @@index([comprobante_id, fecha_hora], map: "ix_se_comp")
   @@index([lote_sunat_id], map: "ix_se_lote")
+}
+
+/// Operación de la sucursal (operación real). Sin fila, la sucursal sigue las reglas de siempre.
+model sucursal_operacion {
+  sucursal_id       Int      @id @db.UnsignedInt
+  cobro_al_ingreso  Boolean  @default(true) @db.TinyInt
+  vende_consumos    Boolean  @default(false) @db.TinyInt
+  minutos_limpieza  Int      @default(30) @db.UnsignedSmallInt
+  hora_salida_noche DateTime @default(dbgenerated("'09:00:00'")) @db.Time(0)
+  turno_sugerido_id Int?     @db.UnsignedTinyInt
+  updated_at        DateTime @default(now()) @db.Timestamp(0)
+  sucursal          sucursal @relation(fields: [sucursal_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sop_sucursal")
+  turno             turno?   @relation(fields: [turno_sugerido_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sop_turno")
+
+  @@index([turno_sugerido_id], map: "fk_sop_turno")
+}
+
+/// Hora máxima de salida según la hora del check-in (operación real)
+model sucursal_franja_salida {
+  id            Int      @id @default(autoincrement()) @db.UnsignedInt
+  sucursal_id   Int      @db.UnsignedInt
+  nombre        String   @db.VarChar(30)
+  desde         DateTime @db.Time(0)
+  hasta         DateTime @db.Time(0)
+  salida_maxima DateTime @db.Time(0)
+  dias_despues  Int      @default(0) @db.UnsignedTinyInt
+  sucursal      sucursal @relation(fields: [sucursal_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_franja_sucursal")
+
+  @@unique([sucursal_id, desde], map: "uk_franja_desde")
 }
 
 model tarifa {
@@ -1106,6 +1142,7 @@ model turno {
   activo             Boolean              @default(true) @db.TinyInt
   estancia           estancia[]
   reserva_habitacion reserva_habitacion[]
+  sucursal_operacion sucursal_operacion[]
   tarifa             tarifa[]
 }
 

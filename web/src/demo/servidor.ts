@@ -1,16 +1,18 @@
 /**
  * API SIMULADA para la demostración publicada en la web (build con VITE_DEMO=1). No forma parte del sistema:
  * responde en el navegador con una foto de la API real (datos.json, tomada del seed) y reproduce las reglas
- * principales para recorrer el proceso completo: caja, reservas, check-in, consumos, check-out con comprobante,
- * limpieza y cierre de caja. Los cambios se guardan solo en este navegador.
+ * principales para recorrer el proceso completo del hotel real: caja, check-in por horas con pago adelantado,
+ * extensión, check-out, limpieza de 30 min, reservas sin adelanto y cierre de caja. Los cambios se guardan solo en
+ * este navegador.
  */
 import { ApiError } from '../lib/api/cliente';
-import type { Amenidad, Cliente, Comprobante, Disponibilidad, ElementoPlano, Estado, Estancia, MetodoPago, PisoPlano, Producto, Reserva, SesionCaja } from '../lib/api/tipos';
+import type { Amenidad, Cliente, Comprobante, Disponibilidad, ElementoPlano, Estado, Estancia, MetodoPago, Operacion, PisoPlano, Producto, Reserva, SesionCaja } from '../lib/api/tipos';
+import { horaConDia, MARGEN_MINUTO_MS, salidaPrevista } from '../features/hospedaje/operacion';
 import { cabe, distribucionInicial } from '../features/hospedaje/plano';
 import { diasEntre, fechaDe, hoyLima, sumarDias } from '../features/reservas/fechas';
 import foto from './datos.json';
 
-const CLAVE = 'hotel-demo-v2';
+const CLAVE = 'hotel-demo-v4';
 const CLAVE_DEMO = 'Hotel2026!';
 const TRANSICIONES: Record<Estado, Estado[]> = {
   DESOCUPADA: ['RESERVADA', 'OCUPADA', 'MANTENIMIENTO', 'LIMPIEZA'],
@@ -22,7 +24,7 @@ const TRANSICIONES: Record<Estado, Estado[]> = {
 };
 
 /** Pasos del recorrido guiado; el servidor los marca cuando ocurren. */
-export type PasoRecorrido = 'caja' | 'reserva' | 'checkin' | 'consumo' | 'checkout' | 'limpieza' | 'cierre';
+export type PasoRecorrido = 'caja' | 'checkin' | 'extension' | 'checkout' | 'limpieza' | 'reserva' | 'cierre';
 
 interface EstanciaDemo {
   id: number;
@@ -40,6 +42,8 @@ interface EstanciaDemo {
   motivoViaje?: string | null;
   huespedes: Estancia['huespedes'];
   cargos: Estancia['cargos'];
+  /** Lo ya cobrado: comprobante, turnos y cargos que llevó (pago adelantado). */
+  pagos: Array<{ id: number; numero: string; total: string; turnos: number; cargos: number[] }>;
 }
 interface Hab {
   id: number;
@@ -55,6 +59,8 @@ interface Hab {
   amenidades: string[];
   activo: boolean;
   estancia: EstanciaDemo | null;
+  /** Desde cuándo está en su estado (cuenta el tiempo de limpieza). */
+  estadoDesde: string;
   historial: Array<{ id: number; fecha: string; motivo: string | null; usuario: string | null; desde: Estado | null; hacia: Estado }>;
 }
 interface Piso { id: number; numero: number; nombre: string; columnas: number; filas: number; elementos: ElementoPlano[] }
@@ -63,6 +69,7 @@ interface Movimiento { id: number; fecha: string; codigo: string; concepto: stri
 interface Datos {
   version: number;
   usuario: string | null;
+  operacion: Operacion;
   pisos: Piso[];
   habs: Hab[];
   tipos: Tipo[];
@@ -84,7 +91,7 @@ const DIA_MS = 86_400_000;
 const cent = (s: string | number) => Math.round(Number(s) * 100);
 const soles = (c: number) => (c / 100).toFixed(2);
 
-/** Corre las fechas de la foto a hoy: estancias por el tiempo exacto, reservas por días enteros (mantienen 14:00 / 12:00). */
+/** Corre las fechas de la foto a hoy: estancias y reservas por horas por el tiempo exacto, las de noche por días enteros. */
 function inicial(): Datos {
   const msDesde = Date.now() - Date.parse(F.capturado);
   const diasDesde = diasEntre(F.hoy, hoyLima());
@@ -93,9 +100,13 @@ function inicial(): Datos {
   const estancias = new Map(F.estancias.map((e) => [e.habitacion.id, e]));
   const canales = R<Array<{ nombre: string; comisionPorcentaje: string }>>('/hospedaje/config/canales');
   const tipos = R<Array<{ id: number; nombre: string; capacidadAdultos: number; capacidadNinos: number }>>('/hospedaje/config/tipos-habitacion');
+  const enTablero = new Map(R<{ pisos: Array<{ habitaciones: Array<{ id: number; estadoDesde?: string | null }> }> }>('/hospedaje/tablero').pisos.flatMap((p) => p.habitaciones).map((h) => [h.id, h.estadoDesde]));
+  const pagados = F.estancias.flatMap((e) => e.cuenta.comprobantes);
+  const operacionFoto = R<Operacion>('/hospedaje/operacion');
   return {
-    version: 2,
+    version: 4,
     usuario: null,
+    operacion: operacionFoto,
     pisos: plano.map((p) => ({ id: p.id, numero: p.numero, nombre: p.nombre, columnas: p.columnas, filas: p.filas, elementos: p.elementos })),
     habs: plano.flatMap((p) =>
       p.habitaciones.map((h) => {
@@ -105,23 +116,33 @@ function inicial(): Datos {
           x: h.x, y: h.y, ancho: h.ancho, alto: h.alto, amenidades: h.amenidades, activo: true,
           estancia: e
             ? {
-                id: e.id, reservaId: null, checkin: mover(e.checkin, msDesde), salidaPrevista: mover(e.salidaPrevista, msDesde), turno: e.turno, horasTurno: e.horasTurno,
+                id: e.id, reservaId: null, checkin: mover(e.checkin, msDesde),
+                // La noche sale a la hora fija (9:00): se recalcula desde el check-in corrido, no se corre
+                salidaPrevista: e.horasTurno === 24 && operacionFoto.horaSalidaNoche
+                  ? salidaPrevista(new Date(mover(e.checkin, msDesde)), 24, e.cantidad, operacionFoto).salida.toISOString()
+                  : mover(e.salidaPrevista, msDesde), turno: e.turno, horasTurno: e.horasTurno,
                 cantidad: e.cantidad, precio: e.precio, canal: e.canal, comision: canales.find((c) => c.nombre === e.canal)?.comisionPorcentaje ?? '0.00',
                 procedencia: e.procedencia, huespedes: e.huespedes, cargos: [],
+                pagos: e.cuenta.comprobantes.map((c) => ({ ...c, turnos: e.cantidad, cargos: [] })),
               }
             : null,
+          estadoDesde: mover(enTablero.get(h.id) ?? F.capturado, msDesde),
           historial: [],
         };
       }),
     ),
     tipos: tipos.map((t) => ({ id: t.id, nombre: t.nombre, adultos: t.capacidadAdultos, ninos: t.capacidadNinos })),
     amenidades: R<Amenidad[]>('/hospedaje/amenidades'),
-    reservas: R<Reserva[]>('/reservas').map((r) => ({ ...r, entrada: mover(r.entrada, diasDesde * DIA_MS), salida: mover(r.salida, diasDesde * DIA_MS) })),
+    reservas: R<Reserva[]>('/reservas').map((r) => {
+      const ms = r.habitaciones[0]?.horasTurno === 24 ? diasDesde * DIA_MS : msDesde;
+      return { ...r, entrada: mover(r.entrada, ms), salida: mover(r.salida, ms) };
+    }),
     clientes: F.clientes as Cliente[],
     caja: null,
     ultimoCierre: null,
     comprobantes: [],
-    correlativos: {},
+    // Las boletas del pago adelantado de la foto ya usaron sus números
+    correlativos: { B001: pagados.filter((c) => c.numero.startsWith('B001')).length },
     recorrido: {},
     seq: 1000,
   };
@@ -134,7 +155,7 @@ function cargar(): Datos {
     const t = localStorage.getItem(CLAVE);
     if (t) {
       const d = JSON.parse(t) as Datos;
-      if (d.version === 2) return d;
+      if (d.version === 4) return d;
     }
   } catch {
     // almacenamiento no disponible: la demo funciona en memoria
@@ -179,12 +200,26 @@ function alerta(salida: string): 'VENCIDA' | 'POR_VENCER' | null {
 }
 
 function rango(llegada: string, cantidad: number, horas: number, hora?: string): { entrada: string; salida: string } {
+  if (db.operacion.configurada) {
+    const [hh, mm] = (hora ?? '14:00').split(':').map(Number);
+    const entrada = new Date(Date.parse(`${llegada}T00:00:00Z`) + (hh + 5) * 3_600_000 + mm * 60_000);
+    return { entrada: entrada.toISOString(), salida: salidaSegunOperacion(entrada, horas, cantidad).toISOString() };
+  }
   if (horas === 24) {
     return { entrada: new Date(Date.parse(`${llegada}T19:00:00Z`)).toISOString(), salida: new Date(Date.parse(`${sumarDias(llegada, cantidad)}T17:00:00Z`)).toISOString() };
   }
   const [hh, mm] = (hora ?? '14:00').split(':').map(Number);
   const entrada = Date.parse(`${llegada}T00:00:00Z`) + (hh + 5) * 3_600_000 + mm * 60_000;
   return { entrada: new Date(entrada).toISOString(), salida: new Date(entrada + horas * cantidad * 3_600_000).toISOString() };
+}
+/** Salida con la operación de la sucursal (noche a las 9:00, tope por franja); lanza 400 si pasa la hora máxima. */
+function salidaSegunOperacion(desde: Date, horas: number, cantidad: number): Date {
+  const p = salidaPrevista(desde, horas, cantidad, db.operacion);
+  if (p.excede) {
+    return error(400, `Con ingreso en la franja «${p.franja}» la salida máxima es a las ${horaConDia(p.maxima!, desde).replace(' de mañana', ' del día siguiente')}. ` +
+      (p.caben ? `Caben ${p.caben} ${p.caben === 1 ? 'turno' : 'turnos'} de ${horas} h, o vende la noche completa.` : `No cabe un turno de ${horas} h; elige uno más corto o la noche completa.`));
+  }
+  return p.salida;
 }
 const cruza = (a: { entrada: string; salida: string }, b: { entrada: string; salida: string }) => a.entrada < b.salida && b.entrada < a.salida;
 const abiertas = (r: Reserva) => ['PENDIENTE', 'CONFIRMADA', 'EN_CURSO'].includes(r.estado);
@@ -193,6 +228,7 @@ function cambiarEstado(h: Hab, hacia: Estado, motivo: string | null) {
   if (h.estado === 'LIMPIEZA' && hacia === 'DESOCUPADA' && db.recorrido.checkout) marcar('limpieza');
   h.historial.unshift({ id: id(), fecha: new Date().toISOString(), motivo, usuario: usuarioActual().nombre, desde: h.estado, hacia });
   h.estado = hacia;
+  h.estadoDesde = new Date().toISOString();
 }
 
 function precio(tipoId: number, canalId: number, turnoId: number): string | null {
@@ -238,27 +274,63 @@ function movimientoCaja(codigo: string, metodoId: number, monto: string, descrip
 
 const grupoDe = (h: Hab): Hab[] => (h.estancia?.reservaId ? db.habs.filter((x) => x.estancia?.reservaId === h.estancia!.reservaId) : [h]);
 
+/** Turnos que suma una salida tardía (30 min de tolerancia), como la API (RF-RES-12). */
+function turnosTarde(salida: string, horas: number): number {
+  const exceso = Date.now() - Date.parse(salida) - 30 * 60_000;
+  return exceso <= 0 ? 0 : Math.ceil((exceso + 30 * 60_000) / (horas * 3_600_000));
+}
+
+/** Cuenta con lo ya cobrado (pago adelantado): `pendientes` es lo que llevará el próximo comprobante. */
 function cuenta(grupo: Hab[]) {
   const lineas: Estancia['cuenta']['lineas'] = [];
+  const pendientes: Estancia['cuenta']['lineas'] = [];
+  const pagos: EstanciaDemo['pagos'] = [];
   for (const h of grupo) {
     const e = h.estancia!;
-    lineas.push({
-      tipo: 'HOSPEDAJE',
-      descripcion: `Hospedaje hab. ${h.numero} (${tipoDe(h).nombre}) · ${e.horasTurno === 24 ? `${e.cantidad} ${e.cantidad === 1 ? 'noche' : 'noches'}` : `${e.cantidad} × turno de ${e.horasTurno} h`}`,
-      cantidad: e.cantidad, precioUnitario: e.precio, total: soles(cent(e.precio) * e.cantidad),
-    });
-    for (const c of e.cargos) lineas.push({ tipo: 'CARGO', descripcion: `${c.descripcion}${grupo.length > 1 ? ` (hab. ${h.numero})` : ''}`, cantidad: c.cantidad, precioUnitario: c.precio, total: c.total, cargoId: String(c.id) });
+    const extra = turnosTarde(e.salidaPrevista, e.horasTurno);
+    const n = e.cantidad + extra;
+    const unidad = (k: number) => (e.horasTurno === 24 ? `${k} ${k === 1 ? 'noche' : 'noches'}` : `${k} × turno de ${e.horasTurno} h`);
+    const base = `Hospedaje hab. ${h.numero} (${tipoDe(h).nombre})`;
+    const hosp = (k: number, desc: string) => ({ tipo: 'HOSPEDAJE' as const, descripcion: desc, cantidad: k, precioUnitario: e.precio, total: soles(cent(e.precio) * k), estanciaId: String(e.id) });
+    lineas.push(hosp(n, `${base} · ${unidad(n)}${extra ? ` (incluye ${extra} por salida tardía)` : ''}`));
+    const cobrados = e.pagos.reduce((acc, p) => acc + p.turnos, 0);
+    if (n > cobrados) {
+      const k = n - cobrados;
+      pendientes.push(hosp(k, `${base} · ${unidad(k)}${cobrados === 0 ? (extra ? ` (incluye ${extra} por salida tardía)` : '') : extra && k <= extra ? ' · salida tardía' : ' · extensión'}`));
+    }
+    for (const c of e.cargos) {
+      const l = { tipo: 'CARGO' as const, descripcion: `${c.descripcion}${grupo.length > 1 ? ` (hab. ${h.numero})` : ''}`, cantidad: c.cantidad, precioUnitario: c.precio, total: c.total, cargoId: String(c.id), estanciaId: String(e.id) };
+      lineas.push(l);
+      if (!e.pagos.some((p) => p.cargos.includes(c.id))) pendientes.push(l);
+    }
+    pagos.push(...e.pagos.filter((p) => !pagos.some((x) => x.id === p.id)));
   }
-  const total = lineas.reduce((s, l) => s + cent(l.total), 0);
+  const total = lineas.reduce((acc, l) => acc + cent(l.total), 0);
+  const porCobrar = pendientes.reduce((acc, l) => acc + cent(l.total), 0);
+  const cobrado = pagos.reduce((acc, p) => acc + cent(p.total), 0);
   const reserva = db.reservas.find((r) => r.id === grupo[0].estancia!.reservaId) ?? null;
-  const adelanto = reserva ? Math.min(cent(reserva.adelanto), total) : 0;
-  const hospedaje = lineas.filter((l) => l.tipo === 'HOSPEDAJE').reduce((s, l) => s + cent(l.total), 0);
+  // El adelanto de la reserva va en el primer comprobante
+  const adelanto = reserva && pagos.length === 0 ? Math.min(cent(reserva.adelanto), porCobrar) : 0;
+  const hospedaje = lineas.filter((l) => l.tipo === 'HOSPEDAJE').reduce((acc, l) => acc + cent(l.total), 0);
   const porcentaje = reserva ? reserva.comision.porcentaje : grupo[0].estancia!.comision;
   return {
-    lineas, total: soles(total), adelanto: soles(adelanto), saldo: soles(total - adelanto),
+    lineas, pendientes, total: soles(total), porCobrar: soles(porCobrar), cobrado: soles(cobrado), comprobantes: pagos.map(({ id: i, numero, total: t }) => ({ id: i, numero, total: t })),
+    adelanto: soles(adelanto), saldo: soles(porCobrar - adelanto),
     comision: { porcentaje, monto: soles(Math.round((hospedaje * Number(porcentaje)) / 100)) },
     reserva: reserva ? { id: reserva.id, codigo: reserva.codigo } : null,
   };
+}
+
+/** Libera las habitaciones del grupo: pasan a limpieza y la reserva termina. */
+function cerrarGrupo(grupo: Hab[], motivo: string) {
+  const reservaId = grupo[0].estancia?.reservaId;
+  for (const g of grupo) {
+    g.estancia = null;
+    cambiarEstado(g, 'LIMPIEZA', motivo);
+  }
+  const r = db.reservas.find((x) => x.id === reservaId);
+  if (r) r.estado = 'FINALIZADA';
+  marcar('checkout');
 }
 
 function vistaEstancia(h: Hab): Estancia {
@@ -293,16 +365,23 @@ function letras(soles: string): string {
   return `${texto} CON ${String(c % 100).padStart(2, '0')}/100 SOLES`;
 }
 
-function checkout(h: Hab, b: Record<string, unknown>) {
+/** Cobra lo pendiente; con `cerrar` además hace el check-out. Con la cuenta pagada, el check-out solo cierra. */
+function cobrar(h: Hab, b: Record<string, unknown>, cerrar: boolean) {
   const grupo = grupoDe(h);
   const c = cuenta(grupo);
+  if (!c.pendientes.length) {
+    if (!cerrar) return error(409, 'La cuenta está pagada: no hay nada por cobrar');
+    cerrarGrupo(grupo, `Check-out (pagado: ${c.comprobantes.map((x) => x.numero).join(', ')})`);
+    return { cerrada: true, comprobanteId: null, comprobante: null, total: '0.00', descuento: '0.00', vuelto: '0.00' };
+  }
+  if (!b.tipoComprobante) return error(400, `Hay S/ ${c.saldo} por cobrar: elige el comprobante y el pago`);
   // Descuento global (S-07): en soles o %, sin bajar el total por debajo del adelanto
   const d = b.descuento as { tipo: 'MONTO' | 'PORCENTAJE'; valor: number; motivo: string } | undefined;
-  const descCent = d ? (d.tipo === 'MONTO' ? cent(d.valor) : Math.round((cent(c.total) * d.valor) / 100)) : 0;
+  const descCent = d ? (d.tipo === 'MONTO' ? cent(d.valor) : Math.round((cent(c.porCobrar) * d.valor) / 100)) : 0;
   if (d && String(d.motivo ?? '').trim().length < 5) return error(400, 'El motivo del descuento debe tener entre 5 y 250 caracteres');
-  if (descCent > cent(c.total) - cent(c.adelanto)) return error(400, 'El descuento no puede bajar el total por debajo del adelanto');
+  if (descCent > cent(c.porCobrar) - cent(c.adelanto)) return error(400, 'El descuento no puede bajar el total por debajo del adelanto');
   const saldo = cent(c.saldo) - descCent;
-  const totalFinal = cent(c.total) - descCent;
+  const totalFinal = cent(c.porCobrar) - descCent;
   const pagos = (b.pagos as Array<{ metodoPagoId: number; monto: number; referencia?: string | null }>) ?? [];
   const noEf = pagos.filter((p) => !metodo(p.metodoPagoId)?.es_efectivo).reduce((s, p) => s + cent(p.monto), 0);
   const total = pagos.reduce((s, p) => s + cent(p.monto), 0);
@@ -327,7 +406,7 @@ function checkout(h: Hab, b: Record<string, unknown>) {
   const ahora = new Date();
   const lima = new Date(ahora.getTime() - 5 * 3_600_000).toISOString();
   let gravada = 0;
-  for (const l of c.lineas) gravada += Math.round(cent(l.total) / 1.18);
+  for (const l of c.pendientes) gravada += Math.round(cent(l.total) / 1.18);
   gravada -= Math.round(descCent / 1.18);
   const empresa = R<{ ruc: string; razon_social: string; nombre_comercial: string | null }>('/organizacion/empresa');
   const tipoDoc = cliente.documento.split(' ')[0];
@@ -335,7 +414,7 @@ function checkout(h: Hab, b: Record<string, unknown>) {
     id: id(), tipo, tipoDescripcion: tipo, numero, fecha: lima.slice(0, 10), hora: lima.slice(11, 19),
     emisor: { ruc: empresa.ruc, razonSocial: empresa.razon_social, nombreComercial: empresa.nombre_comercial, direccion: 'Av. Bolognesi 123, Tacna', sucursal: 'Hotel Centro' },
     cliente: { tipoDoc: { DNI: '1', RUC: '6', CE: '4', PAS: '7' }[tipoDoc] ?? '0', documento: cliente.documento.split(' ').slice(1).join(' '), nombre: cliente.nombre, direccion: null },
-    lineas: c.lineas.map((l, i) => ({ item: i + 1, descripcion: l.descripcion, cantidad: l.cantidad, precio: l.precioUnitario, total: l.total })),
+    lineas: c.pendientes.map((l, i) => ({ item: i + 1, descripcion: l.descripcion, cantidad: l.cantidad, precio: l.precioUnitario, total: l.total })),
     gravada: soles(gravada), igv: soles(totalFinal - gravada), descuento: soles(descCent), descuentoMotivo: d?.motivo ?? null, total: soles(totalFinal), letras: letras(soles(totalFinal)),
     pagos: [
       ...(cent(c.adelanto) > 0 ? [{ metodo: 'Adelanto', monto: c.adelanto, referencia: `Adelanto ${c.reserva!.codigo}` }] : []),
@@ -345,14 +424,16 @@ function checkout(h: Hab, b: Record<string, unknown>) {
   };
   db.comprobantes.unshift(comp);
   for (const p of registrados) movimientoCaja('VENTA', p.metodoPagoId, soles(p.monto), `${numero} · Hab. ${grupo.map((g) => g.numero).join(', ')}`, c.reserva?.codigo ?? null);
-  for (const g of grupo) {
-    g.estancia = null;
-    cambiarEstado(g, 'LIMPIEZA', `Check-out ${numero}`);
+  // Lo cobrado queda en cada estadía: turnos y cargos de este comprobante
+  for (const [i, g] of grupo.entries()) {
+    const e = g.estancia!;
+    const turnosPagados = c.pendientes.filter((l) => l.tipo === 'HOSPEDAJE' && l.estanciaId === String(e.id)).reduce((acc, l) => acc + l.cantidad, 0);
+    const cargos = c.pendientes.filter((l) => l.cargoId && l.estanciaId === String(e.id)).map((l) => Number(l.cargoId));
+    if (e.pagos.length === 0 && !cerrar) marcar('checkin');
+    e.pagos.push({ id: comp.id, numero, total: i === 0 ? soles(totalFinal) : '0.00', turnos: turnosPagados, cargos });
   }
-  const r = db.reservas.find((x) => x.id === c.reserva?.id);
-  if (r) r.estado = 'FINALIZADA';
-  marcar('checkout');
-  return { comprobanteId: comp.id, comprobante: numero, total: soles(totalFinal), descuento: soles(descCent), vuelto: soles(total - saldo) };
+  if (cerrar) cerrarGrupo(grupo, `Check-out ${numero}`);
+  return { cerrada: cerrar, comprobanteId: comp.id, comprobante: numero, total: soles(totalFinal), descuento: soles(descCent), vuelto: soles(total - saldo) };
 }
 
 // ── Vistas de tablero y plano ──────────────────────────────────
@@ -372,7 +453,12 @@ function tablero() {
         const t = tipoDe(h);
         return {
           id: h.id, numero: h.numero, tipo: t.nombre, tipoId: t.id, capacidad: t.adultos, estado: h.estado, estadoDescripcion: e.descripcion, color: e.color_hex,
-          siguientes: TRANSICIONES[h.estado],
+          siguientes: h.estancia ? [] : TRANSICIONES[h.estado].filter((x) => x !== 'OCUPADA'),
+          estadoDesde: h.estadoDesde,
+          limpieza: h.estado === 'LIMPIEZA' ? (() => {
+            const minutos = Math.max(0, Math.floor((Date.now() - Date.parse(h.estadoDesde)) / 60_000));
+            return { minutos, demorada: minutos > db.operacion.minutosLimpieza, esperados: db.operacion.minutosLimpieza };
+          })() : null,
           estancia: h.estancia ? { id: h.estancia.id, huesped: h.estancia.huespedes[0]?.nombre ?? null, checkin: h.estancia.checkin, salidaPrevista: h.estancia.salidaPrevista, alerta: alerta(h.estancia.salidaPrevista) } : null,
         };
       }),
@@ -464,6 +550,7 @@ function accionReserva(r: Reserva, accion: string, b: Record<string, unknown>): 
     r.estado = accion === 'cancelar' ? 'CANCELADA' : 'NO_SHOW';
     Object.assign(r, { motivoCancelacion: String(b.motivo), canceladaPor: db.usuario, canceladaEn: new Date().toISOString() });
     for (const h of habs) if (h.estado === 'RESERVADA' || h.estado === 'CONFIRMADA') cambiarEstado(h, 'DESOCUPADA', `Reserva ${r.codigo} ${accion === 'cancelar' ? 'cancelada' : 'no se presentó'}`);
+    if (accion === 'no-show') marcar('reserva');
   } else if (accion === 'checkin') {
     if (!abierta) return error(400, 'No se puede hacer check-in de esta reserva');
     if (hoy < fechaDe(r.entrada)) return error(400, `El check-in de esta reserva es desde el ${fechaDe(r.entrada)}`);
@@ -473,10 +560,12 @@ function accionReserva(r: Reserva, accion: string, b: Record<string, unknown>): 
     for (const [i, h] of habs.entries()) {
       const rh = r.habitaciones[i];
       const acomp = datos.find((d) => d.habitacionId === h.id)?.acompanantes ?? [];
+      // Con la operación configurada el tiempo corre desde que llegan
+      const salidaPrev = db.operacion.configurada ? salidaSegunOperacion(new Date(), rh.horasTurno, rh.cantidad).toISOString() : r.salida;
       h.estancia = {
-        id: id(), reservaId: r.id, checkin: new Date().toISOString(), salidaPrevista: r.salida, turno: rh.turno, horasTurno: rh.horasTurno, cantidad: rh.cantidad, precio: rh.precio,
+        id: id(), reservaId: r.id, checkin: new Date().toISOString(), salidaPrevista: salidaPrev, turno: rh.turno, horasTurno: rh.horasTurno, cantidad: rh.cantidad, precio: rh.precio,
         canal: r.canal.nombre, comision: canal?.comisionPorcentaje ?? '0.00', procedencia: (b.procedencia as string) || null,
-        destino: (b.destino as string) || null, motivoViaje: (b.motivoViaje as string) || null, cargos: [],
+        destino: (b.destino as string) || null, motivoViaje: (b.motivoViaje as string) || null, cargos: [], pagos: [],
         huespedes: [{ id: r.cliente.id, titular: true, nombre: r.cliente.nombre, documento: r.cliente.documento }, ...acomp.map((cid) => {
           const c = db.clientes.find((x) => x.id === cid)!;
           return { id: c.id, titular: false, nombre: c.nombre, documento: c.documento };
@@ -485,7 +574,7 @@ function accionReserva(r: Reserva, accion: string, b: Record<string, unknown>): 
       cambiarEstado(h, 'OCUPADA', `Check-in ${r.codigo}`);
     }
     r.estado = 'EN_CURSO';
-    marcar('checkin');
+    if (!db.operacion.cobroAlIngreso) marcar('checkin');
   }
   return r;
 }
@@ -521,6 +610,7 @@ export async function responder<T>(rutaCompleta: string, init: RequestInit): Pro
 
   if (metodoHttp === 'GET') {
     if (ruta === '/hospedaje/tablero') return salida(tablero());
+    if (ruta === '/hospedaje/operacion') return salida(db.operacion);
     if (ruta === '/hospedaje/plano') return salida(plano());
     if (ruta === '/hospedaje/amenidades') return salida(db.amenidades.map((a) => ({ ...a, habitaciones: db.habs.filter((h) => h.activo && h.amenidades.includes(a.codigo)).length })));
     if (ruta === '/reservas') {
@@ -626,19 +716,25 @@ export async function responder<T>(rutaCompleta: string, init: RequestInit): Pro
     const p = precio(h.tipoId, canal.id, turno.id) ?? error(404, 'No hay tarifa para este turno');
     const cantidad = Number(b.cantidad);
     const ahora = Date.now();
-    const salidaPrev = turno.duracion_horas === 24 ? rango(hoyLima(), cantidad, 24).salida : new Date(ahora + turno.duracion_horas * cantidad * 3_600_000).toISOString();
+    const salidaPrev = db.operacion.configurada
+      ? salidaSegunOperacion(new Date(ahora), turno.duracion_horas, cantidad).toISOString()
+      : turno.duracion_horas === 24 ? rango(hoyLima(), cantidad, 24).salida : new Date(ahora + turno.duracion_horas * cantidad * 3_600_000).toISOString();
     const ids = [Number(b.clienteId), ...((b.acompanantes as number[]) ?? [])];
+    // Un huésped no se aloja en dos habitaciones a la vez (como la API)
+    const alojado = db.habs.find((x) => x.estancia?.huespedes.some((g) => ids.includes(g.id)));
+    if (alojado) return error(409, `${alojado.estancia!.huespedes.find((g) => ids.includes(g.id))!.nombre} ya está alojado en la habitación ${alojado.numero}`);
     h.estancia = {
       id: id(), reservaId: null, checkin: new Date(ahora).toISOString(), salidaPrevista: salidaPrev, turno: turno.nombre, horasTurno: turno.duracion_horas, cantidad, precio: p,
       canal: canal.nombre, comision: canal.comisionPorcentaje, procedencia: (b.procedencia as string) || null,
-      destino: (b.destino as string) || null, motivoViaje: (b.motivoViaje as string) || null, cargos: [],
+      destino: (b.destino as string) || null, motivoViaje: (b.motivoViaje as string) || null, cargos: [], pagos: [],
       huespedes: ids.map((cid, i) => {
         const c = db.clientes.find((x) => x.id === cid)!;
         return { id: c.id, titular: i === 0, nombre: c.nombre, documento: c.documento };
       }),
     };
     cambiarEstado(h, 'OCUPADA', 'Check-in directo (sin reserva)');
-    marcar('checkin');
+    // Con pago adelantado el paso se completa al cobrar
+    if (!db.operacion.cobroAlIngreso) marcar('checkin');
     return salida(vistaEstancia(h));
   }
   const huesped = m(/^\/estancias\/(\d+)\/huespedes$/);
@@ -656,7 +752,6 @@ export async function responder<T>(rutaCompleta: string, init: RequestInit): Pro
     const precioU = prod ? Number(b.precio ?? prod.precio) : Number(b.precio);
     const cantidad = Number(b.cantidad);
     h.estancia!.cargos.push({ id: id(), descripcion: prod?.nombre ?? String(b.descripcion), cantidad, precio: precioU.toFixed(2), total: soles(Math.round(cantidad * precioU * 100)), fecha: new Date().toISOString() });
-    marcar('consumo');
     return salida(vistaEstancia(h));
   }
   const anular = m(/^\/estancias\/(\d+)\/cargos\/(\d+)$/);
@@ -672,10 +767,19 @@ export async function responder<T>(rutaCompleta: string, init: RequestInit): Pro
     if (!Number.isInteger(turnos) || turnos < 1 || turnos > 30) return error(400, 'La extensión debe ser de 1 a 30 turnos');
     const e = h.estancia!;
     const nueva = new Date(Date.parse(e.salidaPrevista) + e.horasTurno * turnos * 3_600_000).toISOString();
+    if (e.horasTurno !== 24) {
+      // Tampoco pasa la hora máxima de la franja en que entró (operación real)
+      const p = salidaPrevista(new Date(e.checkin), e.horasTurno, 1, db.operacion);
+      if (p.maxima && Date.parse(nueva) > p.maxima.getTime() + MARGEN_MINUTO_MS) {
+        const caben = Math.floor((p.maxima.getTime() + MARGEN_MINUTO_MS - Date.parse(e.salidaPrevista)) / (e.horasTurno * 3_600_000));
+        return error(400, `Entró en la franja «${p.franja}»: la salida máxima es a las ${horaConDia(p.maxima).replace(' de mañana', '')}. ${caben > 0 ? `Se puede extender hasta ${caben} ${caben === 1 ? 'turno' : 'turnos'}.` : 'Ya no se puede extender por horas.'}`);
+      }
+    }
     if (db.reservas.some((x) => x.id !== e.reservaId && abiertas(x) && x.habitaciones.some((y) => y.id === h.id) && cruza(x, { entrada: e.salidaPrevista, salida: nueva }))) {
       return error(409, `La habitación ${h.numero} ya está reservada en ese horario`);
     }
     Object.assign(e, { cantidad: e.cantidad + turnos, salidaPrevista: nueva });
+    marcar('extension');
     return salida(vistaEstancia(h));
   }
   const tras = m(/^\/estancias\/(\d+)\/traslado$/);
@@ -700,8 +804,15 @@ export async function responder<T>(rutaCompleta: string, init: RequestInit): Pro
     if (typeof b.pais === 'string') c.pais = b.pais;
     return salida(c);
   }
-  const co = m(/^\/estancias\/(\d+)\/checkout$/);
-  if (co) return salida(checkout(habDeEstancia(Number(co[1])), b));
+  const co = m(/^\/estancias\/(\d+)\/(checkout|cobro)$/);
+  if (co) return salida(cobrar(habDeEstancia(Number(co[1])), b, co[2] === 'checkout'));
+
+  if (ruta === '/hospedaje/operacion' && metodoHttp === 'PUT') {
+    const o = b as unknown as Operacion;
+    if (!Number.isInteger(o.minutosLimpieza) || o.minutosLimpieza < 5 || o.minutosLimpieza > 240) return error(400, 'El tiempo de limpieza debe ser de 5 a 240 minutos');
+    db.operacion = { ...o, configurada: true, franjas: [...o.franjas].sort((x, y) => x.desde.localeCompare(y.desde)) };
+    return salida(db.operacion);
+  }
 
   const pisoPlano = m(/^\/hospedaje\/plano\/pisos\/(\d+)$/);
   if (pisoPlano && metodoHttp === 'PUT') {
@@ -733,7 +844,7 @@ export async function responder<T>(rutaCompleta: string, init: RequestInit): Pro
     const masComun = [...conteo.entries()].sort((x, y) => y[1] - x[1])[0]?.[0];
     const numeros = d.habitaciones.map((r, i) => {
       const n = `${numero}${String(i + 1).padStart(2, '0')}`;
-      db.habs.push({ id: id(), pisoId: piso.id, numero: n, descripcion: null, tipoId: Number(b.tipoHabitacionId), estado: 'DESOCUPADA', ...r, amenidades: masComun ? masComun.split(',') : [], activo: true, estancia: null, historial: [] });
+      db.habs.push({ id: id(), pisoId: piso.id, numero: n, descripcion: null, tipoId: Number(b.tipoHabitacionId), estado: 'DESOCUPADA', ...r, amenidades: masComun ? masComun.split(',') : [], activo: true, estancia: null, estadoDesde: new Date().toISOString(), historial: [] });
       return n;
     });
     return salida({ ...piso, habitaciones: numeros });
@@ -741,7 +852,7 @@ export async function responder<T>(rutaCompleta: string, init: RequestInit): Pro
   if (ruta === '/hospedaje/habitaciones' && metodoHttp === 'POST') {
     if (db.habs.some((h) => h.numero === b.numero)) return error(409, `Ya existe la habitación ${b.numero} en esta sucursal`);
     const r = (b.plano as { x: number; y: number; ancho: number; alto: number }) ?? { x: 0, y: 0, ancho: 3, alto: 2 };
-    const h: Hab = { id: id(), pisoId: Number(b.pisoId), numero: String(b.numero), descripcion: null, tipoId: Number(b.tipoHabitacionId), estado: 'DESOCUPADA', ...r, amenidades: (b.amenidades as string[]) ?? [], activo: true, estancia: null, historial: [] };
+    const h: Hab = { id: id(), pisoId: Number(b.pisoId), numero: String(b.numero), descripcion: null, tipoId: Number(b.tipoHabitacionId), estado: 'DESOCUPADA', ...r, amenidades: (b.amenidades as string[]) ?? [], activo: true, estancia: null, estadoDesde: new Date().toISOString(), historial: [] };
     db.habs.push(h);
     return salida(h);
   }

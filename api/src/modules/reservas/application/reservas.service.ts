@@ -6,6 +6,8 @@ import { AuditoriaService } from '../../auditoria/application/auditoria.service'
 import { AvisosTablero } from '../../hospedaje/application/avisos-tablero.service';
 import { ConfiguracionService } from '../../hospedaje/application/configuracion.service';
 import { CajaService } from '../../caja/application/caja.service';
+import { OperacionService } from '../../hospedaje/application/operacion.service';
+import { Operacion, ReglaOperacionError, salidaNoche, salidaPorHoras } from '../../hospedaje/domain/operacion';
 import { sumarDias } from '../../hospedaje/domain/tarifa';
 import { validarTransicion, esEstado, TransicionInvalidaError } from '../../hospedaje/domain/estado-habitacion';
 import { bloquearHabitaciones, exigirNoAlojados, exigirSinCruces } from '../../hospedaje/application/cruces';
@@ -50,7 +52,7 @@ type Tx = Prisma.TransactionClient;
 
 /** El trigger de solape de la base responde SQLSTATE 45000: se traduce a 409 con su mismo mensaje. */
 function traducir(e: unknown): never {
-  if (e instanceof ReglaReservaError || e instanceof ReglaEstadiaError) throw new BadRequestException(e.message);
+  if (e instanceof ReglaReservaError || e instanceof ReglaEstadiaError || e instanceof ReglaOperacionError) throw new BadRequestException(e.message);
   if (e instanceof TransicionInvalidaError) throw new ConflictException(`La habitación no está lista: ${e.message}`);
   const texto = e instanceof Error ? e.message : '';
   const m = /(La habitación ya está reservada[^"'\n]*|La habitación está ocupada[^"'\n]*)/.exec(texto);
@@ -100,7 +102,23 @@ export class ReservasService {
     private readonly avisos: AvisosTablero,
     private readonly config: ConfiguracionService,
     private readonly caja: CajaService,
+    private readonly operacion: OperacionService,
   ) {}
+
+  /**
+   * Rango de la reserva con la operación de la sucursal: la noche sale a la hora de la noche (09:00) y por horas no
+   * pasa la hora máxima de la franja de llegada. Sin configuración, la regla de siempre (14:00 a 12:00).
+   */
+  private rango(horasTurno: number, llegada: string, hora: string | undefined, cantidad: number, op: Operacion): { entrada: Date; salida: Date } {
+    if (horasTurno === 24) {
+      if (!op.horaSalidaNoche) return rangoPorNoches(llegada, cantidad);
+      const entrada = rangoPorHoras(llegada, hora ?? '14:00', 1, 1).entrada;
+      return { entrada, salida: salidaNoche(entrada, op.horaSalidaNoche, cantidad) };
+    }
+    const r = rangoPorHoras(llegada, hora ?? '', horasTurno, cantidad);
+    salidaPorHoras(r.entrada, horasTurno, cantidad, op.franjas);
+    return r;
+  }
 
   /** Reservas que se cruzan con [desde, hasta] (fechas de Lima), para el calendario. */
   async listar(sucursalId: number, desde: string, hasta: string) {
@@ -127,9 +145,10 @@ export class ReservasService {
   async disponibilidad(sucursalId: number, q: { llegada: string; cantidad: number; turnoId: number; hora?: string }) {
     const turno = await this.prisma.turno.findUnique({ where: { id: q.turnoId } });
     if (!turno) throw new BadRequestException('Turno no válido');
+    const op = await this.operacion.obtener(sucursalId);
     let rango: { entrada: Date; salida: Date };
     try {
-      rango = turno.duracion_horas === 24 ? rangoPorNoches(q.llegada, q.cantidad) : rangoPorHoras(q.llegada, q.hora ?? '14:00', turno.duracion_horas, q.cantidad);
+      rango = this.rango(turno.duracion_horas, q.llegada, q.hora ?? '14:00', q.cantidad, op);
     } catch (e) {
       traducir(e);
     }
@@ -182,9 +201,10 @@ export class ReservasService {
     if (!cliente) throw new BadRequestException('El huésped no existe');
     if (!canal) throw new BadRequestException('Canal no válido');
 
+    const op = await this.operacion.obtener(c.sucursalId);
     let rango: { entrada: Date; salida: Date };
     try {
-      rango = turno.duracion_horas === 24 ? rangoPorNoches(d.llegada, d.cantidad) : rangoPorHoras(d.llegada, d.hora ?? '', turno.duracion_horas, d.cantidad);
+      rango = this.rango(turno.duracion_horas, d.llegada, d.hora, d.cantidad, op);
       if (rango.salida <= new Date()) throw new ReglaReservaError('Las fechas de la reserva ya pasaron');
       for (const p of pedidas) {
         const h = habs.find((x) => x.id === p.habitacionId)!;
@@ -314,6 +334,7 @@ export class ReservasService {
     });
     if (!r) throw new NotFoundException('La reserva no existe en tu sucursal');
     const ahora = new Date();
+    const op = await this.operacion.obtener(actor.sucursalId);
     // Huéspedes por habitación: el titular de la reserva va en la primera si no se indica otro (S-07 §3)
     const porHab = new Map<number, bigint[]>();
     for (const rh of r.reserva_habitacion) {
@@ -347,6 +368,22 @@ export class ReservasService {
     } catch (e) {
       traducir(e);
     }
+    // Con la operación configurada el tiempo corre desde que llegan (llegan cuando pueden; no todas se usan):
+    // la salida se calcula desde ahora con el turno reservado, igual que un walk-in.
+    const salidas = new Map<bigint, Date>();
+    if (op.configurada) {
+      const turnos = await this.prisma.turno.findMany({ where: { id: { in: r.reserva_habitacion.map((rh) => rh.turno_id) } } });
+      try {
+        for (const rh of r.reserva_habitacion) {
+          const horas = turnos.find((t) => t.id === rh.turno_id)!.duracion_horas;
+          const salida =
+            horas === 24 ? salidaNoche(ahora, op.horaSalidaNoche!, rh.cantidad_turnos) : salidaPorHoras(ahora, horas, rh.cantidad_turnos, op.franjas).salida;
+          salidas.set(rh.id, salida);
+        }
+      } catch (e) {
+        traducir(e);
+      }
+    }
 
     try {
       const res = await this.prisma.$transaction(async (tx) => {
@@ -354,10 +391,15 @@ export class ReservasService {
         await bloquearHabitaciones(tx, r.reserva_habitacion.map((rh) => rh.habitacion_id));
         await exigirNoAlojados(tx, todos.map(BigInt));
         for (const rh of r.reserva_habitacion) {
+          const salida = salidas.get(rh.id);
+          if (salida && salida.getTime() !== rh.fecha_salida.getTime()) {
+            await exigirSinCruces(tx, [rh.habitacion_id], ahora, salida, { reservaId: r.id }, ahora);
+            await tx.reserva_habitacion.update({ where: { id: rh.id }, data: { fecha_entrada: ahora < rh.fecha_entrada ? ahora : rh.fecha_entrada, fecha_salida: salida } });
+          }
           const e = await tx.estancia.create({
             data: {
               sucursal_id: actor.sucursalId, habitacion_id: rh.habitacion_id, reserva_habitacion_id: rh.id, canal_venta_id: r.canal_venta_id,
-              comision_porcentaje: r.comision_porcentaje, turno_id: rh.turno_id, checkin_at: ahora, checkout_previsto: rh.fecha_salida, cantidad_turnos: rh.cantidad_turnos,
+              comision_porcentaje: r.comision_porcentaje, turno_id: rh.turno_id, checkin_at: ahora, checkout_previsto: salida ?? rh.fecha_salida, cantidad_turnos: rh.cantidad_turnos,
               precio_unitario: rh.precio_unitario, procedencia: datos.procedencia?.trim() || null, placa_vehiculo: datos.placa?.trim().toUpperCase() || null,
               destino: libro.destino, motivo_viaje: libro.motivoViaje,
               usuario_checkin_id: actor.sub, estancia_huesped: { create: porHab.get(rh.habitacion_id)!.map((cid, i) => ({ cliente_id: cid, es_titular: i === 0 })) },
